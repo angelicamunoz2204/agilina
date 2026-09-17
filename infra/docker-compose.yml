@@ -1,0 +1,53 @@
+# Infraestructura local de Agilina: base de datos e identidad.
+#
+# Los tres desplegables de Python y la aplicación web NO corren aquí: se
+# ejecutan con `make api`, `make agent`, `make stt` y `make web` para tener
+# recarga automática. La contenerización de los servicios llega con el
+# despliegue en la nube (HU-38).
+name: agilina
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agilina-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USUARIO:-agilina}
+      POSTGRES_PASSWORD: ${POSTGRES_CLAVE:?falta POSTGRES_CLAVE en el .env; ejecuta make env}
+      POSTGRES_DB: ${POSTGRES_BD:-agilina}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "${POSTGRES_PUERTO:-5432}:5432"
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USUARIO:-agilina} -d ${POSTGRES_BD:-agilina}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: agilina-keycloak
+    restart: unless-stopped
+    # start-dev guarda en su propia base embebida: no depende de Postgres. El
+    # despliegue en la nube sí la usará (HU-38).
+    command: ["start-dev", "--import-realm"]
+    environment:
+      # Credenciales del administrador de Keycloak: salen del .env, nunca del repositorio.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_CLAVE:?falta KEYCLOAK_ADMIN_CLAVE en el .env; ejecuta make env}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+      - datos-keycloak:/opt/keycloak/data
+
+volumes:
+  datos-postgres:
+  datos-keycloak:
