@@ -1,0 +1,22 @@
+.encabezado {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--agl-borde);
+}
+
+.marca {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--agl-acento);
+}
+
+.lema {
+  color: var(--agl-texto-tenue);
+  font-size: 0.875rem;
+}
+
+.contenido {
+  padding: 1.5rem;
+}

@@ -1,0 +1,13 @@
+{
+  "app.lema": "Scrum Master virtual para la reunión diaria",
+  "estado.titulo": "Estado del entorno",
+  "estado.descripcion": "Esta pantalla existe para comprobar que la aplicación web habla con la API. Las pantallas del producto llegan con sus historias.",
+  "estado.api": "API",
+  "estado.consultando": "Consultando…",
+  "estado.disponible": "Disponible",
+  "estado.no_disponible": "No disponible",
+  "estado.version": "Versión",
+  "estado.entorno": "Entorno",
+  "estado.reintentar": "Reintentar",
+  "estado.ayuda_error": "Levanta la API con make api y vuelve a intentarlo."
+}

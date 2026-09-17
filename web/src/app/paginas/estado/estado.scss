@@ -1,0 +1,51 @@
+.tarjeta {
+  max-width: 34rem;
+  padding: 1.5rem;
+  border: 1px solid var(--agl-borde);
+  border-radius: 0.5rem;
+  background: var(--agl-superficie);
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.125rem;
+}
+
+.descripcion,
+.ayuda {
+  color: var(--agl-texto-tenue);
+  font-size: 0.875rem;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+dt {
+  color: var(--agl-texto-tenue);
+}
+
+dd {
+  margin: 0;
+}
+
+.disponible {
+  color: var(--agl-acento);
+}
+
+.no-disponible {
+  color: var(--agl-error);
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--agl-borde);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--agl-texto);
+  cursor: pointer;
+}

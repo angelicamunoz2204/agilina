@@ -1,0 +1,21 @@
+<section class="tarjeta">
+  <h1>{{ t('estado.titulo') }}</h1>
+  <p class="descripcion">{{ t('estado.descripcion') }}</p>
+
+  @if (estado(); as api) {
+    <dl>
+      <dt>{{ t('estado.api') }}</dt>
+      <dd class="disponible">{{ t('estado.disponible') }}</dd>
+      <dt>{{ t('estado.version') }}</dt>
+      <dd>{{ api.version }}</dd>
+      <dt>{{ t('estado.entorno') }}</dt>
+      <dd>{{ api.entorno }}</dd>
+    </dl>
+  } @else if (consultando()) {
+    <p>{{ t('estado.consultando') }}</p>
+  } @else if (error()) {
+    <p class="no-disponible">{{ t('estado.no_disponible') }}</p>
+    <p class="ayuda">{{ t('estado.ayuda_error') }}</p>
+    <button type="button" (click)="consultar()">{{ t('estado.reintentar') }}</button>
+  }
+</section>

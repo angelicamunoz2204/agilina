@@ -1,0 +1,13 @@
+{
+  "app.lema": "Virtual Scrum Master for the daily stand-up",
+  "estado.titulo": "Environment status",
+  "estado.descripcion": "This screen exists to check that the web application talks to the API. The product screens arrive with their own stories.",
+  "estado.api": "API",
+  "estado.consultando": "Checking…",
+  "estado.disponible": "Available",
+  "estado.no_disponible": "Unavailable",
+  "estado.version": "Version",
+  "estado.entorno": "Environment",
+  "estado.reintentar": "Retry",
+  "estado.ayuda_error": "Start the API with make api and try again."
+}

@@ -1,0 +1,3 @@
+# Específico de la aplicación web; lo general está en el .gitignore de la raíz.
+/out-tsc/
+/.angular/
