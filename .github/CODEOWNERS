@@ -1,0 +1,15 @@
+# Revisión cruzada: la revisión la hace siempre el otro desarrollador, nunca
+# el autor. Reemplaza USUARIO-DE-DIEGO por el usuario real de GitHub y activa
+# "Require review from Code Owners" en la protección de main.
+
+*                     @angelicamunoz2204 @USUARIO-DE-DIEGO
+
+# Dueño por área, para desempatar cuando la revisión no llega a acuerdo
+# (Avance 1, sección 7.4).
+/api/                 @angelicamunoz2204 @USUARIO-DE-DIEGO
+/agent/               @USUARIO-DE-DIEGO
+/stt/                 @angelicamunoz2204
+/web/                 @USUARIO-DE-DIEGO
+/infra/               @angelicamunoz2204
+/.github/             @angelicamunoz2204 @USUARIO-DE-DIEGO
+/docs/                @USUARIO-DE-DIEGO
