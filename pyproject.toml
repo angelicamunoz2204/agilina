@@ -1,0 +1,96 @@
+# ============================================================================
+# Raíz del workspace de Python de Agilina.
+# No es un paquete instalable: solo agrupa los cuatro miembros del workspace
+# y concentra la configuración de herramientas para que sea una sola.
+# ============================================================================
+[project]
+name = "agilina"
+version = "0.1.0"
+description = "Scrum Master virtual que facilita la reunión diaria por voz"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["shared", "api", "agent", "stt"]
+
+[tool.uv.sources]
+agilina-shared = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "ruff>=0.14,<0.15",  # la misma versión que fija .pre-commit-config.yaml
+    "httpx>=0.27",
+    "pre-commit>=3.8",
+]
+
+# ------------------------------------------------------------------ Ruff ----
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["shared/src", "api/src", "agent/src", "stt/src"]
+extend-exclude = ["api/migraciones/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "S",   # bandit: credenciales y llamadas inseguras
+    "ASYNC",
+]
+ignore = [
+    "S101",  # assert: es el mecanismo normal de pytest
+    "N999",  # nombres de módulo en español
+    "N818",  # sufijo Error en excepciones: los nombres del dominio van en español
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Declarar dependencias en el valor por defecto es el patrón de FastAPI, no un
+# descuido: sin esto, B008 marca cada Form, Depends o Query del proyecto.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agilina_agent", "agilina_api", "agilina_shared", "agilina_stt"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*" = ["S105", "S106"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------- pytest ----
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["shared/tests", "api/tests", "agent/tests", "stt/tests"]
+pythonpath = ["shared/src", "api/src", "agent/src", "stt/src"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+
+# -------------------------------------------------------------- coverage ----
+[tool.coverage.run]
+branch = true
+source = ["shared/src", "api/src", "agent/src", "stt/src"]
+omit = ["*/tests/*", "api/migraciones/*"]
+
+[tool.coverage.report]
+skip_empty = true
+exclude_lines = ["pragma: sin cobertura", "if TYPE_CHECKING:", "raise NotImplementedError"]
