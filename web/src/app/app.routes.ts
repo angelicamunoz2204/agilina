@@ -1,14 +1,15 @@
 import { Routes } from '@angular/router';
 
 /**
- * Mapa de pantallas del producto. Cada ruta llega con la historia que la
- * construye; por ahora solo existe la de estado del entorno, que es lo que
- * demuestra que la aplicación habla con la API.
+ * Screen map of the product. Each route arrives with the story that builds it;
+ * for now only the environment status one exists, which is what shows that the
+ * application talks to the API.
  */
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./paginas/estado/estado').then((m) => m.Estado),
+    loadComponent: () =>
+      import('./features/status/presentation/status-page').then((m) => m.StatusPage),
     title: 'Agilina',
   },
   { path: '**', redirectTo: '' },

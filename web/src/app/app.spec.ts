@@ -14,16 +14,16 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  it('se crea', () => {
+  it('is created', () => {
     const fixture = TestBed.createComponent(App);
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('muestra la marca del producto', () => {
+  it('shows the product brand', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    const elemento = fixture.nativeElement as HTMLElement;
-    expect(elemento.querySelector('.marca')?.textContent).toContain('Agilina');
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.brand')?.textContent).toContain('Agilina');
   });
 });

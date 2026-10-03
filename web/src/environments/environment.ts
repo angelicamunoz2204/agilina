@@ -1,13 +1,13 @@
 /**
- * Configuración de producción.
+ * Production settings.
  *
- * En la nube la aplicación se sirve detrás del mismo dominio que la API, de
- * modo que las rutas relativas evitan tener que recompilar por entorno. Eso
- * supone un proxy inverso que enrute `/api` hacia la API y `/auth` hacia
- * Keycloak, recortando el prefijo; se configura con el despliegue (HU-38).
+ * In the cloud the application is served behind the same domain as the API, so
+ * relative paths avoid recompiling per environment. That assumes a reverse
+ * proxy routing `/api` to the API and `/auth` to Keycloak, stripping the
+ * prefix; it is configured with the deployment (HU-38).
  */
 export const environment = {
-  produccion: true,
+  production: true,
   apiUrl: '/api',
   keycloak: {
     url: '/auth',

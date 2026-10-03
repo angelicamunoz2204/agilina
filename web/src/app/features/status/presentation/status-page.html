@@ -1,0 +1,21 @@
+<section class="card">
+  <h1>{{ t('status.title') }}</h1>
+  <p class="description">{{ t('status.description') }}</p>
+
+  @if (status(); as api) {
+    <dl>
+      <dt>{{ t('status.api') }}</dt>
+      <dd class="available">{{ t('status.available') }}</dd>
+      <dt>{{ t('status.version') }}</dt>
+      <dd>{{ api.version }}</dd>
+      <dt>{{ t('status.environment') }}</dt>
+      <dd>{{ api.environment }}</dd>
+    </dl>
+  } @else if (checking()) {
+    <p>{{ t('status.checking') }}</p>
+  } @else if (failed()) {
+    <p class="unavailable">{{ t('status.unavailable') }}</p>
+    <p class="hint">{{ t('status.error_hint') }}</p>
+    <button type="button" (click)="refresh()">{{ t('status.retry') }}</button>
+  }
+</section>
