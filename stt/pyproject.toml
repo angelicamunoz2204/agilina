@@ -1,7 +1,7 @@
 [project]
 name = "agilina-stt"
 version = "0.1.0"
-description = "Servicio de transcripción con faster-whisper sobre GPU"
+description = "Transcription service with faster-whisper on GPU"
 requires-python = ">=3.12"
 dependencies = [
     "agilina-shared",
