@@ -89,8 +89,8 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | Contexto | Responsabilidad | Estado |
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
-| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Planeado (HU-02, 03, 04) |
-| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Planeado (HU-05, 06, 07…) |
+| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Estructura creada, sin código (HU-02, 03, 04) |
+| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Estructura creada, sin código (HU-02 lo usa; HU-05, 06, 07…) |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
 
@@ -112,16 +112,19 @@ api/
 │   └── versions/
 ├── src/agilina_api/
 │   ├── bootstrap/app.py              Raíz de composición: fábrica de la app, lifespan, cableado
+│   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
-│   │   ├── application/health.py     Consultas de salud y el puerto DatabaseProbe
-│   │   ├── infrastructure/           settings, logging, base de datos, planificador, sonda SQL
+│   │   ├── application/              Consultas de salud y los puertos Clock y UnitOfWork
+│   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL
 │   │   └── presentation/http/        Router de salud y dependencias declaradas
+│   ├── identity/                     Contexto (HU-02): las cuatro capas, aún sin código
+│   ├── teams/                        Contexto (HU-02 lo necesita, HU-05 en adelante lo construye): las cuatro capas, aún sin código
 │   └── ceremonies/
 │       └── presentation/http/        Router del contrato del agente
 └── tests/
 ```
 
-Un contexto nuevo (por ejemplo `identity`) crea solo las capas que necesita:
+La forma que tendrá cada contexto con dominio (por ejemplo `identity`):
 
 ```
 identity/
@@ -215,7 +218,7 @@ Se ejecutan con `make verify`, en la CI y (mypy e import-linter) antes de cada
 
 | Herramienta | Qué hace cumplir |
 | --- | --- |
-| `import-linter` (`make arch`) | Capas de la API, del worker y de la transcripción; la raíz de composición va encima de todo; el contrato compartido no depende de ningún desplegable; el dominio del worker no conoce LiveKit ni `httpx` |
+| `import-linter` (`make arch`) | Capas de la API, del worker y de la transcripción; la raíz de composición va encima de todo; los contextos de la API no se importan entre sí y `shared` y `shared_kernel` quedan debajo; el dominio de la API (y `shared_kernel`) no conoce FastAPI, SQLAlchemy, Pydantic ni `httpx`; el dominio del worker no conoce LiveKit ni `httpx`; el contrato compartido no depende de ningún desplegable |
 | ESLint (`make lint`) | En la web, `presentation` no importa `infrastructure` y `domain` no conoce Angular ni rxjs |
 | `mypy --strict` (`make typecheck`) | Tipado estricto en los cuatro paquetes de Python |
 | `ruff` | Formato y reglas de estilo y seguridad |
@@ -247,13 +250,15 @@ en el code review.
 **Un contexto nuevo**
 
 1. Crea el paquete bajo `agilina_api/` con solo las capas que necesite.
-2. Agrégalo a los `containers` y a las `layers` del contrato de import-linter en
-   el `pyproject.toml`.
+2. Agrégalo a los `containers` y a la lista de contextos hermanos (`a | b | c`) de
+   los contratos de import-linter en el `pyproject.toml`, y su paquete `domain` al
+   contrato de "el dominio no conoce frameworks".
 3. Importa sus modelos ORM en `api/migrations/env.py` para que Alembic los vea.
 4. Registra su router en `bootstrap/app.py`.
 
-## Decisiones pendientes de registrar
+## Dónde está el porqué
 
-Estas reglas se aplican desde la historia HU-02. Su ADR (`docs/adr/0020`) y la
-guía de convenciones de código están por escribirse; hasta entonces, este
-documento y la configuración de `pyproject.toml` son la referencia.
+- La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
+- Cómo nace el primer Administrador sin registro público: [AD-22](adr/0022-emitir-por-cli-la-invitacion-del-primer-administrador.md).
+- Cómo se escribe el código dentro de esta estructura: [code-conventions.md](code-conventions.md).
+- El vocabulario del dominio: [glossary.md](glossary.md).
