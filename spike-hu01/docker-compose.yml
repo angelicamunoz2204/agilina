@@ -11,3 +11,12 @@ services:
     env_file: .env
     volumes:
       - ./agent:/app
+  whisper:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
+
+volumes:
+  hf-hub-cache:
