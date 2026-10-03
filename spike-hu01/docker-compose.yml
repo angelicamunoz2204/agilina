@@ -6,3 +6,8 @@ services:
     volumes:
       - ./client:/app
       - /app/node_modules
+  agent:
+    build: ./agent
+    env_file: .env
+    volumes:
+      - ./agent:/app

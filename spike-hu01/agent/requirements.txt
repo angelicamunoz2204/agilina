@@ -1,0 +1,2 @@
+livekit-agents==1.8.4
+livekit-plugins-elevenlabs==1.8.4
