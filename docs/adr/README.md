@@ -1,12 +1,12 @@
 # Decisiones arquitectónicas
 
-Las decisiones AD-01 a AD-19 están en el documento de
+Las decisiones AD-01 a AD-20 están en el documento de
 arquitectura del Sprint 0. De aquí en adelante, cada decisión que cambie la
 forma del sistema se registra como un archivo en esta carpeta, numerado y
 enlazado desde el pull request que la aplica.
 
 ```
-docs/adr/0020-titulo-corto.md
+docs/adr/0021-titulo-corto.md
 ```
 
 Una decisión entra aquí cuando cumple al menos una de estas condiciones:
