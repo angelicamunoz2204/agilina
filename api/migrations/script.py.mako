@@ -1,8 +1,8 @@
 """${message}
 
-ID de revisión: ${up_revision}
-Revisión anterior: ${down_revision | comma,n}
-Fecha: ${create_date}
+Revision ID: ${up_revision}
+Previous revision: ${down_revision | comma,n}
+Date: ${create_date}
 """
 
 from collections.abc import Sequence

@@ -1,0 +1,89 @@
+"""API entry point and composition root.
+
+Run: ``make api`` · Interactive documentation: http://localhost:8000/docs
+"""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from agilina_api import __version__
+from agilina_api.ceremonies.presentation.http import router as ceremonies_router
+from agilina_api.shared.application.health import GetLiveness, GetReadiness
+from agilina_api.shared.infrastructure.database_probe import SqlDatabaseProbe
+from agilina_api.shared.infrastructure.logging_setup import configure_logging, get_logger
+from agilina_api.shared.infrastructure.scheduler import create_scheduler
+from agilina_api.shared.infrastructure.settings import get_settings
+from agilina_api.shared.presentation.http import health_router
+from agilina_api.shared.presentation.http.dependencies import (
+    get_liveness_query,
+    get_readiness_query,
+)
+
+logger = get_logger(__name__)
+
+DESCRIPTION = """
+Source of truth of the Agilina domain.
+
+This specification is the contract with the web application and with the agent
+worker: it is generated from the types, so it cannot drift from the code.
+"""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start the scheduler with the application and stop it with it.
+
+    If the database is unavailable, the API stays up without a scheduler and
+    logs it: a deferred job must not bring the API down.
+    """
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    logger.info("Starting agilina-api %s in environment %s", __version__, settings.environment)
+
+    scheduler = None
+    try:
+        scheduler = create_scheduler(settings)
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler started")
+    except Exception as error:  # running without a scheduler is degradation, not a crash
+        app.state.scheduler = None
+        logger.warning("The scheduler could not start: %s", error)
+
+    yield
+
+    if scheduler is not None and scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(
+        title="Agilina API",
+        version=__version__,
+        description=DESCRIPTION,
+        lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(health_router.router)
+    app.include_router(ceremonies_router.router)
+
+    # Wiring: presentation declares what it needs, this is where it is provided.
+    liveness = GetLiveness(__version__, settings.environment)
+    readiness = GetReadiness(SqlDatabaseProbe(), __version__, settings.environment)
+    app.dependency_overrides[get_liveness_query] = lambda: liveness
+    app.dependency_overrides[get_readiness_query] = lambda: readiness
+    return app
+
+
+app = create_app()
