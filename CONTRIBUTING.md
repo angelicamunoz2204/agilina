@@ -122,6 +122,11 @@ Una historia está terminada cuando:
 
 ## Convenciones de código
 
+La guía completa está en [docs/code-conventions.md](docs/code-conventions.md), la
+estructura de carpetas y capas en
+[docs/estructura-del-proyecto.md](docs/estructura-del-proyecto.md) y el
+vocabulario del dominio en [docs/glossary.md](docs/glossary.md). Lo esencial:
+
 - **Idioma.** El código va en inglés: identificadores, comentarios, variables de
   entorno y objetivos de `make`. Commits, pull requests y documentación van en
   español. Los textos de usuario van en español e inglés mediante i18n.

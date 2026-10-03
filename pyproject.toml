@@ -121,16 +121,34 @@ name = "API: layers of each context"
 type = "layers"
 # Parentheses mark optional layers: a context only creates the ones it needs.
 layers = ["(presentation) | (infrastructure)", "(application)", "(domain)"]
-containers = ["agilina_api.shared", "agilina_api.ceremonies"]
+containers = [
+    "agilina_api.shared",
+    "agilina_api.ceremonies",
+    "agilina_api.identity",
+    "agilina_api.teams",
+]
 
 [[tool.importlinter.contracts]]
-name = "API: the composition root is on top of everything"
+name = "API: bootstrap on top, contexts independent of each other, shared and the kernel below"
 type = "layers"
-layers = ["agilina_api.bootstrap", "agilina_api.ceremonies", "agilina_api.shared"]
+# "a | b" means siblings: a context cannot import another one (AD-21).
+layers = [
+    "agilina_api.bootstrap",
+    "agilina_api.ceremonies | agilina_api.identity | agilina_api.teams",
+    "agilina_api.shared",
+    "agilina_api.shared_kernel",
+]
 
-# The "API: the domain does not know frameworks" contract is added together with
-# the first domain package (identity.domain, HU-02): import-linter requires the
-# modules it names to exist.
+[[tool.importlinter.contracts]]
+name = "API: the domain does not know frameworks"
+type = "forbidden"
+source_modules = [
+    "agilina_api.shared_kernel",
+    "agilina_api.identity.domain",
+    "agilina_api.teams.domain",
+]
+forbidden_modules = ["fastapi", "sqlalchemy", "pydantic", "httpx", "apscheduler"]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Agent: layers"
