@@ -32,7 +32,7 @@ Este apartado no es opcional: sin él, revisar obliga a adivinar.
 
 - [ ] Los criterios de aceptación de la historia están cubiertos.
 - [ ] La lógica nueva tiene pruebas automatizadas.
-- [ ] `make verificar` pasa en local.
+- [ ] `make verify` pasa en local.
 - [ ] Ninguna credencial quedó en el código ni en la configuración versionada.
 - [ ] Los textos dirigidos al usuario existen en español y en inglés.
 - [ ] La documentación técnica quedó actualizada si cambió la arquitectura o un contrato.

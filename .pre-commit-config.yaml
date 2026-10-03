@@ -1,5 +1,5 @@
-# Verificación local antes de cada commit: `make ganchos` los instala una vez.
-# Es el mismo análisis estático que corre el pipeline, ejecutado en tu máquina.
+# Local verification before each commit: `make hooks` installs them once.
+# It is the same static analysis the pipeline runs, on your machine.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -26,3 +26,21 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args: [feat, fix, refactor, test, docs, chore, perf, build, ci]
+
+  # Slower checks run before pushing, not on every commit.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict typing)
+        entry: uv run mypy shared/src api/src agent/src stt/src
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-push]
+      - id: import-linter
+        name: import-linter (architecture rules)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-push]

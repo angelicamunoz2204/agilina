@@ -2,8 +2,8 @@
 # Valida que los commits de un pull request sigan la convención acordada en el
 # Sprint 0: Conventional Commits con ámbito y referencia a la historia.
 #
-#   uso: validar-commits.sh <sha-base> <sha-cabeza>
-#   local: ./.github/scripts/validar-commits.sh origin/main HEAD
+#   uso: validate-commits.sh <sha-base> <sha-cabeza>
+#   local: ./.github/scripts/validate-commits.sh origin/main HEAD
 set -uo pipefail
 
 BASE="${1:-origin/main}"

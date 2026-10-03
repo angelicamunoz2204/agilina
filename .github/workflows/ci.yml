@@ -33,7 +33,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           CABEZA: ${{ github.event.pull_request.head.sha }}
-        run: ./.github/scripts/validar-commits.sh "$BASE" "$CABEZA"
+        run: ./.github/scripts/validate-commits.sh "$BASE" "$CABEZA"
 
   python:
     name: API, worker y transcripción
@@ -55,6 +55,12 @@ jobs:
 
       - name: Análisis estático
         run: uv run ruff check --output-format=github .
+
+      - name: Tipado estricto
+        run: uv run mypy shared/src api/src agent/src stt/src
+
+      - name: Reglas de arquitectura
+        run: uv run lint-imports
 
       - name: Pruebas con cobertura
         run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
