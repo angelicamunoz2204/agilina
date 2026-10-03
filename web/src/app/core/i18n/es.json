@@ -1,0 +1,13 @@
+{
+  "app.tagline": "Scrum Master virtual para la reunión diaria",
+  "status.title": "Estado del entorno",
+  "status.description": "Esta pantalla existe para comprobar que la aplicación web habla con la API. Las pantallas del producto llegan con sus historias.",
+  "status.api": "API",
+  "status.checking": "Consultando…",
+  "status.available": "Disponible",
+  "status.unavailable": "No disponible",
+  "status.version": "Versión",
+  "status.environment": "Entorno",
+  "status.retry": "Reintentar",
+  "status.error_hint": "Levanta la API con make api y vuelve a intentarlo."
+}

@@ -1,5 +1,5 @@
-// Análisis estático de la aplicación web.
-// El code review no revisa formato ni estilo: de eso se encarga esto.
+// Static analysis of the web application.
+// Code review does not check format or style: this does.
 const eslint = require("@eslint/js");
 const tseslint = require("typescript-eslint");
 const angular = require("angular-eslint");
@@ -21,6 +21,27 @@ module.exports = tseslint.config(
       "@angular-eslint/component-selector": [
         "error",
         { type: "element", prefix: "agl", style: "kebab-case" },
+      ],
+    },
+  },
+  {
+    // Layer rules (docs/adr/0020): presentation never imports infrastructure and
+    // the domain knows no framework. The adapters are bound in app.config.ts.
+    files: ["src/app/features/*/presentation/**/*.ts"],
+    ignores: ["**/*.spec.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ group: ["**/infrastructure/**"], message: "Presentation must not import infrastructure; go through the application layer." }] },
+      ],
+    },
+  },
+  {
+    files: ["src/app/features/*/domain/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ group: ["@angular/*", "rxjs", "rxjs/*", "**/application/**", "**/infrastructure/**", "**/presentation/**"], message: "The domain is pure: no framework and no outer layers." }] },
       ],
     },
   },

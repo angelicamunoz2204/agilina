@@ -1,82 +1,44 @@
-"""Punto de entrada del servicio de transcripción.
+"""Transcription service entry point and composition root.
 
-    make stt   → http://localhost:8001/docs
-
-Solo lo consume el worker, por la red privada de la instancia: este servicio
-nunca se expone a internet.
+make stt   → http://localhost:8001/docs
 """
 
-import time
+from functools import lru_cache
 
-from fastapi import APIRouter, FastAPI, Form, UploadFile
-from pydantic import BaseModel
+from fastapi import FastAPI
 
-from agilina_shared.enums import Idioma
 from agilina_stt import __version__
-from agilina_stt.config import obtener_configuracion
-from agilina_stt.modelo import obtener_transcriptor
-
-router = APIRouter()
-
-
-class EstadoServicio(BaseModel):
-    servicio: str = "agilina-stt"
-    version: str
-    estado: str
-    modo: str
-    modelo: str
-    dispositivo: str
+from agilina_stt.application.ports import ServiceInfo, Transcriber
+from agilina_stt.infrastructure.settings import get_settings
+from agilina_stt.infrastructure.transcribers import build_transcriber
+from agilina_stt.presentation.http.dependencies import get_service_info, get_transcriber
+from agilina_stt.presentation.http.router import router
 
 
-class RespuestaTranscripcion(BaseModel):
-    texto: str
-    idioma: Idioma
-    simulada: bool
-    duracion_ms: int
-
-
-@router.get("/salud", response_model=EstadoServicio, tags=["salud"], summary="Sonda de estado")
-async def salud() -> EstadoServicio:
-    configuracion = obtener_configuracion()
-    return EstadoServicio(
-        version=__version__,
-        estado="vivo",
-        modo="simulado" if configuracion.simulado else "modelo",
-        modelo=configuracion.modelo,
-        dispositivo=configuracion.dispositivo,
-    )
-
-
-@router.post(
-    "/v1/transcribir",
-    response_model=RespuestaTranscripcion,
-    tags=["transcripcion"],
-    summary="Transcribe un segmento de audio",
-)
-async def transcribir(
-    audio: UploadFile, idioma: Idioma = Form(default=Idioma.ES)
-) -> RespuestaTranscripcion:
-    contenido = await audio.read()
-    inicio = time.perf_counter()
-    resultado = obtener_transcriptor().transcribir(contenido, idioma)
-    duracion_ms = int((time.perf_counter() - inicio) * 1000)
-
-    return RespuestaTranscripcion(
-        texto=resultado.texto,
-        idioma=resultado.idioma,
-        simulada=resultado.simulada,
-        duracion_ms=duracion_ms,
-    )
-
-
-def crear_aplicacion() -> FastAPI:
+def create_app() -> FastAPI:
+    settings = get_settings()
     app = FastAPI(
         title="Agilina STT",
         version=__version__,
-        description="Transcripción de segmentos de audio. Uso interno del worker.",
+        description="Audio segment transcription. Internal use of the worker.",
     )
     app.include_router(router)
+
+    info = ServiceInfo(
+        version=__version__,
+        mode="simulated" if settings.simulated else "model",
+        model=settings.model,
+        device=settings.device,
+    )
+
+    @lru_cache(maxsize=1)
+    def transcriber() -> Transcriber:
+        # Lazy: the model is only loaded on the first request that needs it.
+        return build_transcriber(settings)
+
+    app.dependency_overrides[get_transcriber] = transcriber
+    app.dependency_overrides[get_service_info] = lambda: info
     return app
 
 
-app = crear_aplicacion()
+app = create_app()

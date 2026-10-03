@@ -1,10 +1,10 @@
-"""Worker del agente de Agilina.
+"""Agilina agent worker.
 
-Proceso de larga vida sin interfaz ni puerto de entrada: al arrancar abre una
-conexión de salida hacia LiveKit y se registra como trabajador disponible.
-Cuando se crea la sala de una ceremonia, LiveKit ofrece el trabajo por esa
-conexión ya abierta y el worker lanza un subproceso dedicado a esa sala. Nunca
-necesita ser accesible desde internet.
+Long-lived process with no interface or inbound port: on start it opens an
+outbound connection to LiveKit and registers as an available worker. When a
+ceremony room is created, LiveKit offers the job over that already-open
+connection and the worker launches a subprocess dedicated to that room. It
+never needs to be reachable from the internet.
 """
 
 __version__ = "0.1.0"

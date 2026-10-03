@@ -1,7 +1,7 @@
 [project]
 name = "agilina-shared"
 version = "0.1.0"
-description = "Modelos de dominio y contrato compartidos entre la API y el worker"
+description = "Domain models and contract shared between the API and the worker"
 requires-python = ">=3.12"
 dependencies = ["pydantic>=2.8"]
 

@@ -1,12 +1,12 @@
 # ============================================================================
-# Raíz del workspace de Python de Agilina.
-# No es un paquete instalable: solo agrupa los cuatro miembros del workspace
-# y concentra la configuración de herramientas para que sea una sola.
+# Root of the Agilina Python workspace.
+# Not an installable package: it only groups the four workspace members and
+# concentrates the tool configuration so there is a single one.
 # ============================================================================
 [project]
 name = "agilina"
 version = "0.1.0"
-description = "Scrum Master virtual que facilita la reunión diaria por voz"
+description = "Virtual Scrum Master that facilitates the daily stand-up by voice"
 requires-python = ">=3.12"
 dependencies = []
 
@@ -24,7 +24,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=5.0",
-    "ruff>=0.14,<0.15",  # la misma versión que fija .pre-commit-config.yaml
+    "ruff>=0.14,<0.15",  # same version pinned by .pre-commit-config.yaml
+    "mypy>=1.13",
+    "import-linter>=2.1",
     "httpx>=0.27",
     "pre-commit>=3.8",
 ]
@@ -34,7 +36,7 @@ dev = [
 line-length = 100
 target-version = "py312"
 src = ["shared/src", "api/src", "agent/src", "stt/src"]
-extend-exclude = ["api/migraciones/versions"]
+extend-exclude = ["api/migrations/versions"]
 
 [tool.ruff.lint]
 select = [
@@ -44,18 +46,16 @@ select = [
     "B",   # bugbear
     "UP",  # pyupgrade
     "N",   # pep8-naming
-    "S",   # bandit: credenciales y llamadas inseguras
+    "S",   # bandit: credentials and unsafe calls
     "ASYNC",
 ]
 ignore = [
-    "S101",  # assert: es el mecanismo normal de pytest
-    "N999",  # nombres de módulo en español
-    "N818",  # sufijo Error en excepciones: los nombres del dominio van en español
+    "S101",  # assert: it is the normal pytest mechanism
 ]
 
 [tool.ruff.lint.flake8-bugbear]
-# Declarar dependencias en el valor por defecto es el patrón de FastAPI, no un
-# descuido: sin esto, B008 marca cada Form, Depends o Query del proyecto.
+# Declaring dependencies in the default value is the FastAPI pattern, not an
+# oversight: without this, B008 flags every Form, Depends or Query of the project.
 extend-immutable-calls = [
     "fastapi.Body",
     "fastapi.Cookie",
@@ -89,8 +89,72 @@ addopts = "-q --strict-markers"
 [tool.coverage.run]
 branch = true
 source = ["shared/src", "api/src", "agent/src", "stt/src"]
-omit = ["*/tests/*", "api/migraciones/*"]
+omit = ["*/tests/*", "api/migrations/*"]
 
 [tool.coverage.report]
 skip_empty = true
-exclude_lines = ["pragma: sin cobertura", "if TYPE_CHECKING:", "raise NotImplementedError"]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+# ------------------------------------------------------------------ mypy ----
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["shared/src", "api/src", "agent/src", "stt/src"]
+explicit_package_bases = true
+namespace_packages = true
+exclude = ["/tests/", "/migrations/"]
+
+[[tool.mypy.overrides]]
+# Third-party libraries without type information.
+module = ["livekit.*", "apscheduler.*", "faster_whisper.*"]
+ignore_missing_imports = true
+
+# --------------------------------------------------------- import-linter ----
+# Architecture rules (docs/adr/0020): dependencies point inward and bounded
+# contexts do not reach into each other.
+[tool.importlinter]
+root_packages = ["agilina_api", "agilina_agent", "agilina_stt", "agilina_shared"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "API: layers of each context"
+type = "layers"
+# Parentheses mark optional layers: a context only creates the ones it needs.
+layers = ["(presentation) | (infrastructure)", "(application)", "(domain)"]
+containers = ["agilina_api.shared", "agilina_api.ceremonies"]
+
+[[tool.importlinter.contracts]]
+name = "API: the composition root is on top of everything"
+type = "layers"
+layers = ["agilina_api.bootstrap", "agilina_api.ceremonies", "agilina_api.shared"]
+
+# The "API: the domain does not know frameworks" contract is added together with
+# the first domain package (identity.domain, HU-02): import-linter requires the
+# modules it names to exist.
+
+[[tool.importlinter.contracts]]
+name = "Agent: layers"
+type = "layers"
+layers = ["main", "presentation | infrastructure", "application", "domain"]
+containers = ["agilina_agent"]
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Agent: the domain does not know frameworks"
+type = "forbidden"
+source_modules = ["agilina_agent.domain"]
+forbidden_modules = ["livekit", "httpx", "fastapi", "sqlalchemy"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "STT: layers"
+type = "layers"
+layers = ["main", "presentation | infrastructure", "application", "domain"]
+containers = ["agilina_stt"]
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Shared contract does not depend on any deployable"
+type = "forbidden"
+source_modules = ["agilina_shared"]
+forbidden_modules = ["agilina_api", "agilina_agent", "agilina_stt"]

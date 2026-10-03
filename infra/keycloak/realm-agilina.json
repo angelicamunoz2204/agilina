@@ -15,14 +15,14 @@
     "realm": [
       {
         "name": "worker",
-        "description": "Cuenta de servicio del worker del agente. Los roles de equipo (administrador y miembro) no viven aquí: son de la base de datos de Agilina, porque una persona puede ser miembro en un equipo y administrador en otro."
+        "description": "Service account of the agent worker. Team roles (admin and member) do not live here: they are in the Agilina database, because a person can be a member in one team and an admin in another."
       }
     ]
   },
   "clients": [
     {
       "clientId": "agilina-web",
-      "name": "Aplicación web de Agilina",
+      "name": "Agilina web application",
       "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
@@ -42,7 +42,7 @@
     {
       "clientId": "agilina-worker",
       "name": "Worker del agente",
-      "description": "Cuenta de servicio con la que el worker se autentica contra la API. El secreto lo genera Keycloak al importar el realm y se copia al .env: no vive en el repositorio.",
+      "description": "Service account the worker authenticates against the API with. Keycloak generates the secret when importing the realm and it is copied to .env: it does not live in the repository.",
       "enabled": true,
       "publicClient": false,
       "protocol": "openid-connect",

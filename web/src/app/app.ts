@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
-import { I18nService } from './i18n/i18n.service';
+import { I18nService } from './core/i18n/i18n.service';
 
 @Component({
   selector: 'agl-root',
@@ -13,6 +13,6 @@ import { I18nService } from './i18n/i18n.service';
 export class App {
   private readonly i18n = inject(I18nService);
 
-  protected readonly titulo = 'Agilina';
+  protected readonly title = 'Agilina';
   protected readonly t = this.i18n.t.bind(this.i18n);
 }

@@ -1,47 +1,48 @@
-"""Enumeraciones del dominio.
+"""Domain enumerations.
 
-Los valores son los que viajan por la API y se guardan en base de datos; las
-etiquetas visibles al usuario se resuelven en la capa de presentación, que es
-donde vive la regla de que el Administrador se muestra como Scrum Master
-cuando el equipo está en modo soporte.
+The values are the ones that travel through the API and are stored in the
+database (they match the PostgreSQL enum types); the labels shown to the user
+are resolved in the presentation layer, which is where the rule that the
+Admin is displayed as Scrum Master when the team is in support mode lives.
 """
 
 from enum import StrEnum
 
 
-class ModoOperacion(StrEnum):
-    """Lo único que cambia entre los dos modos es si Agilina pide aprobación
-    antes de ejecutar una acción."""
+class OperationMode(StrEnum):
+    """The only difference between the two modes is whether Agilina asks for
+    approval before executing an action."""
 
-    SOPORTE = "soporte"
-    AUTONOMO = "autonomo"
-
-
-class RolEquipo(StrEnum):
-    """Roles internos por equipo. Una persona puede ser miembro en un equipo y
-    administrador en otro: el rol se resuelve siempre contra el equipo de la
-    petición, nunca se toma del token sin contrastarlo con la membresía."""
-
-    ADMINISTRADOR = "administrador"
-    MIEMBRO = "miembro"
+    SUPPORT = "support"
+    AUTONOMOUS = "autonomous"
 
 
-class Idioma(StrEnum):
-    """Atributo del equipo. Parametriza el modelo de transcripción, el juego de
-    plantillas, las instrucciones del modelo de lenguaje, la voz sintetizada y
-    el idioma del resumen."""
+class TeamRole(StrEnum):
+    """Internal roles per team. A person can be a member in one team and an
+    admin in another: the role is always resolved against the team of the
+    request, and a token claim is never trusted without checking the
+    membership."""
+
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
+class Language(StrEnum):
+    """Team attribute. Parameterizes the transcription model, the template set,
+    the language model instructions, the synthesized voice and the language of
+    the summary."""
 
     ES = "es"
     EN = "en"
 
 
-class TipoCeremonia(StrEnum):
+class CeremonyType(StrEnum):
     DAILY = "daily"
 
 
-class EstadoCeremonia(StrEnum):
-    PROGRAMADA = "programada"
-    EN_CURSO = "en_curso"
-    CERRADA = "cerrada"
-    CANCELADA = "cancelada"
-    DEGRADADA = "degradada"
+class CeremonyStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    DEGRADED = "degraded"

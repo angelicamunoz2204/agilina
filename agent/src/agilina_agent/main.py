@@ -1,56 +1,55 @@
-"""Punto de entrada del worker.
+"""Worker entry point and composition root.
 
-    make agent     → registra el worker en LiveKit y queda esperando trabajos
+    make agent     → registers the worker in LiveKit and waits for jobs
 
-El worker abre una conexión de salida hacia LiveKit y se registra. Cuando se
-crea la sala de una ceremonia, LiveKit ofrece el trabajo por esa conexión y
-este módulo lanza el subproceso que se une a la sala como un participante más.
+The worker opens an outbound connection to LiveKit and registers. When a
+ceremony room is created, LiveKit offers the job over that connection and this
+module launches the subprocess that joins the room as one more participant.
 
-Lo que hay aquí es el esqueleto que demuestra el ciclo de vida: entrar a la
-sala, anunciarse y quedar en espera. La facilitación completa llega con las
-historias del Release 1 y 2; la lógica que ya existe vive en
-``agilina_agent.facilitacion`` y se prueba sin sala ni audio.
+What is here is the skeleton that shows the life cycle: join the room,
+announce itself and wait. Full facilitation arrives with the Release 1 and 2
+stories; the logic that already exists lives in
+``agilina_agent.domain.facilitation`` and is tested without a room or audio.
 """
 
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
+from livekit.agents import JobContext, WorkerOptions, cli
 
-from agilina_agent.adaptadores.tts_elevenlabs import SintesisSimulada
-from agilina_agent.config import obtener_configuracion
-from agilina_agent.registro import configurar_registro, obtener_registro
+from agilina_agent.infrastructure.logging_setup import configure_logging, get_logger
+from agilina_agent.infrastructure.settings import get_settings
+from agilina_agent.infrastructure.speech_synthesizers import RecordingSynthesizer
+from agilina_agent.presentation.room_job import RoomJob
 
-registro = obtener_registro(__name__)
-
-
-async def punto_de_entrada(ctx: JobContext) -> None:
-    """Se ejecuta una vez por ceremonia, en su propio subproceso."""
-    configuracion = obtener_configuracion()
-    configurar_registro(configuracion.nivel_log)
-
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    registro.info("Agilina entró a la sala %s", ctx.room.name)
-
-    # En espera: Agilina está en la sala pero no envía audio al servicio de
-    # transcripción hasta que alguien inicia la daily desde la aplicación.
-    voz = SintesisSimulada()
-    await voz.sintetizar("Agilina está en la sala y en espera.", configuracion.idioma_por_defecto)
+logger = get_logger(__name__)
 
 
-def ejecutar() -> None:
-    configuracion = obtener_configuracion()
-    configurar_registro(configuracion.nivel_log)
-    registro.info("Registrando el worker en %s", configuracion.livekit_url or "(sin configurar)")
+async def entrypoint(ctx: JobContext) -> None:
+    """Runs once per ceremony, in its own subprocess: wires the job here."""
+    settings = get_settings()
+    configure_logging(settings.log_level)
+
+    job = RoomJob(
+        synthesizer=RecordingSynthesizer(),
+        default_language=settings.default_language,
+    )
+    await job.run(ctx)
+
+
+def run() -> None:
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    logger.info("Registering the worker in %s", settings.livekit_url or "(not configured)")
 
     cli.run_app(
         WorkerOptions(
-            entrypoint_fnc=punto_de_entrada,
-            ws_url=configuracion.livekit_url,
-            api_key=configuracion.livekit_api_key,
-            api_secret=configuracion.livekit_api_secret,
+            entrypoint_fnc=entrypoint,
+            ws_url=settings.livekit_url,
+            api_key=settings.livekit_api_key,
+            api_secret=settings.livekit_api_secret,
         )
     )
 
 
-__all__ = ["ejecutar", "punto_de_entrada"]
+__all__ = ["entrypoint", "run"]
 
 if __name__ == "__main__":
-    ejecutar()
+    run()

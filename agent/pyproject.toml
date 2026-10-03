@@ -1,7 +1,7 @@
 [project]
 name = "agilina-agent"
 version = "0.1.0"
-description = "Worker de LiveKit Agents: todo lo que ocurre durante la ceremonia"
+description = "LiveKit Agents worker: everything that happens during the ceremony"
 requires-python = ">=3.12"
 dependencies = [
     "agilina-shared",

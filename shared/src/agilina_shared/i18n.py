@@ -1,63 +1,62 @@
-"""Catálogo de textos de Agilina en los dos idiomas del producto.
+"""Catalog of Agilina's texts in the two languages of the product.
 
-Toda intervención hablada de Agilina sale de plantillas parametrizadas por
-idioma, no del modelo de lenguaje (AD-19). Este módulo es el único lugar donde
-viven esos textos, de modo que agregar un idioma sea agregar una columna y no
-buscar cadenas por todo el código.
+Every spoken intervention of Agilina comes from templates parameterized by
+language, not from the language model (AD-19). This module is the only place
+where those texts live, so that adding a language means adding a column
+instead of hunting for strings across the code.
 """
 
-from agilina_shared.enums import Idioma
+from agilina_shared.enums import Language
 
-PLANTILLAS: dict[str, dict[Idioma, str]] = {
-    "saludo": {
-        Idioma.ES: "Hola, soy Agilina. Estamos en el día {dia} de {total} del sprint. "
+TEMPLATES: dict[str, dict[Language, str]] = {
+    "greeting": {
+        Language.ES: "Hola, soy Agilina. Estamos en el día {day} de {total} del sprint. "
         "Empecemos la reunión diaria.",
-        Idioma.EN: "Hi, I'm Agilina. We're on day {dia} of {total} of the sprint. "
+        Language.EN: "Hi, I'm Agilina. We're on day {day} of {total} of the sprint. "
         "Let's start the daily stand-up.",
     },
-    "cede_turno": {
-        Idioma.ES: "{nombre}, es tu turno.",
-        Idioma.EN: "{nombre}, it's your turn.",
+    "hand_over_turn": {
+        Language.ES: "{name}, es tu turno.",
+        Language.EN: "{name}, it's your turn.",
     },
-    "silencio": {
-        Idioma.ES: "{nombre}, ¿sigues ahí?",
-        Idioma.EN: "{nombre}, are you still there?",
+    "silence": {
+        Language.ES: "{name}, ¿sigues ahí?",
+        Language.EN: "{name}, are you still there?",
     },
-    "turno_trabado": {
-        Idioma.ES: "{nombre}, ¿quieres cerrar tu turno?",
-        Idioma.EN: "{nombre}, would you like to wrap up your turn?",
+    "stuck_turn": {
+        Language.ES: "{name}, ¿quieres cerrar tu turno?",
+        Language.EN: "{name}, would you like to wrap up your turn?",
     },
-    "despedida": {
-        Idioma.ES: "Con eso cerramos la reunión diaria. Que tengan buen día.",
-        Idioma.EN: "That wraps up the daily stand-up. Have a good day.",
+    "farewell": {
+        Language.ES: "Con eso cerramos la reunión diaria. Que tengan buen día.",
+        Language.EN: "That wraps up the daily stand-up. Have a good day.",
     },
-    "degradado": {
-        Idioma.ES: "No puedo escuchar en este momento: el servicio de transcripción no "
+    "degraded": {
+        Language.ES: "No puedo escuchar en este momento: el servicio de transcripción no "
         "responde. Continúen sin mí y yo aviso cuando vuelva.",
-        Idioma.EN: "I can't listen right now: the transcription service isn't responding. "
+        Language.EN: "I can't listen right now: the transcription service isn't responding. "
         "Please carry on without me and I'll let you know when I'm back.",
     },
 }
 
 
-def texto(clave: str, idioma: Idioma, **parametros: object) -> str:
-    """Devuelve la plantilla ``clave`` en ``idioma`` con sus parámetros resueltos.
+def render_text(key: str, language: Language, **params: object) -> str:
+    """Return the template ``key`` in ``language`` with its parameters resolved.
 
-    Falla fuerte ante una clave inexistente o un parámetro faltante: un texto a
-    medias llegaría a la sala convertido en voz.
+    Fails loudly on a missing key or a missing parameter: a half-resolved text
+    would reach the room turned into speech.
     """
     try:
-        plantilla = PLANTILLAS[clave][idioma]
+        template = TEMPLATES[key][language]
     except KeyError as error:
-        raise KeyError(f"No existe la plantilla '{clave}' para el idioma '{idioma}'") from error
-    return plantilla.format(**parametros)
+        raise KeyError(f"No template '{key}' for language '{language}'") from error
+    return template.format(**params)
 
 
-def claves_incompletas() -> list[str]:
-    """Claves que no existen en los dos idiomas.
+def incomplete_keys() -> list[str]:
+    """Keys that do not exist in both languages.
 
-    La prueba que usa esta función es lo que hace verificable el criterio del
-    Definition of Done de que todo texto dirigido al usuario exista en español
-    y en inglés.
+    The test that uses this function is what makes the Definition of Done
+    criterion verifiable: every user-facing text exists in Spanish and English.
     """
-    return [clave for clave, traducciones in PLANTILLAS.items() if set(traducciones) != set(Idioma)]
+    return [key for key, translations in TEMPLATES.items() if set(translations) != set(Language)]

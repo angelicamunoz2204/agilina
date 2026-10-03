@@ -1,6 +1,6 @@
-/** Configuración de desarrollo local: cada servicio en su propio puerto. */
+/** Local development settings: each service on its own port. */
 export const environment = {
-  produccion: false,
+  production: false,
   apiUrl: 'http://localhost:8000',
   keycloak: {
     url: 'http://localhost:8080',

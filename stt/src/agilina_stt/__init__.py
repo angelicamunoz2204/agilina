@@ -1,9 +1,10 @@
-"""Servicio de transcripción de Agilina.
+"""Agilina transcription service.
 
-Convierte segmentos de audio en texto. No identifica hablantes: la identidad
-llega con la pista de audio, firmada en el token de LiveKit. Vive en su propia
-instancia porque necesita GPU, es el componente más caro por hora y debe poder
-encenderse y apagarse con la ceremonia sin afectar al resto.
+Turns audio segments into text. It does not identify speakers: the identity
+arrives with the audio track, signed in the LiveKit token. It lives in its own
+instance because it needs a GPU, it is the most expensive component per hour
+and it must be switchable on and off with the ceremony without affecting the
+rest.
 """
 
 __version__ = "0.1.0"
