@@ -1,121 +1,130 @@
 # ============================================================================
-# Agilina — un solo punto de entrada para levantar, probar y verificar.
-# `make` sin argumentos lista los objetivos disponibles.
+# Agilina — a single entry point to bring up, test and verify.
+# `make` without arguments lists the available targets.
 # ============================================================================
 SHELL := /bin/bash
-.DEFAULT_GOAL := ayuda
+.DEFAULT_GOAL := help
 
 COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
 UV      := uv
 WEB     := web
 
-.PHONY: ayuda env instalar ganchos infra migrar migracion arriba abajo reiniciar \
-        api agent stt web pruebas pruebas-python pruebas-web cobertura lint formato \
-        verificar keycloak-admin logs limpiar
+.PHONY: help env install hooks infra migrate migration up down restart \
+        api agent stt web test test-python test-web coverage lint format \
+        typecheck arch verify keycloak-admin logs clean
 
-ayuda: ## Muestra esta ayuda
+help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-# ---------------------------------------------------------------- Entorno ---
-env: ## Crea el .env a partir de .env.example, con claves locales generadas
+# ------------------------------------------------------------ Environment ---
+env: ## Create .env from .env.example, with generated local passwords
 	@test -f .env || { \
 		cp .env.example .env; \
-		clave_bd=$$(openssl rand -hex 16); \
-		clave_kc=$$(openssl rand -hex 16); \
-		sed -i.bak -e "s|^POSTGRES_CLAVE=.*|POSTGRES_CLAVE=$$clave_bd|" \
-		           -e "s|^KEYCLOAK_ADMIN_CLAVE=.*|KEYCLOAK_ADMIN_CLAVE=$$clave_kc|" .env; \
+		db_password=$$(openssl rand -hex 16); \
+		kc_password=$$(openssl rand -hex 16); \
+		sed -i.bak -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$$db_password|" \
+		           -e "s|^KEYCLOAK_ADMIN_PASSWORD=.*|KEYCLOAK_ADMIN_PASSWORD=$$kc_password|" .env; \
 		rm -f .env.bak; \
-		echo "Creado .env con claves locales generadas."; \
-		echo "Completa las claves de LiveKit, Gemini y ElevenLabs antes de usar la voz."; \
+		echo "Created .env with generated local passwords."; \
+		echo "Fill in the LiveKit, Gemini and ElevenLabs keys before using voice."; \
 	}
 
-instalar: env ## Instala dependencias de Python (uv) y de la web (npm)
+install: env ## Install Python (uv) and web (npm) dependencies
 	$(UV) sync --all-packages
 	cd $(WEB) && (test -f package-lock.json && npm ci || npm install)
 
-ganchos: ## Instala los ganchos de pre-commit (una sola vez por clon)
+hooks: ## Install the pre-commit hooks (once per clone)
 	$(UV) run pre-commit install --install-hooks
 	$(UV) run pre-commit install --hook-type commit-msg
+	$(UV) run pre-commit install --hook-type pre-push
 
-# --------------------------------------------------------- Infraestructura --
-infra: env ## Levanta Postgres y Keycloak en contenedores
+# --------------------------------------------------------- Infrastructure ---
+infra: env ## Bring up Postgres and Keycloak in containers
 	$(COMPOSE) up -d postgres keycloak
-	@echo "Postgres en localhost:5432 · Keycloak en http://localhost:8080"
+	@echo "Postgres on localhost:5432 · Keycloak on http://localhost:8080"
 
-migrar: ## Aplica las migraciones pendientes a la base de datos
+migrate: ## Apply the pending database migrations
 	cd api && $(UV) run alembic upgrade head
 
-migracion: ## Crea una migración nueva: make migracion m="descripcion"
+migration: ## Create a new migration: make migration m="description"
 	cd api && $(UV) run alembic revision --autogenerate -m "$(m)"
 
-arriba: instalar infra ## EL comando: deja el entorno completo listo para trabajar
-	./infra/esperar-servicios.sh
-	$(MAKE) migrar
+up: install infra ## THE command: leave the whole environment ready to work
+	./infra/wait-for-services.sh
+	$(MAKE) migrate
 	@echo ""
-	@echo "Entorno listo. En terminales separadas:"
+	@echo "Environment ready. In separate terminals:"
 	@echo "  make api    → http://localhost:8000/docs"
 	@echo "  make stt    → http://localhost:8001/docs"
 	@echo "  make web    → http://localhost:4200"
-	@echo "  make agent  → worker registrado en LiveKit"
+	@echo "  make agent  → worker registered in LiveKit"
 
-abajo: ## Detiene los contenedores sin borrar los datos
+down: ## Stop the containers without deleting the data
 	$(COMPOSE) down
 
-reiniciar: abajo arriba ## Reinicia el entorno completo
+restart: down up ## Restart the whole environment
 
-logs: ## Sigue los logs de la infraestructura
+logs: ## Follow the infrastructure logs
 	$(COMPOSE) logs -f
 
-keycloak-admin: ## Abre la consola de administración de Keycloak
-	@echo "http://localhost:8080/admin — usuario y clave en tu .env"
+keycloak-admin: ## Show where the Keycloak admin console is
+	@echo "http://localhost:8080/admin — user and password in your .env"
 
-# ------------------------------------------------------------ Ejecutables ---
-api: env ## Ejecuta la API con recarga automática
+# ------------------------------------------------------------ Executables ---
+api: env ## Run the API with auto-reload
 	@set -a; . ./.env; set +a; \
-	$(UV) run uvicorn agilina_api.main:app --reload \
-		--host $${AGILINA_API_HOST:-127.0.0.1} --port $${AGILINA_API_PUERTO:-8000}
+	$(UV) run uvicorn agilina_api.bootstrap.app:app --reload \
+		--host $${AGILINA_API_HOST:-127.0.0.1} --port $${AGILINA_API_PORT:-8000}
 
-agent: env ## Ejecuta el worker del agente y lo registra en LiveKit
+agent: env ## Run the agent worker and register it in LiveKit
 	@set -a; . ./.env; set +a; $(UV) run python -m agilina_agent.main dev
 
-stt: env ## Ejecuta el servicio de transcripción
+stt: env ## Run the transcription service
 	@set -a; . ./.env; set +a; \
 	$(UV) run uvicorn agilina_stt.main:app --reload --host 127.0.0.1 --port 8001
 
-web: ## Ejecuta la aplicación Angular
+web: ## Run the Angular application
 	cd $(WEB) && npm start
 
-# --------------------------------------------------------------- Calidad ----
-lint: ## Análisis estático de Python y de la web
+# ---------------------------------------------------------------- Quality ---
+lint: ## Static analysis of Python and the web
 	$(UV) run ruff check .
 	cd $(WEB) && npm run lint
 
-formato: ## Formatea el código de Python
+format: ## Format the Python code
 	$(UV) run ruff format .
 	$(UV) run ruff check --fix .
 
-pruebas: pruebas-python pruebas-web ## Ejecuta todas las pruebas
+typecheck: ## Strict type checking of the Python packages
+	$(UV) run mypy shared/src api/src agent/src stt/src
 
-pruebas-python: ## Pruebas de los paquetes de Python
+arch: ## Check the architecture rules (layers and context boundaries)
+	$(UV) run lint-imports
+
+test: test-python test-web ## Run all the tests
+
+test-python: ## Tests of the Python packages
 	$(UV) run pytest
 
-pruebas-web: ## Pruebas de la aplicación Angular
+test-web: ## Tests of the Angular application
 	cd $(WEB) && npm run test:ci
 
-cobertura: ## Pruebas de Python con reporte de cobertura
+coverage: ## Python tests with a coverage report
 	$(UV) run pytest --cov --cov-report=term-missing --cov-report=xml
 
-verificar: ## Lo mismo que corre el pipeline, en tu máquina
+verify: ## The same the pipeline runs, on your machine
 	$(UV) run ruff format --check .
 	$(UV) run ruff check .
+	$(UV) run mypy shared/src api/src agent/src stt/src
+	$(UV) run lint-imports
 	$(UV) run pytest --cov --cov-report=term-missing
 	cd $(WEB) && npm run lint && npm run build && npm run test:ci
 	@echo ""
-	@echo "Verificación en verde. El pull request no debería fallar por análisis ni pruebas."
+	@echo "Verification green. The pull request should not fail on analysis or tests."
 
-limpiar: ## Borra artefactos de build, cachés y contenedores con sus datos
+clean: ## Delete build artifacts, caches and containers with their data
 	$(COMPOSE) down -v
-	rm -rf .venv .pytest_cache .ruff_cache htmlcov coverage.xml .coverage
+	rm -rf .venv .pytest_cache .ruff_cache .mypy_cache htmlcov coverage.xml .coverage
 	rm -rf $(WEB)/node_modules $(WEB)/dist $(WEB)/.angular $(WEB)/coverage
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

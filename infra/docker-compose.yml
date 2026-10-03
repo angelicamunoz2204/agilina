@@ -1,9 +1,8 @@
-# Infraestructura local de Agilina: base de datos e identidad.
+# Agilina local infrastructure: database and identity.
 #
-# Los tres desplegables de Python y la aplicación web NO corren aquí: se
-# ejecutan con `make api`, `make agent`, `make stt` y `make web` para tener
-# recarga automática. La contenerización de los servicios llega con el
-# despliegue en la nube (HU-38).
+# The three Python deployables and the web application do NOT run here yet:
+# they run with `make api`, `make agent`, `make stt` and `make web` to get
+# auto-reload. Their containers arrive in the next infra pull request.
 name: agilina
 
 services:
@@ -12,18 +11,18 @@ services:
     container_name: agilina-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USUARIO:-agilina}
-      POSTGRES_PASSWORD: ${POSTGRES_CLAVE:?falta POSTGRES_CLAVE en el .env; ejecuta make env}
-      POSTGRES_DB: ${POSTGRES_BD:-agilina}
+      POSTGRES_USER: ${POSTGRES_USER:-agilina}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing in .env; run make env}
+      POSTGRES_DB: ${POSTGRES_DB:-agilina}
       TZ: UTC
       PGTZ: UTC
     ports:
-      - "${POSTGRES_PUERTO:-5432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - datos-postgres:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USUARIO:-agilina} -d ${POSTGRES_BD:-agilina}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agilina} -d ${POSTGRES_DB:-agilina}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -32,13 +31,13 @@ services:
     image: quay.io/keycloak/keycloak:26.0
     container_name: agilina-keycloak
     restart: unless-stopped
-    # start-dev guarda en su propia base embebida: no depende de Postgres. El
-    # despliegue en la nube sí la usará (HU-38).
+    # start-dev stores in its own embedded database: it does not depend on
+    # Postgres. The cloud deployment will use it (HU-38).
     command: ["start-dev", "--import-realm"]
     environment:
-      # Credenciales del administrador de Keycloak: salen del .env, nunca del repositorio.
+      # Keycloak admin credentials: they come from .env, never from the repository.
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_CLAVE:?falta KEYCLOAK_ADMIN_CLAVE en el .env; ejecuta make env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is missing in .env; run make env}
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_PORT: "8080"
     ports:
@@ -46,8 +45,8 @@ services:
       - "9000:9000"
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
-      - datos-keycloak:/opt/keycloak/data
+      - keycloak-data:/opt/keycloak/data
 
 volumes:
-  datos-postgres:
-  datos-keycloak:
+  postgres-data:
+  keycloak-data:
