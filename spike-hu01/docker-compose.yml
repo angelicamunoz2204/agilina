@@ -1,0 +1,8 @@
+services:
+  client:
+    build: ./client
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
