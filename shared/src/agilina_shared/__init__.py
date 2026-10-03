@@ -1,40 +1,41 @@
-"""Modelos de dominio y contrato compartidos por los desplegables de Agilina.
+"""Domain models and contract shared by the Agilina deployables.
 
-Este paquete es la razón de que Agilina viva en un solo repositorio: el contrato
-entre el worker y la API se expresa como tipos compartidos y no como
-documentación que se desactualiza (documento de arquitectura, sección 5.2).
+This package is the reason Agilina lives in a single repository: the contract
+between the worker and the API is expressed as shared types instead of
+documentation that goes stale (architecture document, section 5.2).
 """
 
-from agilina_shared.contrato import (
-    ContextoCeremonia,
-    ParticipanteContexto,
-    ResultadoCeremonia,
-    SegmentoTranscripcion,
+from agilina_shared.contract import (
+    CeremonyContext,
+    CeremonyResult,
+    ParticipantContext,
+    TranscriptSegment,
 )
 from agilina_shared.enums import (
-    EstadoCeremonia,
-    Idioma,
-    ModoOperacion,
-    RolEquipo,
-    TipoCeremonia,
+    CeremonyStatus,
+    CeremonyType,
+    Language,
+    OperationMode,
+    TeamRole,
 )
 
 __all__ = [
-    "ContextoCeremonia",
-    "EstadoCeremonia",
-    "Idioma",
-    "ModoOperacion",
-    "ParticipanteContexto",
-    "ResultadoCeremonia",
-    "RolEquipo",
-    "SegmentoTranscripcion",
-    "TipoCeremonia",
-    "VERSION_CONTRATO",
+    "CONTRACT_VERSION",
+    "CeremonyContext",
+    "CeremonyResult",
+    "CeremonyStatus",
+    "CeremonyType",
+    "Language",
+    "OperationMode",
+    "ParticipantContext",
+    "TeamRole",
+    "TranscriptSegment",
 ]
 
-VERSION_CONTRATO = "1.0"
-"""Versión del contrato worker ↔ API.
+CONTRACT_VERSION = "2.0"
+"""Worker ↔ API contract version.
 
-Cambiarla es un BREAKING CHANGE y debe declararse en el pie del commit
-(documento de Avance 1, sección 7.3).
+Changing it is a BREAKING CHANGE and must be declared in the commit footer
+(Avance 1 document, section 7.3). 2.0: field names and enum values moved to
+English; nothing was deployed with 1.0.
 """
