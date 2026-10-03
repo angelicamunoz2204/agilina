@@ -6,10 +6,10 @@ LiveKit.
 
 | Operación | Cuándo | Qué viaja |
 | --- | --- | --- |
-| `GET /v1/ceremonias/{id}/contexto` | Antes de entrar a la sala | `ContextoCeremonia` |
-| `POST /v1/ceremonias/{id}/resultado` | Al cerrar la ceremonia | `ResultadoCeremonia` |
+| `GET /v1/ceremonies/{id}/context` | Antes de entrar a la sala | `CeremonyContext` |
+| `POST /v1/ceremonies/{id}/result` | Al cerrar la ceremonia | `CeremonyResult` |
 
-Los tipos viven en `shared/src/agilina_shared/contrato.py` y los importan los
+Los tipos viven en `shared/src/agilina_shared/contract.py` y los importan los
 dos desplegables: el contrato es código compartido, no documentación que se
 desactualiza. Esta página explica el porqué; la forma exacta está en el tipo.
 
@@ -29,7 +29,7 @@ desactualiza. Esta página explica el porqué; la forma exacta está en el tipo.
 ## Cambiarlo
 
 Un cambio incompatible es un `BREAKING CHANGE` declarado en el pie del commit y
-sube `VERSION_CONTRATO` en `agilina_shared`. Agregar un campo opcional no lo es.
+sube `CONTRACT_VERSION` en `agilina_shared`. Agregar un campo opcional no lo es.
 
 ## Qué no cruza por aquí
 

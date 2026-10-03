@@ -18,10 +18,10 @@ Muñoz; asesor: Oscar Bedoya.
 
 ```bash
 git clone git@github.com:angelicamunoz2204/agilina.git && cd agilina
-make arriba
+make up
 ```
 
-`make arriba` crea el `.env` con claves locales generadas, instala las
+`make up` crea el `.env` con claves locales generadas, instala las
 dependencias de Python y de la web, levanta Postgres y Keycloak, espera a que
 respondan y aplica las migraciones.
 Después, en terminales separadas:
@@ -42,12 +42,12 @@ Requisitos, qué corre dónde y qué hacer cuando algo falla:
 ## Probar y verificar
 
 ```bash
-make pruebas      # pruebas de los tres desplegables, el paquete común y la web
-make verificar    # exactamente lo que corre el pipeline, en tu máquina
+make test      # pruebas de los tres desplegables, el paquete común y la web
+make verify    # exactamente lo que corre el pipeline, en tu máquina
 ```
 
-`make verificar` ejecuta formato, análisis estático, pruebas con cobertura,
-compilación de la web y sus pruebas. Si pasa en local, el pull request no
+`make verify` ejecuta formato, análisis estático, tipado estricto, reglas de
+arquitectura, pruebas con cobertura, compilación de la web y sus pruebas. Si pasa en local, el pull request no
 debería fallar por análisis ni por pruebas. `make` sin argumentos lista todo lo
 demás.
 
@@ -56,7 +56,7 @@ demás.
 ```
 agilina/
 ├── shared/    Modelos de dominio y contrato worker ↔ API (Python)
-├── api/       API en FastAPI: dominio, razonamiento al cierre, planificador
+├── api/       API en FastAPI: un paquete por contexto, cada uno en cuatro capas
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre en la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper sobre GPU
 ├── web/       Aplicación web en Angular

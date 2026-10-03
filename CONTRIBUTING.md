@@ -62,7 +62,7 @@ Refs: HU-nn
 - **Idioma.** Español, igual que el resto de la documentación del proyecto.
 
 El pipeline valida asunto y pie en cada pull request. El gancho de `pre-commit`
-(`make ganchos`) valida el asunto al hacer el commit; el pie lo revisas antes de
+(`make hooks`) valida el asunto al hacer el commit; el pie lo revisas antes de
 empujar con:
 
 ```bash
@@ -83,7 +83,7 @@ Un pull request con la compilación o las pruebas en rojo no se revisa. El
 trabajo en curso se sube como borrador. Se integra con squash, usando el
 mensaje del pull request como commit final.
 
-Antes de pedir revisión, `make verificar` en verde y el checklist de la
+Antes de pedir revisión, `make verify` en verde y el checklist de la
 plantilla completo.
 
 ## Code review
@@ -122,13 +122,16 @@ Una historia está terminada cuando:
 
 ## Convenciones de código
 
-- **Python.** `ruff` decide formato y reglas; la configuración está en el
-  `pyproject.toml` de la raíz. Nombres del dominio en español, nombres de
-  bibliotecas y protocolos como los define cada biblioteca.
+- **Idioma.** El código va en inglés: identificadores, comentarios, variables de
+  entorno y objetivos de `make`. Commits, pull requests y documentación van en
+  español. Los textos de usuario van en español e inglés mediante i18n.
+- **Python.** `ruff` decide formato y reglas, `mypy` en modo estricto el tipado
+  e `import-linter` las reglas de arquitectura (capas y fronteras entre
+  contextos); la configuración está en el `pyproject.toml` de la raíz.
 - **TypeScript y Angular.** `eslint` con `angular-eslint`. Componentes
   `standalone`, `OnPush` y señales. Prefijo de selectores `agl`.
 - **Textos de usuario.** Nunca en el código: en `shared/src/agilina_shared/i18n.py`
-  para lo que Agilina dice, y en `web/src/app/i18n/*.json` para la interfaz.
+  para lo que Agilina dice, y en `web/src/app/core/i18n/*.json` para la interfaz.
   Hay una prueba que falla si una clave existe en un idioma y no en el otro.
 - **Configuración.** Siempre por variables de entorno, con su clave declarada en
   `.env.example`. Ningún valor real entra al repositorio.
