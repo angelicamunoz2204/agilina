@@ -1,0 +1,22 @@
+# Override para la instancia GPU (g4dn.xlarge, Tesla T4). Solo para la instancia, no para el Mac:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d whisper whisper-warmup agent
+# Requiere Docker Compose >= 2.24.4 (por !reset).
+services:
+  whisper:
+    # speaches 0.8.3-cuda (CUDA 12.9), la misma versión que la imagen de CPU (0.8.3-cpu).
+    # Digest del índice multiplataforma; en la instancia se resuelve a linux/amd64.
+    image: ghcr.io/speaches-ai/speaches@sha256:9abc6968a883e77ead9286c38a6ccf3139dcad518b783deeebb7be2ced50e972
+    # Sin puerto publicado: el agente llega a Whisper por la red interna (http://whisper:8000/v1).
+    ports: !reset []
+    environment:
+      WHISPER__TTL: "-1"
+      # cuda explícito: con "auto", si la GPU no estuviera visible speaches caería a CPU sin avisar.
+      WHISPER__INFERENCE_DEVICE: cuda
+      WHISPER__COMPUTE_TYPE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
