@@ -68,8 +68,8 @@ lk token create --join --room <sala> --identity <nombre> --valid-for 24h   # lk 
 
 ## Estado
 
-Hecho (pasos 1–13):
-- Cuentas: AWS (experiencia simplificada, us-east-2, límite USD 20; cuota GPU G/VT de 8 vCPU **solicitada**),
+Hecho (pasos 1–16):
+- Cuentas: AWS (experiencia simplificada, us-east-2; cuota GPU G/VT de 8 vCPU **aprobada** tras apelación),
   LiveKit Cloud (proyecto `agilina`), ElevenLabs (voz predeterminada, `eleven_v4_turbo`), Gemini.
 - HU-01.4 cumplida: el cliente Angular compila en modo estricto y conecta a la sala.
 - Agente con cadena STT → LLM/plantilla → TTS funcionando en una sala con un participante.
@@ -78,11 +78,12 @@ Hecho (pasos 1–13):
   Cliente con botón de micrófono (`publishDefaults.stopMicTrackOnMute`, entra apagado).
   Agente: fin de turno por STT (`turn_detection="stt"`, `min_delay` 1,0 s), ignora turnos de < 3 palabras en
   modo plantilla, espera al primer participante para saludarlo por nombre.
+- Pasos 14–16: g4dn.xlarge (Tesla T4, Deep Learning Base AMI Ubuntu 24.04, disco ampliado a 80 GB) con whisper,
+  whisper-warmup y agent (`docker-compose.gpu.yml`, speaches `0.8.3-cuda`); el agente usa Whisper por la red interna.
+  Fin de voz → transcripción: small 0,95–1,17 s; `deepdml/faster-whisper-large-v3-turbo-ct2` 1,13–1,21 s (cumple U1).
+  Recomendación: large-v3-turbo. Con `WHISPER_PROMPT`, "Keycloak" se transcribe bien sin costo de latencia.
 
 Pendiente:
-14. Lanzar la g4dn.xlarge cuando se apruebe la cuota (Deep Learning AMI, security group solo a nuestras IPs).
-15. Whisper en GPU con la imagen CUDA de speaches y un modelo mayor; probar con `curl`; documentar despliegue y costo/hora.
-16. Apuntar el agente a la GPU (`WHISPER_BASE_URL=http://<ip>:8000/v1`). Apagar la instancia al terminar cada sesión.
 17. Registrar métricas por tramo en CSV (ChatMessage.metrics), grabar la sala, `nvidia-smi` durante las pruebas.
 18. Diez interacciones con dos personas reales (Diego y Angélica), una sala nueva por sesión de pruebas.
 19. Medir Gemini sobre una transcripción sintética de ~15 min (si se acordó en el Planning).
@@ -90,7 +91,6 @@ Pendiente:
 21. Firma de ambos. 22. Decisiones a flujos y ADR. 23. Terminar la instancia GPU y archivar la rama.
 
 Deuda conocida del prototipo (anotar, no necesariamente resolver):
-- Probar `prompt` de vocabulario en Whisper ("Keycloak" se transcribe como "KeyClub").
 - Cargar Silero VAD una vez por proceso (hoy bloquea ~160 ms al iniciar cada sesión).
 - La rotación de turnos no termina nunca (en la app real, la ceremonia acaba cuando todos hablaron, HU-26).
 - Si quien tiene la palabra se desconecta, se cierra la sesión del agente (`close_on_disconnect=True` por defecto).
@@ -106,6 +106,11 @@ Deuda conocida del prototipo (anotar, no necesariamente resolver):
   `gemini-3.8-flash` se satura (503/504); respaldo verificado: `gemini-3.5-flash-lite`. `gemini-2.5-flash` no existe para usuarios nuevos.
 - **ElevenLabs**: el plan gratuito no permite voces de la Voice Library por API; solo voces predeterminadas.
 - **Audio**: usar audífonos; sin ellos, Agilina se transcribe a sí misma. El micrófono solo funciona en localhost o HTTPS.
+- **AWS**: el límite de gasto pausa el proyecto según el pronóstico del mes, no el gasto real; al encender la GPU con
+  límite de USD 20, AWS detuvo la instancia. Límite temporal USD 400 y `sudo shutdown -h +120` en cada sesión.
+- **Instancia GPU**: la IP pública cambia en cada encendido. El disco de 35 GB por defecto no alcanza (usar ≥ 80 GB).
+- **.env**: al agregar variables con `echo >> .env`, si el archivo no termina en salto de línea la variable queda
+  pegada a la anterior. Verificar con `printenv` dentro del contenedor.
 
 ## Cómo trabajamos
 

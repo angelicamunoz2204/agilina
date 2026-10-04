@@ -202,7 +202,7 @@
   y detallar el caso de uso. Para cuentas nuevas: la cuota de GPU no es inmediata; hay que pedirla
   con justificación y prever días de espera en la planificación.
 
-## Paso 15 · Despliegue de Whisper en GPU (preparado, sin levantar)
+## Paso 15 · Despliegue de Whisper en GPU (desplegado y medido)
 - Versión real de la imagen de CPU: el digest fijado (`21e3df06…`) es el índice de **`0.8.3-cpu`**
   (era `latest-cpu` al fijarlo), aunque `/openapi.json` reporta `v0.8.2`. La versión de speaches del spike es 0.8.3.
 - Imagen GPU: `0.8.3-cuda`, fijada por el digest del índice `9abc6968…` (amd64 `f3438861…`).
@@ -244,6 +244,11 @@
 - Memoria de GPU: small 822 MiB; con turbo cargado, 2.883 MiB en total (los dos modelos residentes
   por WHISPER__TTL=-1). En producción, un solo modelo fijo.
 - Recomendación: large-v3-turbo como modelo de Agilina.
+- Prompt de vocabulario (WHISPER_PROMPT, sala gpu-04, large-v3-turbo): "Keycloak" transcrito correctamente
+  (sin prompt: "Kiklook"). Ambas frases exactas. Latencia 1,15 / 1,12 s: el prompt no añade costo medible.
+  Implicación: el vocabulario del equipo (herramientas, nombres propios) debe ser configurable por equipo (insumo para HU-24).
+- Trampa: al agregar variables con `echo >> .env`, si el archivo no termina en salto de línea la variable queda
+  pegada a la anterior y el agente no la recibe. Verificar con `printenv` dentro del contenedor.
 
 ## Ajuste · Prompt de vocabulario para Whisper
 - livekit-plugins-openai 1.8.4: el parámetro de `openai.STT` es `prompt` (`NotGivenOr[str]`). En la transcripción sin
@@ -251,12 +256,12 @@
   (`prompt=transcription.prompt or openai.omit`). También existe `keywords`, pensado para los modelos de OpenAI; no se usa.
 - speaches 0.8.3 recibe `prompt` como campo del formulario y lo pasa a faster-whisper como `initial_prompt`
   (`routers/stt.py`).
-- El agente lee `WHISPER_PROMPT` (opcional, vacío por defecto = sin prompt). Pendiente medir su efecto en términos como
-  "Keycloak", "API" e "instancia" con el mismo guion, con y sin prompt.
+- El agente lee `WHISPER_PROMPT` (opcional, vacío por defecto = sin prompt). Medido en la sala gpu-04 (ver paso 15):
+  "Keycloak" correcto con prompt, sin costo de latencia medible.
 
 ## Pendientes para el informe
 - Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.
 - TTFB de eleven_v4_turbo frente a eleven_flash_v2_5.
-- Whisper small frente a un modelo mayor en GPU, con el mismo guion de frases.
-- Efecto del `prompt` de vocabulario en términos técnicos.
+- Whisper small frente a un modelo mayor en GPU, con el mismo guion de frases (primera medición: gpu-01 y gpu-02; repetir con el protocolo).
+- Efecto del `prompt` de vocabulario en términos técnicos (primera medición: gpu-04; repetir con el protocolo).
 - U6: caracteres de ElevenLabs por ceremonia estimada.
