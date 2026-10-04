@@ -138,5 +138,9 @@ vocabulario del dominio en [docs/glossary.md](docs/glossary.md). Lo esencial:
 - **Textos de usuario.** Nunca en el código: en `shared/src/agilina_shared/i18n.py`
   para lo que Agilina dice, y en `web/src/app/core/i18n/*.json` para la interfaz.
   Hay una prueba que falla si una clave existe en un idioma y no en el otro.
+- **Dependencias.** Cuando cambias `pyproject.toml` o `web/package.json`, ejecuta
+  `make lock` y commitea `uv.lock` y `web/package-lock.json`. Los locks fijan la
+  versión exacta de cada librería: las imágenes y la CI los exigen y fallan si
+  no coinciden con el manifiesto.
 - **Configuración.** Siempre por variables de entorno, con su clave declarada en
   `.env.example`. Ningún valor real entra al repositorio.

@@ -48,7 +48,7 @@ jobs:
           enable-cache: true
 
       - name: Instalar dependencias
-        run: uv sync --all-packages --all-groups
+        run: uv sync --locked --all-packages --all-groups
 
       - name: Formato
         run: uv run ruff format --check .
@@ -97,13 +97,7 @@ jobs:
           node-version: 22
 
       - name: Instalar dependencias
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            echo "::warning::No hay package-lock.json todavía; commitéalo tras el primer npm install."
-            npm install
-          fi
+        run: npm ci
 
       - name: Análisis estático
         run: npm run lint

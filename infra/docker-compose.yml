@@ -1,9 +1,26 @@
-# Agilina local infrastructure: database and identity.
+# Agilina local environment: everything runs in containers, nothing is installed
+# on the host but Docker and make.
 #
-# The three Python deployables and the web application do NOT run here yet:
-# they run with `make api`, `make agent`, `make stt` and `make web` to get
-# auto-reload. Their containers arrive in the next infra pull request.
+#   default services   postgres, keycloak, mailpit, api, web   (`make up`)
+#   profile `voice`    stt, agent                              (`make stt`, `make agent`)
+#   profile `tools`    tools, web-test: one-off containers for tests and checks
+#
+# The source is bind-mounted into the dev containers, so editing code reloads the
+# service without rebuilding. Production images are the `api` and `prod` targets
+# of the Dockerfiles (HU-38).
 name: agilina
+
+# Shared by every Python dev service: same image, the repository mounted at /app and
+# the host user, so the files they create (caches, migrations) belong to you.
+x-python-dev: &python-dev
+  build:
+    context: ..
+    dockerfile: infra/docker/python.Dockerfile
+    target: dev
+  user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+  env_file: ../.env
+  volumes:
+    - ..:/app
 
 services:
   postgres:
@@ -46,6 +63,92 @@ services:
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
       - keycloak-data:/opt/keycloak/data
+
+  # Catches every email the application sends: nothing leaves the machine.
+  # SMTP on :1025, inbox on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: agilina-mailpit
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  api:
+    <<: *python-dev
+    container_name: agilina-api
+    command:
+      - uvicorn
+      - agilina_api.bootstrap.app:app
+      - --reload
+      - --reload-dir=/app/api/src
+      - --reload-dir=/app/shared/src
+      - --host=0.0.0.0
+      - --port=8000
+    environment:
+      # Inside the compose network the services are reached by name, not localhost.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      AGILINA_KEYCLOAK_URL: http://keycloak:8080
+      AGILINA_STT_URL: http://stt:8001
+    ports:
+      - "${AGILINA_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../web
+      target: dev
+    container_name: agilina-web
+    ports:
+      - "4200:4200"
+    volumes:
+      - ../web/src:/app/src
+      - ../web/public:/app/public
+
+  stt:
+    <<: *python-dev
+    container_name: agilina-stt
+    profiles: ["voice"]
+    command:
+      - uvicorn
+      - agilina_stt.main:app
+      - --reload
+      - --reload-dir=/app/stt/src
+      - --reload-dir=/app/shared/src
+      - --host=0.0.0.0
+      - --port=8001
+    ports:
+      - "8001:8001"
+
+  agent:
+    <<: *python-dev
+    container_name: agilina-agent
+    profiles: ["voice"]
+    command: ["python", "-m", "agilina_agent.main", "dev"]
+    environment:
+      AGILINA_API_PUBLIC_URL: http://api:8000
+      AGILINA_STT_URL: http://stt:8001
+      AGILINA_KEYCLOAK_URL: http://keycloak:8080
+
+  # One-off containers: `make test`, `make lint`, `make verify`...
+  tools:
+    <<: *python-dev
+    profiles: ["tools"]
+
+  web-test:
+    build:
+      context: ../web
+      target: test
+    profiles: ["tools"]
+    volumes:
+      - ../web/src:/app/src
+      - ../web/public:/app/public
 
 volumes:
   postgres-data:

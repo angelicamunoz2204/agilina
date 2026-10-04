@@ -1,42 +1,54 @@
 # Entorno local
 
+Todo corre en contenedores: lo único que necesitas en tu máquina es **Docker con
+Compose** y **make** (más `bash`, `curl` y `openssl`, que cualquier Linux o macOS
+ya trae). No se instala Python, uv, Node ni nada más.
+
 ## Qué corre dónde
 
-| Pieza | Cómo corre | Dónde escucha |
-| --- | --- | --- |
-| Postgres | Contenedor (`make infra`) | `localhost:5432` |
-| Keycloak | Contenedor (`make infra`) | `localhost:8080`, sondas en `:9000` |
-| API | Proceso local (`make api`) | `localhost:8000`, documentación en `/docs` |
-| Servicio de transcripción | Proceso local (`make stt`) | `localhost:8001` |
-| Worker del agente | Proceso local (`make agent`) | Sin puerto: se conecta hacia afuera |
-| Aplicación web | Proceso local (`make web`) | `localhost:4200` |
+| Pieza | Contenedor | Dónde escucha | Cuándo |
+| --- | --- | --- | --- |
+| Postgres | `postgres` | `localhost:5432` | `make up` |
+| Keycloak | `keycloak` | `localhost:8080`, sondas en `:9000` | `make up` |
+| Mailpit (correo de pruebas) | `mailpit` | Bandeja en `localhost:8025`, SMTP en `:1025` | `make up` |
+| API | `api` | `localhost:8000`, documentación en `/docs` | `make up` |
+| Aplicación web | `web` | `localhost:4200` | `make up` |
+| Servicio de transcripción | `stt` | `localhost:8001` | `make stt` |
+| Worker del agente | `agent` | Sin puerto: se conecta hacia afuera | `make agent` |
 
-La base de datos y la identidad van en contenedores porque nadie las edita; los
-cuatro desplegables corren como procesos locales porque se editan todo el
-tiempo y la recarga automática es la diferencia entre iterar y esperar. La
-contenerización de los cuatro llega con el despliegue en la nube (HU-38).
+El código fuente se monta dentro de los contenedores de desarrollo: al guardar un
+archivo, la API y la web se recargan solas, sin reconstruir nada. Reconstruir
+solo hace falta cuando cambian las dependencias (`pyproject.toml`,
+`package.json`); `make up` ya lo hace.
+
+Mailpit atrapa todo correo que envíe la aplicación (por ejemplo el enlace de
+activación de una invitación): nada sale de tu máquina y lo ves en
+<http://localhost:8025>.
 
 ## Requisitos
 
-- Docker con Compose
-- [uv](https://docs.astral.sh/uv/) para Python
-- Node 22 y npm para la aplicación web
-- `make`
+- Docker con Compose (v2 o posterior)
+- `make`, `bash`, `curl` y `openssl` (el `.env` se genera con `openssl` y el arranque espera a Keycloak con `curl`)
 
-En macOS: `brew install uv node` y Docker Desktop.
+No hace falta `buildx`: las imágenes se construyen también con el *builder*
+clásico de Docker.
 
 ## Primera vez
 
 ```bash
-make up      # .env, dependencias, contenedores y migraciones
-make hooks     # instala los ganchos de pre-commit (una vez por clon)
+make up      # .env, imágenes, contenedores, espera y migraciones
 ```
 
-`make up` crea el `.env` a partir de `.env.example` si no existe y le
-genera claves locales aleatorias para Postgres y para el administrador de
-Keycloak, de modo que el repositorio no necesita guardar ninguna. Las claves de
-LiveKit, ElevenLabs y Gemini las completas tú: sin ellas la API y la web
-funcionan, pero el worker no entra a ninguna sala.
+`make up` crea el `.env` a partir de `.env.example` si no existe y le genera
+claves locales aleatorias para Postgres y para el administrador de Keycloak, de
+modo que el repositorio no necesita guardar ninguna. Las claves de LiveKit,
+ElevenLabs y Gemini las completas tú: sin ellas la API y la web funcionan, pero
+el worker no entra a ninguna sala. La primera ejecución descarga y construye las
+imágenes y tarda varios minutos; las siguientes son rápidas.
+
+Los ganchos de git (`make hooks`) son opcionales y necesitan
+[pre-commit](https://pre-commit.com) en tu máquina. La CI ejecuta las mismas
+verificaciones, y `make verify` las corre en contenedores.
 
 ## Si ya tenías un `.env`
 
@@ -47,15 +59,57 @@ nuevo, o cambia los nombres a mano según `.env.example` (por ejemplo
 `AGILINA_URL_BD` → `AGILINA_DB_URL`, `AGILINA_NIVEL_LOG` → `AGILINA_LOG_LEVEL`).
 La contraseña de Postgres debe seguir siendo la misma si conservas el volumen.
 
+Dentro de la red de contenedores los servicios se alcanzan por nombre
+(`postgres`, `keycloak`, `stt`, `api`): el compose ya sobrescribe esas variables
+para los contenedores, de modo que el `.env` sigue apuntando a `localhost`.
+
+## Entrar a Keycloak
+
+La consola de administración está en <http://localhost:8080/admin> (con el
+entorno levantado: `make up` o `make infra`). Las credenciales están en tu
+`.env`, que git ignora y `make env` genera la primera vez:
+
+| Dato | Variable del `.env` | Valor |
+| --- | --- | --- |
+| Usuario | `KEYCLOAK_ADMIN` | `admin` |
+| Contraseña | `KEYCLOAK_ADMIN_PASSWORD` | Aleatoria, generada por `make env` |
+
+**Cómo ver la contraseña:** desde la carpeta del repo, ejecuta
+
+```bash
+grep KEYCLOAK_ADMIN .env
+```
+
+Imprime las dos líneas, `KEYCLOAK_ADMIN=admin` y
+`KEYCLOAK_ADMIN_PASSWORD=<la contraseña>`; la contraseña es lo que va después del
+`=`. También puedes abrir el archivo `.env` y buscar esa variable. Para ver
+solo la contraseña:
+
+```bash
+grep '^KEYCLOAK_ADMIN_PASSWORD=' .env | cut -d= -f2
+```
+
+Entras al realm `master`, que es el de administración; el de Agilina es
+`agilina` y se elige en el menú de arriba a la izquierda. Este usuario administra
+Keycloak, no es una persona de Agilina: el realm `agilina` solo tiene la cuenta
+de servicio del worker, y las personas llegan con las invitaciones (HU-02).
+
+La contraseña solo se aplica cuando Keycloak se crea por primera vez, con su
+volumen de datos vacío. Si cambias `KEYCLOAK_ADMIN_PASSWORD` después, Keycloak
+sigue con la anterior: para empezar de cero, `make clean` y `make up` (borra los
+datos de Postgres y de Keycloak). Si el `.env` se perdió, hay que hacer lo mismo,
+porque `make env` generaría una contraseña nueva que no coincide con la que ya
+guardó el volumen.
+
 ## El secreto del worker
 
 El realm de Keycloak se importa desde `infra/keycloak/realm-agilina.json` y el
 secreto del cliente `agilina-worker` lo genera Keycloak: no está en el
 repositorio. Para obtenerlo:
 
-1. Entra a <http://localhost:8080/admin> con las credenciales de tu `.env`.
+1. Entra a la consola de Keycloak (ver la sección anterior).
 2. Realm `agilina` → Clients → `agilina-worker` → pestaña Credentials.
-3. Copia el secreto en `AGILINA_KEYCLOAK_WORKER_SECRET` de tu `.env`.
+3. Copia el secreto en `AGILINA_KEYCLOAK_WORKER_SECRET` de tu `.env` y ejecuta `make agent`.
 
 ## Trabajar sin GPU
 
@@ -64,34 +118,36 @@ El servicio de transcripción arranca en modo simulado
 modelo. Es lo que permite ejercitar la ceremonia completa en un portátil y lo
 que mantiene el pipeline por debajo de los diez minutos.
 
-Con GPU disponible:
-
-```bash
-uv sync --package agilina-stt --extra gpu
-AGILINA_STT_SIMULATED=false AGILINA_STT_DEVICE=cuda make stt
-```
+La imagen con CUDA para transcribir de verdad llega con el despliegue en la nube
+(HU-38); hoy el modo con GPU solo existe en el spike de voz (HU-01).
 
 ## Comandos frecuentes
 
 ```bash
-make              # lista todos los objetivos
-make verify       # exactamente lo que corre el pipeline, en tu máquina
-make test         # solo las pruebas
-make typecheck    # mypy en modo estricto
-make arch         # reglas de arquitectura (capas y fronteras entre contextos)
+make                # lista todos los objetivos
+make up             # construye, levanta todo, espera y migra
+make down           # detiene los contenedores sin borrar datos
+make logs s=api     # logs de un servicio (sin s=, de todos)
+make ps             # qué está corriendo
+make migrate        # aplica las migraciones pendientes
 make migration m="crear tabla equipos"   # nueva migración de Alembic
-make migrate       # aplica las migraciones pendientes
-make logs         # logs de Postgres y Keycloak
-make down        # detiene los contenedores sin borrar datos
-make clean      # borra cachés, dependencias y datos de los contenedores
+make test           # pruebas de Python y de la web
+make lint           # ruff y ESLint
+make typecheck      # mypy en modo estricto
+make arch           # reglas de arquitectura (capas y fronteras entre contextos)
+make verify         # exactamente lo que corre el pipeline, en contenedores
+make lock           # actualiza uv.lock y package-lock.json tras cambiar dependencias
+make clean          # borra contenedores, volúmenes, imágenes y cachés
 ```
 
 ## Cuando algo falla
 
 | Síntoma | Causa habitual |
 | --- | --- |
-| `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs` y reintenta |
-| La web muestra «No disponible» | La API no está corriendo: `make api` |
+| `make up` dice que un puerto está ocupado | Otro servicio usa 5432, 8000, 8080, 4200, 8025 o 1025. Detenlo o cambia el puerto en el `.env` (`POSTGRES_PORT`, `AGILINA_API_PORT`, `MAILPIT_UI_PORT`…) |
+| `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs s=postgres` y reintenta |
+| `make agent` pide completar el `.env` | Faltan `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET`: el worker no arranca sin ellos |
+| La web muestra «No disponible» | La API no está corriendo: `make logs s=api` |
 | Keycloak no importa el realm | El volumen ya tenía datos: `make clean` y `make up` |
-| `uv sync` no encuentra `agilina-shared` | Ejecútalo desde la raíz del repositorio, no desde una carpeta |
-| Las pruebas de la web no arrancan | Falta Chrome; instálalo o usa `npm test` con tu navegador |
+| Cambié `package.json` o `pyproject.toml` y la imagen no se construye ("lockfile needs to be updated" o `npm ci` falla) | Ejecuta `make lock`, commitea los dos locks y repite `make up` |
+| Los archivos que crea un contenedor son de `root` | El compose usa tu usuario (`HOST_UID`/`HOST_GID`); ejecuta siempre con `make`, no con `docker compose` a mano |

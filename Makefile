@@ -1,17 +1,26 @@
 # ============================================================================
 # Agilina — a single entry point to bring up, test and verify.
-# `make` without arguments lists the available targets.
+# Everything runs in containers: the only things needed on your machine are
+# Docker (with Compose) and make, plus bash, curl and openssl, which any Linux or
+# macOS already has. `make` without arguments lists the targets.
 # ============================================================================
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
-UV      := uv
-WEB     := web
+# The dev containers run as your user, so the files they create are yours.
+export HOST_UID := $(shell id -u)
+export HOST_GID := $(shell id -g)
 
-.PHONY: help env install hooks infra migrate migration up down restart \
-        api agent stt web test test-python test-web coverage lint format \
-        typecheck arch verify keycloak-admin logs clean
+COMPOSE   := docker compose -f infra/docker-compose.yml --env-file .env
+# --build: `run` reuses an image that already exists under the same name; building first
+# guarantees the image matches the current Dockerfile and dependencies (cached, so cheap).
+TOOLS     := $(COMPOSE) --profile tools run --rm --no-deps --build tools
+WEB       := $(COMPOSE) run --rm --no-deps --build web
+PYPACKAGES := shared/src api/src agent/src stt/src
+
+.PHONY: help env up infra down restart ps logs migrate migration stt agent \
+        lint format typecheck arch test test-python test-web coverage verify \
+        lock hooks keycloak-admin clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -30,101 +39,109 @@ env: ## Create .env from .env.example, with generated local passwords
 		echo "Fill in the LiveKit, Gemini and ElevenLabs keys before using voice."; \
 	}
 
-install: env ## Install Python (uv) and web (npm) dependencies
-	$(UV) sync --all-packages
-	cd $(WEB) && (test -f package-lock.json && npm ci || npm install)
-
-hooks: ## Install the pre-commit hooks (once per clone)
-	$(UV) run pre-commit install --install-hooks
-	$(UV) run pre-commit install --hook-type commit-msg
-	$(UV) run pre-commit install --hook-type pre-push
-
-# --------------------------------------------------------- Infrastructure ---
-infra: env ## Bring up Postgres and Keycloak in containers
-	$(COMPOSE) up -d postgres keycloak
-	@echo "Postgres on localhost:5432 · Keycloak on http://localhost:8080"
-
-migrate: ## Apply the pending database migrations
-	cd api && $(UV) run alembic upgrade head
-
-migration: ## Create a new migration: make migration m="description"
-	cd api && $(UV) run alembic revision --autogenerate -m "$(m)"
-
-up: install infra ## THE command: leave the whole environment ready to work
+up: env ## THE command: build and start everything, wait, migrate
+	$(COMPOSE) up -d --build postgres keycloak mailpit api web
 	./infra/wait-for-services.sh
 	$(MAKE) migrate
 	@echo ""
-	@echo "Environment ready. In separate terminals:"
-	@echo "  make api    → http://localhost:8000/docs"
-	@echo "  make stt    → http://localhost:8001/docs"
-	@echo "  make web    → http://localhost:4200"
-	@echo "  make agent  → worker registered in LiveKit"
+	@echo "Environment ready:"
+	@echo "  API       http://localhost:8000/docs"
+	@echo "  Web       http://localhost:4200"
+	@echo "  Mailpit   http://localhost:8025   (every email the app sends lands here)"
+	@echo "  Keycloak  http://localhost:8080"
+	@echo "Voice (optional): make stt, make agent. Logs: make logs s=api"
 
-down: ## Stop the containers without deleting the data
-	$(COMPOSE) down
+infra: env ## Start only the infrastructure: Postgres, Keycloak and Mailpit
+	$(COMPOSE) up -d postgres keycloak mailpit
+	@echo "Postgres :5432 · Keycloak http://localhost:8080 · Mailpit http://localhost:8025"
+
+down: env ## Stop the containers without deleting the data
+	$(COMPOSE) --profile voice --profile tools down
 
 restart: down up ## Restart the whole environment
 
-logs: ## Follow the infrastructure logs
-	$(COMPOSE) logs -f
+ps: env ## List the running services
+	$(COMPOSE) --profile voice ps
 
-keycloak-admin: ## Show where the Keycloak admin console is
-	@echo "http://localhost:8080/admin — user and password in your .env"
+logs: env ## Follow the logs: make logs [s=api]
+	$(COMPOSE) --profile voice logs -f $(s)
 
-# ------------------------------------------------------------ Executables ---
-api: env ## Run the API with auto-reload
-	@set -a; . ./.env; set +a; \
-	$(UV) run uvicorn agilina_api.bootstrap.app:app --reload \
-		--host $${AGILINA_API_HOST:-127.0.0.1} --port $${AGILINA_API_PORT:-8000}
+keycloak-admin: env ## Show the Keycloak admin console and its credentials
+	@echo "http://localhost:8080/admin"
+	@grep -E '^KEYCLOAK_ADMIN(_PASSWORD)?=' .env
 
-agent: env ## Run the agent worker and register it in LiveKit
-	@set -a; . ./.env; set +a; $(UV) run python -m agilina_agent.main dev
+# --------------------------------------------------------------- Database ---
+migrate: env ## Apply the pending database migrations
+	$(COMPOSE) run --rm --build -w /app/api api alembic upgrade head
 
-stt: env ## Run the transcription service
-	@set -a; . ./.env; set +a; \
-	$(UV) run uvicorn agilina_stt.main:app --reload --host 127.0.0.1 --port 8001
+migration: env ## Create a new migration: make migration m="description"
+	$(COMPOSE) run --rm --build -w /app/api api alembic revision --autogenerate -m "$(m)"
 
-web: ## Run the Angular application
-	cd $(WEB) && npm start
+# ------------------------------------------------------------------ Voice ---
+stt: env ## Start the transcription service (simulated unless you set a GPU)
+	$(COMPOSE) --profile voice up -d --build stt
+	@echo "STT http://localhost:8001/docs"
+
+agent: env ## Start the agent worker and register it in LiveKit
+	@grep -Eq '^AGILINA_LIVEKIT_API_KEY=.+' .env && grep -Eq '^AGILINA_LIVEKIT_API_SECRET=.+' .env || { \
+		echo "The agent needs LiveKit: fill AGILINA_LIVEKIT_URL, AGILINA_LIVEKIT_API_KEY and"; \
+		echo "AGILINA_LIVEKIT_API_SECRET in .env, then run make agent again."; exit 1; }
+	$(COMPOSE) --profile voice up -d --build stt agent
+	@echo "Agent started. Check that it registered: make logs s=agent"
 
 # ---------------------------------------------------------------- Quality ---
-lint: ## Static analysis of Python and the web
-	$(UV) run ruff check .
-	cd $(WEB) && npm run lint
+lint: env ## Static analysis of Python and the web
+	$(TOOLS) ruff check .
+	$(WEB) npm run lint
 
-format: ## Format the Python code
-	$(UV) run ruff format .
-	$(UV) run ruff check --fix .
+format: env ## Format the Python code
+	$(TOOLS) sh -c "ruff format . && ruff check --fix ."
 
-typecheck: ## Strict type checking of the Python packages
-	$(UV) run mypy shared/src api/src agent/src stt/src
+typecheck: env ## Strict type checking of the Python packages
+	$(TOOLS) mypy $(PYPACKAGES)
 
-arch: ## Check the architecture rules (layers and context boundaries)
-	$(UV) run lint-imports
+arch: env ## Check the architecture rules (layers and context boundaries)
+	$(TOOLS) lint-imports
 
 test: test-python test-web ## Run all the tests
 
-test-python: ## Tests of the Python packages
-	$(UV) run pytest
+test-python: env ## Tests of the Python packages
+	$(TOOLS) pytest
 
-test-web: ## Tests of the Angular application
-	cd $(WEB) && npm run test:ci
+test-web: env ## Tests of the Angular application (headless Chromium)
+	$(COMPOSE) --profile tools run --rm --no-deps --build web-test
 
-coverage: ## Python tests with a coverage report
-	$(UV) run pytest --cov --cov-report=term-missing --cov-report=xml
+coverage: env ## Python tests with a coverage report
+	$(TOOLS) pytest --cov --cov-report=term-missing --cov-report=xml
 
-verify: ## The same the pipeline runs, on your machine
-	$(UV) run ruff format --check .
-	$(UV) run ruff check .
-	$(UV) run mypy shared/src api/src agent/src stt/src
-	$(UV) run lint-imports
-	$(UV) run pytest --cov --cov-report=term-missing
-	cd $(WEB) && npm run lint && npm run build && npm run test:ci
+verify: env ## The same the pipeline runs, in containers
+	$(TOOLS) sh -c "ruff format --check . && ruff check . && mypy $(PYPACKAGES) && lint-imports && pytest --cov --cov-report=term-missing"
+	$(WEB) sh -c "npm run lint && npm run build"
+	$(MAKE) test-web
 	@echo ""
 	@echo "Verification green. The pull request should not fail on analysis or tests."
 
-clean: ## Delete build artifacts, caches and containers with their data
-	$(COMPOSE) down -v
-	rm -rf .venv .pytest_cache .ruff_cache .mypy_cache htmlcov coverage.xml .coverage
-	rm -rf $(WEB)/node_modules $(WEB)/dist $(WEB)/.angular $(WEB)/coverage
+# ----------------------------------------------------------- Dependencies ---
+# Run it after changing pyproject.toml or web/package.json, and commit the two lock
+# files: they pin the exact version of every library, so the images, the CI and every
+# machine install the same thing. It does not upgrade what is already pinned.
+# It uses plain uv and node images, not ours: our images require the lock to be
+# up to date, and this is the command that brings it up to date.
+UV_IMAGE   := ghcr.io/astral-sh/uv:0.9-python3.12-bookworm-slim
+NODE_IMAGE := node:22-bookworm-slim
+AS_YOU     := -u "$(HOST_UID):$(HOST_GID)" -e HOME=/tmp
+
+lock: ## Update uv.lock and web/package-lock.json (commit them)
+	docker run --rm $(AS_YOU) -e UV_CACHE_DIR=/tmp/uv -v "$(CURDIR):/app" -w /app $(UV_IMAGE) uv lock
+	docker run --rm $(AS_YOU) -v "$(CURDIR)/web:/app" -w /app $(NODE_IMAGE) npm install --package-lock-only
+
+# ------------------------------------------------------------------ Hooks ---
+hooks: ## Install the git hooks (optional; needs pre-commit on your machine)
+	pre-commit install --install-hooks
+	pre-commit install --hook-type commit-msg
+	pre-commit install --hook-type pre-push
+
+clean: ## Delete the containers with their data, the images and the caches
+	-$(COMPOSE) --profile voice --profile tools down -v --rmi local
+	rm -rf .pytest_cache .ruff_cache .mypy_cache .import_linter_cache htmlcov coverage.xml .coverage
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

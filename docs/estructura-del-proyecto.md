@@ -18,10 +18,10 @@ agilina/
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre durante la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper (GPU)
 ├── web/       Aplicación web en Angular
-├── infra/     Compose de Postgres y Keycloak, realm versionado, scripts
+├── infra/     Compose del entorno, Dockerfile de Python, realm versionado, scripts
 ├── docs/      Documentación técnica y decisiones arquitectónicas (ADR)
 ├── .github/   Pipeline de verificación, plantillas y validación de commits
-├── Makefile   Punto de entrada: levantar, probar y verificar
+├── Makefile   Punto de entrada: levantar, probar, verificar y actualizar los locks
 └── pyproject.toml   Workspace de uv y configuración de ruff, mypy, pytest e import-linter
 ```
 
@@ -202,14 +202,23 @@ web/src/app/
 Hoy solo existe `features/status` (la pantalla de estado del entorno). Las
 demás pantallas llegan con sus historias.
 
-### `infra/`
+### `infra/` y los contenedores
+
+Todo corre en contenedores (solo hacen falta Docker y `make`):
 
 | Archivo | Para qué |
 | --- | --- |
-| `docker-compose.yml` | Postgres y Keycloak en contenedores |
+| `docker-compose.yml` | El entorno: `postgres`, `keycloak`, `mailpit`, `api` y `web`; con el perfil `voice`, `stt` y `agent`; con el perfil `tools`, los contenedores de un solo uso de las pruebas y verificaciones |
+| `docker/python.Dockerfile` | Imagen de Python con varios objetivos: `dev` (todas las dependencias y las herramientas; el código se monta en `/app`) y `api` (producción: solo sus dependencias, código instalado, sin uv y sin root) |
+| `../web/Dockerfile` | Imagen de la web: `dev` (`ng serve`), `test` (con Chromium), `build` y `prod` (nginx sin privilegios) |
 | `keycloak/realm-agilina.json` | Realm, clientes y roles versionados: no se configura a mano |
 | `postgres/01-extensions.sql` | Extensiones y zona UTC, solo al crear el volumen |
 | `wait-for-services.sh` | Espera a que Postgres y Keycloak respondan antes de migrar |
+
+Los contenedores de desarrollo corren con tu usuario (`HOST_UID` y `HOST_GID`,
+que exporta el `Makefile`), de modo que los archivos que crean son tuyos. Por eso
+conviene ejecutar siempre con `make` y no con `docker compose` a mano. Las
+imágenes de producción de `stt` y `agent` llegan con el despliegue (HU-38).
 
 ## Reglas que se verifican solas
 

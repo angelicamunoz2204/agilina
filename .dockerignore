@@ -1,0 +1,20 @@
+# Build context of the Python image (the repository root).
+# Keep it small: only what the image needs is sent to the Docker daemon.
+.git
+.github
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.py[cod]
+.venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.import_linter_cache
+.coverage
+coverage.xml
+htmlcov
+docs
+web
+infra
