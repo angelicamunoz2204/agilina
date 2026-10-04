@@ -17,3 +17,12 @@
 - Con despacho automático, el agente entra a toda sala nueva del proyecto: un trabajo por sala.
   Saluda una sola vez al arrancar; quienes entran después no disparan un nuevo saludo.
 - ElevenLabs funciona desde el plugin con el modelo eleven_v4_turbo.
+- Segunda prueba en sala con gemini-3.8-flash: 504 (timeout de ~11 s) y luego 503. En el nivel
+  gratuito el modelo más reciente no es confiable; se valida la cadena con gemini-3.5-flash-lite.
+- Whisper small en CPU: "Keycloak" → "kicklock" y "Hoy sigo" → "voy seguro". Errores de palabras
+  comunes, no solo de términos técnicos: revisar con el modelo grande en GPU.
+- Transcripción en sala: 4,20 s desde el fin del habla (incluye carga en frío de 1,11 s; faltaba WHISPER__TTL).
+- Cadena completa funcionando con gemini-3.5-flash-lite: transcripción → resumen → voz en la sala.
+  Tiempos en CPU (solo referencia): transcripción 5,60 s; respuesta registrada ~8,1 s después del turno.
+  "Keycloak" volvió a transcribirse como "KeyClub", y Gemini repitió el error en el resumen:
+  los errores del STT se propagan al LLM sin corrección.
