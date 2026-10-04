@@ -101,6 +101,84 @@ datos de Postgres y de Keycloak). Si el `.env` se perdió, hay que hacer lo mism
 porque `make env` generaría una contraseña nueva que no coincide con la que ya
 guardó el volumen.
 
+## Correo
+
+Todo correo que envía la aplicación (por ejemplo el enlace de activación de una
+invitación) sale por SMTP, y **qué servidor lo entrega es solo configuración**
+(AD-23). Por defecto es **Mailpit**: atrapa los mensajes y los muestra en
+<http://localhost:8025>; nada sale de tu máquina. Es lo que usan el desarrollo y la CI.
+
+Para comprobar el envío en cualquier momento (con `make up` o `make infra` activos):
+
+```bash
+make mail-test to=alguien@example.com            # en el idioma por defecto
+make mail-test to=alguien@example.com lang=en    # en inglés (lang=es o lang=en)
+```
+
+Con Mailpit, el mensaje aparece en su bandeja; la dirección puede ser cualquiera. Es un
+correo con el diseño real (HTML) y su versión de texto: en Mailpit puedes alternar entre
+las pestañas *HTML*, *Text* y *HTML Source*, y ver cómo se adapta a un ancho de móvil.
+
+### Plantillas de correo
+
+Los correos no llevan texto escrito en el código: se arman con plantillas en
+`api/src/agilina_api/shared/infrastructure/mail/`.
+
+| Archivo | Qué es |
+| --- | --- |
+| `templates/layout.html` | El marco común: cabecera con la marca, tarjeta de contenido y pie |
+| `templates/<nombre>.html` | El contenido de un correo; extiende el marco |
+| `templates/<nombre>.txt` | La versión de texto plano, que muestran los clientes sin HTML |
+| `texts.py` | Todos los textos, en español y en inglés |
+| `theme.py` | Los colores y las tipografías |
+
+Para ver un cambio de diseño: edita la plantilla, ejecuta `make mail-test to=...` y
+abre Mailpit (la API recarga sola, y el comando renderiza la plantilla en cada
+ejecución). Reglas del diseño: los colores y las tipografías **son los tokens de los mockups**
+(`context/mockups.md`: índigo `#3b5bd4`, tarjeta blanca sobre fondo azul pálido,
+Plus Jakarta Sans e Inter) y viven solo en `theme.py`; una prueba los reconvierte desde
+los valores originales del mockup y falla si uno se desvía. Además, tema oscuro con
+`prefers-color-scheme` para los clientes que lo soportan. Sin imágenes ni hojas de estilo
+remotas (los clientes de correo las bloquean), estilos en línea y maquetación con tablas;
+por eso el logo es la inicial «A» sobre un cuadrado índigo y no el icono del mockup. Los valores que entran
+en el HTML se escapan solos, y un parámetro que falta hace fallar el envío en vez de
+mandar un correo a medias.
+
+### Cambiar a Amazon SES (sandbox)
+
+Sirve para una demo con correo real o para probar el camino de producción. Los pasos de
+la consola de AWS son los que conozco; confírmalos allí.
+
+1. En la consola de **SES**, elige la región (la misma donde se desplegará; el servidor
+   SMTP depende de ella).
+2. **Identities → Create identity → Email address**, para la dirección que será el
+   remitente y para cada destinatario de prueba (tú, Diego…). Cada una recibe un correo
+   con un enlace de verificación. En *sandbox*, SES solo entrega a identidades verificadas.
+3. **SMTP settings → Create SMTP credentials.** Crea un usuario de IAM y muestra su
+   usuario y contraseña SMTP **una sola vez**; no son las de tu cuenta de AWS.
+4. En tu `.env` (nunca en el repositorio):
+
+   ```bash
+   AGILINA_SMTP_HOST=email-smtp.<región>.amazonaws.com
+   AGILINA_SMTP_PORT=587
+   AGILINA_SMTP_USER=<usuario SMTP>
+   AGILINA_SMTP_PASSWORD=<contraseña SMTP>
+   AGILINA_SMTP_SECURITY=starttls
+   AGILINA_MAIL_FROM='Agilina <la-direccion-verificada>'
+   ```
+5. `make restart` (la API lee el `.env` al crearse) y luego
+   `make mail-test to=<una dirección verificada>`. Si dice «Not sent», revisa la región,
+   la verificación de las dos direcciones y las credenciales.
+
+Límites mientras no haya dominio propio: *sandbox* (cerca de 200 correos por día y solo a
+destinatarios verificados) y, como el remitente no tiene SPF ni DKIM propios, los correos
+pueden llegar a spam. Salir del *sandbox* y enviar a cualquiera se pide en AWS y requiere
+un dominio verificado: llega con el despliegue (HU-38).
+
+Para **volver a Mailpit**, restaura esas variables a los valores de `.env.example`
+(servidor `mailpit`, puerto `1025`, sin usuario ni contraseña, seguridad `none`) y
+`make restart`.
+
 ## El secreto del worker
 
 El realm de Keycloak se importa desde `infra/keycloak/realm-agilina.json` y el
@@ -130,6 +208,7 @@ make down           # detiene los contenedores sin borrar datos
 make logs s=api     # logs de un servicio (sin s=, de todos)
 make ps             # qué está corriendo
 make migrate        # aplica las migraciones pendientes
+make mail-test to=a@b.com   # envía un correo de prueba con el SMTP configurado
 make migration m="crear tabla equipos"   # nueva migración de Alembic
 make test           # pruebas de Python y de la web
 make lint           # ruff y ESLint

@@ -114,8 +114,8 @@ api/
 │   ├── bootstrap/app.py              Raíz de composición: fábrica de la app, lifespan, cableado
 │   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
-│   │   ├── application/              Consultas de salud y los puertos Clock y UnitOfWork
-│   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL
+│   │   ├── application/              Consultas de salud y los puertos Clock, UnitOfWork, Mailer y EmailRenderer
+│   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL, correo SMTP y plantillas de correo (Jinja2)
 │   │   └── presentation/http/        Router de salud y dependencias declaradas
 │   ├── identity/                     Contexto (HU-02): las cuatro capas, aún sin código
 │   ├── teams/                        Contexto (HU-02 lo necesita, HU-05 en adelante lo construye): las cuatro capas, aún sin código
@@ -268,6 +268,7 @@ en el code review.
 ## Dónde está el porqué
 
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
+- Cómo se envía el correo (SMTP, Mailpit y el proveedor por configuración): [AD-23](adr/0023-enviar-correo-por-smtp-con-mailpit-y-proveedor-configurable.md).
 - Cómo nace el primer Administrador sin registro público: [AD-22](adr/0022-emitir-por-cli-la-invitacion-del-primer-administrador.md).
 - Cómo se escribe el código dentro de esta estructura: [code-conventions.md](code-conventions.md).
 - El vocabulario del dominio: [glossary.md](glossary.md).
