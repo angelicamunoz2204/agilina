@@ -55,3 +55,53 @@ El `identity` es el nombre que Agilina pronuncia al dar la palabra.
 - `USAR_LLM=1`: responde Gemini con un resumen de una frase.
 
 Tras cambiar `.env`: `docker compose up -d --force-recreate agent`.
+
+## Despliegue en GPU
+
+En la instancia (g4dn.xlarge, Tesla T4) corren `whisper`, `whisper-warmup` y `agent`; el cliente sigue en el Mac.
+El override `docker-compose.gpu.yml` cambia Whisper a la imagen CUDA, reserva la GPU y no publica el puerto 8000.
+
+1. Encender la instancia en la consola de AWS (us-east-2) y anotar su IP pública: cambia en cada encendido.
+2. Subir el proyecto desde el Mac:
+
+   ```bash
+   GPU_LLAVE=~/.ssh/<llave>.pem scripts/subir-gpu.sh <ip>
+   ```
+
+3. Copiar el `.env` aparte (el script imprime el comando exacto). En la instancia, el `.env` debe tener
+   `WHISPER_BASE_URL=http://whisper:8000/v1` y el modelo a medir en `WHISPER_MODEL`:
+   `Systran/faster-whisper-small` (referencia) o `deepdml/faster-whisper-large-v3-turbo-ct2`.
+
+   ```bash
+   scp -i ~/.ssh/<llave>.pem .env ubuntu@<ip>:spike-hu01/.env
+   ```
+
+4. Entrar y verificar Compose (≥ 2.24.4, por `!reset`) y la GPU:
+
+   ```bash
+   ssh -i ~/.ssh/<llave>.pem ubuntu@<ip>
+   docker compose version
+   nvidia-smi
+   ```
+
+5. Levantar en la instancia, desde `~/spike-hu01`:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build whisper whisper-warmup agent
+   ```
+
+   La primera vez el warmup descarga el modelo (turbo: ~1,6 GB) antes de transcribir; el agente arranca cuando termina.
+
+6. Confirmar la carga del modelo y que el agente quedó registrado:
+
+   ```bash
+   docker compose logs whisper | grep -i "loaded in"
+   docker compose logs whisper-warmup
+   docker compose logs agent | grep "registered worker"
+   ```
+
+   Para cambiar de modelo: editar `WHISPER_MODEL` en el `.env` de la instancia y
+   `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --force-recreate whisper-warmup agent`.
+
+7. **Al terminar cada sesión, detener la instancia** en la consola de AWS: se cobra por hora mientras esté encendida.
+   Los modelos descargados quedan en el volumen `hf-hub-cache` del disco de la instancia.

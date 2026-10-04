@@ -31,6 +31,8 @@ Antes de trabajar, lee `README.md`, `UMBRALES.md` y `HALLAZGOS.md`.
 spike-hu01/
 ├── CLAUDE.md, README.md, UMBRALES.md, HALLAZGOS.md
 ├── docker-compose.yml   # client, agent, whisper, whisper-warmup
+├── docker-compose.gpu.yml # override para la instancia GPU (imagen CUDA, reserva de GPU, sin puerto 8000)
+├── scripts/subir-gpu.sh # rsync a la instancia (sin client/ ni .env)
 ├── .env / .env.example
 ├── client/              # Angular 22 + livekit-client 2.22 (cliente mínimo de sala)
 ├── agent/               # Python 3.12 + livekit-agents 1.8.4 (agent.py, requirements.txt, Dockerfile)
@@ -42,8 +44,8 @@ spike-hu01/
 | Servicio | Qué hace |
 |---|---|
 | `client` | Cliente Angular en http://localhost:4200. URL y token se pegan en pantalla. |
-| `whisper` | speaches v0.8.2 (API compatible con OpenAI) en :8000, imagen CPU fijada por digest. `WHISPER__TTL=-1`. |
-| `whisper-warmup` | Espera a Whisper y envía `warmup.wav` para cargar el modelo. speaches no tiene opción de precarga. |
+| `whisper` | speaches 0.8.3 (`/openapi.json` dice v0.8.2; API compatible con OpenAI) en :8000, imagen CPU fijada por digest. `WHISPER__TTL=-1`. |
+| `whisper-warmup` | Espera a Whisper, descarga el modelo (`POST /v1/models/...`) y envía `warmup.wav` para cargarlo. speaches no tiene opción de precarga ni descarga sola. |
 | `agent` | Worker de LiveKit. Arranca solo si `whisper-warmup` terminó bien. Despacho automático: entra a toda sala nueva. |
 
 Variables de `.env`: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `GOOGLE_API_KEY`, `GEMINI_MODEL`,

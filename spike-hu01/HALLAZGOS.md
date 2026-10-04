@@ -10,7 +10,7 @@
 |---|---|
 | Cliente | Angular 22.2, TypeScript 6.0.2, livekit-client 2.22.3 |
 | Agente | Python 3.12, livekit-agents 1.8.4 (plugins 1.8.4), livekit rtc 1.1.20 |
-| STT | speaches v0.8.2 (CPU, fijado por digest), Systran/faster-whisper-small, idioma es |
+| STT | speaches 0.8.3 (`0.8.3-cpu` fijado por digest; `/openapi.json` dice v0.8.2), Systran/faster-whisper-small, idioma es. GPU: `0.8.3-cuda` |
 | TTS | ElevenLabs eleven_v4_turbo, voz predeterminada |
 | LLM | gemini-3.5-flash-lite (respaldo; gemini-3.8-flash saturado), cuenta secundaria en nivel gratuito |
 | Salas | LiveKit Cloud, proyecto agilina; worker registrado en US East B |
@@ -167,16 +167,6 @@
   transcripciones pendientes. Por eso no se evalúa el partido de turnos por pausas del VAD.
   Para la medición: registrar también el tiempo del clic a la última transcripción.
 
-## Paso 14 · Instancia GPU
-- g4dn.xlarge en us-east-2: USD 0,526/h (Linux, on-demand), exactamente en el límite de U4 (≤ 0,526). Cumple sin margen.
-- AMI: Deep Learning Base AMI with Single CUDA (Ubuntu 24.04, x86). Trae driver NVIDIA 595.91, CUDA 13.2,
-  Docker y NVIDIA Container Toolkit: `docker run --gpus all` ve la GPU sin instalar nada.
-- GPU: Tesla T4, 15 GB de memoria.
-- Security group solo con SSH desde la IP de Diego; ningún puerto de servicio expuesto.
-- La apelación funcionó: AWS aprobó 8 vCPU G/VT en us-east-2 tras reducir el pedido a una instancia
-  y detallar el caso de uso. Para cuentas nuevas: la cuota de GPU no es inmediata; hay que pedirla
-  con justificación y prever días de espera en la planificación.
-
 ### Prueba en sala `turnos-06` (dos ventanas, `USAR_LLM=0`, fin de turno por STT)
 - Funcionó: saludo con nombre ("diego, tienes la palabra"), tres turnos completos alternando diego → andres → diego,
   cada uno cerrado justo al llegar la transcripción (`source: stt`), sin avisos de transcripción tardía
@@ -201,6 +191,37 @@
 - En `start` los logs salen en JSON (una línea por evento, sin colores); el `grep` de `transcript_delay` sigue sirviendo.
 - `start` precalienta procesos al arrancar (4 inicializados en el Mac). En `dev` el primer trabajo esperaba
   ~1,4–1,5 s a que se creara un proceso ("no warmed process available"); verificar en la próxima sala.
+
+## Paso 14 · Instancia GPU
+- g4dn.xlarge en us-east-2: USD 0,526/h (Linux, on-demand), exactamente en el límite de U4 (≤ 0,526). Cumple sin margen.
+- AMI: Deep Learning Base AMI with Single CUDA (Ubuntu 24.04, x86). Trae driver NVIDIA 595.91, CUDA 13.2,
+  Docker y NVIDIA Container Toolkit: `docker run --gpus all` ve la GPU sin instalar nada.
+- GPU: Tesla T4, 15 GB de memoria.
+- Security group solo con SSH desde la IP de Diego; ningún puerto de servicio expuesto.
+- La apelación funcionó: AWS aprobó 8 vCPU G/VT en us-east-2 tras reducir el pedido a una instancia
+  y detallar el caso de uso. Para cuentas nuevas: la cuota de GPU no es inmediata; hay que pedirla
+  con justificación y prever días de espera en la planificación.
+
+## Paso 15 · Despliegue de Whisper en GPU (preparado, sin levantar)
+- Versión real de la imagen de CPU: el digest fijado (`21e3df06…`) es el índice de **`0.8.3-cpu`**
+  (era `latest-cpu` al fijarlo), aunque `/openapi.json` reporta `v0.8.2`. La versión de speaches del spike es 0.8.3.
+- Imagen GPU: `0.8.3-cuda`, fijada por el digest del índice `9abc6968…` (amd64 `f3438861…`).
+  Variantes de 0.8.3: `cuda` = CUDA 12.9 (driver ≥ 575), `cuda-12.6.3` y `cuda-12.4.1`. Con el driver 595.91 de la AMI
+  sirve la estándar. `latest-cuda` no coincide con `0.8.3-cuda`: no usar etiquetas `latest`.
+- La imagen CUDA usa el mismo usuario (`ubuntu`) y caché (`/home/ubuntu/.cache/huggingface/hub`): el volumen sirve igual.
+- `docker-compose.gpu.yml` (override): imagen CUDA, reserva de GPU (`driver: nvidia`, `count: 1`),
+  `WHISPER__COMPUTE_TYPE=float16`, `WHISPER__INFERENCE_DEVICE=cuda` (con `auto` caería a CPU sin avisar si la GPU
+  no fuera visible) y `ports: !reset []` (el agente usa la red interna; Compose ≥ 2.24.4). En el Mac hay Compose 2.29.7.
+- whisper-warmup ahora hace `POST /v1/models/${WHISPER_MODEL}` antes de transcribir: speaches no descarga modelos solo.
+  Si el modelo ya está, responde 200 ("Model '…' downloaded"): probado en CPU, el warmup terminó con código 0.
+  En la instancia nueva el POST bloquea mientras descarga (turbo: `model.bin` de 1,6 GB).
+- Modelos a comparar (IDs verificados en `GET /v1/registry?task=automatic-speech-recognition` de speaches):
+  `Systran/faster-whisper-small` (referencia) y **`deepdml/faster-whisper-large-v3-turbo-ct2`** (multilingüe con es,
+  etiqueta `ctranslate2`, ~140 mil descargas, revisión `4df90f75`). El registro de speaches es una búsqueda en
+  Hugging Face (611 resultados): hay muchas copias y variantes (int8, ajustes por idioma); no usarlas.
+- `scripts/subir-gpu.sh <ip>`: rsync sin `client/`, `node_modules`, `.angular`, `dist`, `metrics/`, `recordings/` ni
+  `.env`. Simulado en local: se copian solo agent, whisper, scripts, los compose y los .md.
+  `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config` valida sin `client/` (exit 0).
 
 ## Pendientes para el informe
 - Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.
