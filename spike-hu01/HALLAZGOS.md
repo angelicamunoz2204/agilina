@@ -1,5 +1,34 @@
 # Spike HU-01 — Hallazgos
 
+> Se registran en el momento, con datos concretos. Son la fuente del informe.
+> Los tiempos en CPU son de desarrollo (Mac, Whisper small) y sirven solo como referencia:
+> la medición formal se hace en GPU, con el protocolo de `UMBRALES.md`.
+
+## Configuración actual
+
+| Componente | Versión / valor |
+|---|---|
+| Cliente | Angular 22.2, TypeScript 6.0.2, livekit-client 2.22.3 |
+| Agente | Python 3.12, livekit-agents 1.8.4 (plugins 1.8.4), livekit rtc 1.1.20 |
+| STT | speaches v0.8.2 (CPU, fijado por digest), Systran/faster-whisper-small, idioma es |
+| TTS | ElevenLabs eleven_v4_turbo, voz predeterminada |
+| LLM | gemini-3.5-flash-lite (respaldo; gemini-3.8-flash saturado), cuenta secundaria en nivel gratuito |
+| Salas | LiveKit Cloud, proyecto agilina; worker registrado en US East B |
+| Nube | AWS, experiencia simplificada, us-east-2, límite de gasto USD 20/mes; cuota GPU G/VT de 8 vCPU solicitada |
+
+## Fase 0 · Cuentas y servicios
+- AWS asigna a las cuentas nuevas una experiencia simplificada organizada en proyectos, con límite de gasto
+  por proyecto y región fija según el país del contacto (Colombia → us-east-2). La cuota
+  "Running On-Demand G and VT instances" arranca en 0: se solicitaron 8 vCPU (g4dn.xlarge usa 4).
+- El CLI de LiveKit (`lk`) corre desde Docker con un alias; la sesión persiste en un volumen.
+- Google AI Studio solo emite llaves nuevas con prefijo `AQ.` (53 caracteres); ya no `AIza`.
+- En el nivel gratuito de Gemini, Google puede usar el contenido enviado para mejorar sus productos:
+  en desarrollo solo frases inventadas; transcripciones reales exigen nivel pago.
+- ElevenLabs, plan gratuito: las voces de la Voice Library no se pueden usar por API (`paid_plan_required`).
+  Se usa una voz predeterminada. Una voz de biblioteca en producción suma el costo del plan de ElevenLabs.
+- Modelos de ElevenLabs de baja latencia disponibles: eleven_v4_turbo y eleven_flash_v2_5, ambos a la mitad
+  de créditos por carácter. Medir el TTFB de ambos en la fase 4.
+
 ## HU-01.4 · Cliente Angular (cumplida)
 - Versiones: Angular 22.2, TypeScript 6.0.2, livekit-client 2.22.3.
 - TypeScript 6 activa `strict` por defecto y Angular ya no lo declara en tsconfig.
@@ -17,26 +46,147 @@
 - Con despacho automático, el agente entra a toda sala nueva del proyecto: un trabajo por sala.
   Saluda una sola vez al arrancar; quienes entran después no disparan un nuevo saludo.
 - ElevenLabs funciona desde el plugin con el modelo eleven_v4_turbo.
-- Segunda prueba en sala con gemini-3.8-flash: 504 (timeout de ~11 s) y luego 503. En el nivel
-  gratuito el modelo más reciente no es confiable; se valida la cadena con gemini-3.5-flash-lite.
-- Whisper small en CPU: "Keycloak" → "kicklock" y "Hoy sigo" → "voy seguro". Errores de palabras
-  comunes, no solo de términos técnicos: revisar con el modelo grande en GPU.
-- Transcripción en sala: 4,20 s desde el fin del habla (incluye carga en frío de 1,11 s; faltaba WHISPER__TTL).
-- Cadena completa funcionando con gemini-3.5-flash-lite: transcripción → resumen → voz en la sala.
-  Tiempos en CPU (solo referencia): transcripción 5,60 s; respuesta registrada ~8,1 s después del turno.
-  "Keycloak" volvió a transcribirse como "KeyClub", y Gemini repitió el error en el resumen:
-  los errores del STT se propagan al LLM sin corrección.
-- Desglose de los 5,60 s: ~0,8 s VAD + 2,38 s carga del modelo + 2,42 s transcripción (6,4 s de audio).
-  WHISPER__TTL=-1 evita descargar el modelo, pero no lo carga al arrancar: hace falta precargarlo
-  (PRELOAD_MODELS). Sin carga en frío, la transcripción en CPU queda en ~3,2 s.
+
+## Paso 11 · Whisper local en CPU (solo desarrollo)
+- Servidor: speaches v0.8.2 (API compatible con OpenAI). La etiqueta de versión de la imagen dice 24.04,
+  que es la de Ubuntu; la versión real se lee en `/openapi.json`. Imagen fijada por digest.
+- speaches no descarga modelos solo: hay que pedirlo con `POST /v1/models/<id>`.
+- Prueba con el audio de ElevenLabs (~4 s): transcripción exacta en las 4 ejecuciones.
+  Tiempos: 2,44 s la primera vez; luego 2,41, 2,03 y 2,01 s.
+- speaches descarga el modelo de memoria tras 300 s sin uso (TTL por defecto). Se fijó `WHISPER__TTL=-1`.
+- `WHISPER__TTL=-1` evita descargar el modelo, pero no lo carga al arrancar el contenedor.
+  speaches v0.8.2 **no tiene opción de precarga** (la línea `Config:` no la muestra; `PRELOAD_MODELS` no funciona).
+  Solución: contenedor `whisper-warmup` que envía un audio corto al arrancar; el agente depende de que
+  termine bien (`service_completed_successfully`). Resultado: modelo cargado en 1,19 s al arrancar.
+
+## Paso 12 · Cadena STT → LLM → TTS
+
+### Acceso a Gemini (bloqueo externo, resuelto)
+- `gemini-2.5-flash` ya no está disponible para usuarios nuevos; Google redirige a `gemini-3.8-flash`.
+- Cuenta principal de Google: nivel de facturación "No disponible" y 403 "Your project has been denied access"
+  en `generateContent`, aunque la misma llave lista los modelos. En septiembre de 2026 hubo muchos reportes
+  idénticos en el foro de Google; según Google, indica una marca sobre la cuenta. Configurar facturación
+  suele levantarla, pero se pierde el nivel gratuito.
+- Nivel pago: solo prepago, mínimo COP 100.000 (elevado "por motivos de seguridad"), no reembolsable,
+  solo para Gemini y con vencimiento a un año. Los USD 300 de bienvenida de Google Cloud no cubren Gemini.
+  Decisión: no pagar para el spike.
+- Con una cuenta de Google distinta, el nivel gratuito sí funciona: la restricción era de la cuenta, no del proyecto.
+- Disponibilidad del nivel gratuito: 503 "high demand" en gemini-3.8, 3.7 y 3.6-flash a la vez; se resolvió en
+  minutos. En sala, gemini-3.8-flash dio 504 (timeout de ~11 s) y luego 503. Respaldo verificado:
+  gemini-3.5-flash-lite y gemini-3.1-flash-lite. Implicación para el resumen de cierre: reintentos con espera
+  exponencial, modelo de respaldo y posiblemente nivel pago.
+- **Riesgo de proyecto:** los documentos asumían Gemini gratuito; esa suposición ya no es segura.
+  Registrar como riesgo y decidir con el director (acceso gratuito, prepago o LLM alternativo).
+- El agente quedó con dos modos: `USAR_LLM=1` (Gemini) y `USAR_LLM=0` (respuesta por plantilla,
+  coherente con AD-19).
+
+### Latencia (CPU, referencia)
+- Primera prueba en sala: 4,36 s desde el fin del habla.
+  Desglose: ~0,8 s espera del VAD + 1,05 s carga en frío del modelo + ~2,5 s transcripción (6,1 s de audio).
+- Segunda: 4,20 s (incluye carga en frío de 1,11 s; faltaba `WHISPER__TTL`).
+- Tercera: 5,60 s = ~0,8 s VAD + 2,38 s carga del modelo (primera petición tras recrear el contenedor)
+  + 2,42 s transcripción (6,4 s de audio). Origen del contenedor de precalentamiento.
+- Con el modelo precargado: 3,53 s y 3,41 s. **Línea base en CPU (small): 3,4–3,5 s**, por encima de U1 (< 3 s).
+- Respuesta con LLM registrada ~8,1 s después de cerrar el turno (incluye Gemini, síntesis y reproducción;
+  la medición por tramo es de la fase 4).
+
+### Calidad de transcripción y resumen
+- "Keycloak" → "KeyClub" (dos veces) y "kicklock"; "Hoy sigo" → "voy seguro"; "agente" → "de la gente".
+  Errores en términos técnicos y también en palabras comunes: comparar con el modelo grande en GPU
+  y probar el `prompt` de vocabulario de Whisper (insumo para HU-24).
+- Gemini repitió "KeyClub" en el resumen: los errores del STT se propagan al LLM sin corrección.
+- Gemini agregó contenido inexistente ("con datos reales"). Para el resumen de cierre: instrucciones estrictas
+  de fidelidad y validación contra la transcripción.
+- Con "endpoint" y "API" la transcripción fue exacta y el resumen fiel.
+
+### Comportamiento de LiveKit
+- LiveKit Cloud activa por defecto un detector de fin de turno y otro de interrupciones en su gateway:
+  parte del audio sale a un tercero más (privacidad) e influye en cuánto espera Agilina para responder.
+  En una sesión el detector en la nube no respondió en 1 s y el agente usó un modelo local de respaldo.
+- El primer trabajo tras reiniciar el worker puede esperar ~1–2 s a que se cree un proceso ("no warmed process").
 - Cargar Silero VAD en el entrypoint bloquea el agente ~160 ms al iniciar cada sesión;
   en producción conviene cargarlo una vez por proceso.
-- Línea base en CPU sin carga en frío (modelo small precargado): transcripción en 3,53 s desde el fin del habla.
-- "agente" se transcribió como "de la gente" (error fonético comprensible).
-- Gemini agregó contenido inexistente al resumir ("con datos reales"): el LLM no solo propaga errores
-  del STT, también inventa detalles. Para el resumen de cierre: instrucciones estrictas de fidelidad
-  y validación contra la transcripción (insumo para la HU del resumen).
-- Segunda prueba sin carga en frío: transcripción exacta ("endpoint", "API"), 3,41 s; resumen fiel.
-  Línea base en CPU (small): 3,4–3,5 s desde el fin del habla.
+- `python agent.py dev` está deprecado (LiveKit recomienda `lk agent dev`); usar `start` en el contenedor.
 - Si alguien entra a la sala antes de que LiveKit cierre la anterior, no se despacha un agente nuevo.
   Protocolo de medición: una sala nueva por sesión de pruebas.
+
+## Paso 13 · Turnos entre participantes (cumplido)
+- El agente cambia la pista que escucha con `session.room_io.set_participant` y anuncia
+  "<nombre>, tienes la palabra" al terminar su respuesta. Es el modelo de turnos de HU-26.
+- Con dos ventanas del navegador en el mismo Mac, el agente no recibe voz: Whisper recibió una sola petición
+  de 1,4 s en 35 s y no hubo transcripciones. Hipótesis: ambas ventanas capturan el mismo micrófono.
+  Siguiente prueba: botón de micrófono con `stopMicTrackOnMute: true`.
+- En livekit-client 2.22.3, `stopMicTrackOnMute` no es opción directa de `Room`: va en
+  `publishDefaults` (`new Room({ publishDefaults: { stopMicTrackOnMute: true } })`); el build estricto lo detectó.
+  El cliente ahora entra con el micrófono apagado y lo alterna con un botón (signal `micActivo`).
+- El protocolo de `UMBRALES.md` exige un dispositivo por participante: las dos ventanas solo sirven
+  para desarrollo.
+- El saludo puede decir "equipo" en vez del nombre si el participante aún no está vinculado al arrancar.
+- El botón de micrófono (stopMicTrackOnMute) resolvió la falta de voz: confirmado el problema de micrófono compartido.
+- En CPU la transcripción (~2,5 s) tarda más que la espera de fin de turno (0,3 s): el VAD cierra el turno antes
+  de que llegue el texto. La frase llegó cuando el turno ya era de otro participante, abrió un turno nuevo,
+  interrumpió el anuncio "andres, tienes la palabra" y la palabra volvió a Diego.
+  Implicación para HU-20: la atribución debe basarse en la pista de origen del audio, no en el participante
+  vinculado en el momento en que llega el texto.
+- Whisper transcribió 1,3 s de audio inicial como "Gracias." (posible alucinación con ruido al activar el micrófono).
+- livekit-agents 1.8.4: `min_endpointing_delay` y `max_endpointing_delay` de `AgentSession` están deprecados;
+  lo vigente es `turn_handling={"endpointing": {"min_delay", "max_delay", "mode"}}`. Hay dos juegos de valores por
+  defecto en `turn.py`: 0,5/3,0 s en general y **0,3/2,5 s cuando hay detector de turno en streaming**, que es el
+  caso de LiveKit Cloud (`turn-detector-v1`); por eso los logs muestran `endpointing_delay: 0.3`.
+  `max_delay` se usa cuando el detector considera improbable que el participante haya terminado: debe ser ≥ `min_delay`.
+- La espera se cuenta desde el último instante con voz según el VAD (`last_speaking_time`), y con speaches
+  (STT sin streaming) la petición a Whisper solo sale cuando el VAD da por terminada la voz.
+  Cronología de la sala `turnos-01` (UTC):
+  03:37:17,8 se abre el micrófono de diego · 03:37:20,1 Whisper recibe 1,3 s → "Gracias." (logprob −1,06)
+  · 03:37:27,11 fin de la voz · 03:37:27,69 turno cerrado por VAD (EOU 0,74, `from_cache: true`) con solo "Gracias."
+  · 03:37:27,79 Whisper recibe 7,7 s · 03:37:29,97 responde "Gracias, quedó anotado." y vincula a andres
+  · 03:37:30,25 llega la transcripción real (**3,14 s después del fin de la voz**; 2,45 s de Whisper)
+  · aviso "transcript arrives after turn has been committed" · abre un turno nuevo (`source: stt`), interrumpe
+  "andres, tienes la palabra" (mensajes de ElevenLabs "for inactive context") y la palabra vuelve a diego.
+- Implicación: con `min_delay` = 3,0 s, esa misma frase se habría cerrado 0,14 s antes de que llegara el texto.
+  El tiempo de Whisper crece con la duración del audio (2,45 s para 7,7 s), y el protocolo admite intervenciones
+  de hasta 15 s: en CPU un retraso fijo tendría que ser de ~5 s o más.
+- Decisión: fin de turno por STT (`turn_handling={"turn_detection": "stt", "endpointing": {"min_delay": 1.0}}`)
+  en lugar de un retraso fijo. En 1.8.4, si no hay transcripción todavía, el agente no evalúa el fin de turno
+  (`audio_recognition.py`, "stt enabled but no transcript yet"): el turno se cierra cuando llega el texto, o al
+  cumplirse 1 s desde el fin de la voz si el texto llega antes. Se adapta solo a lo que tarde Whisper (CPU o GPU)
+  y deja de enviar audio al detector de turno de LiveKit Cloud (el de interrupciones sigue activo).
+- Hueco conocido: el adaptador de STT sin streaming (`StreamAdapter`) emite `END_OF_SPEECH` al terminar cada
+  segmento del VAD, antes de llamar a Whisper. Si un turno tiene dos segmentos (pausa > ~0,55 s) y el primero ya
+  tiene texto, el turno se cierra con ese texto 1 s después del fin de la voz, sin esperar el segundo. Si el primer
+  fragmento es ruido corto ("Gracias."), el filtro de menos de 3 palabras lo descarta y el segundo llega como turno
+  propio; si es habla real, Agilina responde a mitad de la intervención. Solución robusta (insumo para HU-26):
+  cierre manual del turno (`turn_detection="manual"` + `commit_user_turn()`) cuando no quede STT pendiente.
+- Otros ajustes: en modo plantilla, los turnos de menos de 3 palabras se ignoran sin responder ni ceder el turno;
+  el agente espera al primer participante (`ctx.wait_for_participant()`) y arranca la sesión vinculada a él
+  (`RoomOptions(participant_identity=...)`), así el saludo ya no dice "equipo".
+- Efecto en la medición: U1 no cambia (fin de la voz → transcripción); U3 suma `min_delay` solo cuando Whisper
+  responde en menos de 1 s. Reportar la configuración de fin de turno junto a U3.
+- Decisión: el turno lo cierra el participante con un botón de "terminar turno" (cierre manual,
+  turn_detection="manual" + commit_user_turn()). El cierre debe esperar a que no queden
+  transcripciones pendientes. Por eso no se evalúa el partido de turnos por pausas del VAD.
+  Para la medición: registrar también el tiempo del clic a la última transcripción.
+
+### Prueba en sala `turnos-06` (dos ventanas, `USAR_LLM=0`, fin de turno por STT)
+- Funcionó: saludo con nombre ("diego, tienes la palabra"), tres turnos completos alternando diego → andres → diego,
+  cada uno cerrado justo al llegar la transcripción (`source: stt`), sin avisos de transcripción tardía
+  ni anuncios interrumpidos. No hubo "Gracias." alucinado: el filtro de menos de 3 palabras no se ejercitó.
+- Tiempos (CPU, small), fin de la voz → transcripción (`transcript_delay`): **3,45 s, 3,30 s y 3,02 s**.
+  Desglose: ~0,65–0,75 s hasta que el VAD da por terminada la voz y sale la petición + Whisper 2,69 s (6,1 s de audio),
+  2,64 s (7,1 s) y 2,35 s (6,1 s). Coincide con la línea base (3,4–3,5 s), por encima de U1 (< 3 s).
+- La rotación no termina: el agente alterna indefinidamente porque no sabe cuándo ya hablaron todos.
+  En la app real la ceremonia termina cuando cada participante tuvo su turno (HU-26).
+- Al salir andres (que tenía la palabra), LiveKit cerró toda la sesión del agente: "closing agent session due to
+  participant disconnect". Por defecto `close_on_disconnect=True` en `RoomOptions`. En la app real hay que
+  desactivarlo y pasar el turno al siguiente si quien habla se desconecta.
+- Aviso "stt end of speech received while vad is still in a speech segment, flushing vad": el adaptador de STT tiene
+  su propio VAD y terminó antes que el de la sesión; sin efecto visible.
+- Errores de transcripción: "instancia" → "distancia", "API" → "IPI", "Keycloak" → "KeyClub" (otra vez),
+  "mediodía" sin tilde. Insumo para comparar con el modelo grande y el `prompt` de vocabulario.
+
+## Pendientes para el informe
+- Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.
+- TTFB de eleven_v4_turbo frente a eleven_flash_v2_5.
+- Whisper small frente a un modelo mayor en GPU, con el mismo guion de frases.
+- Efecto del `prompt` de vocabulario en términos técnicos.
+- U6: caracteres de ElevenLabs por ceremonia estimada.
