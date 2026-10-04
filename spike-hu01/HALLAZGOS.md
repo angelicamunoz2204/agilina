@@ -222,6 +222,37 @@
 - `scripts/subir-gpu.sh <ip>`: rsync sin `client/`, `node_modules`, `.angular`, `dist`, `metrics/`, `recordings/` ni
   `.env`. Simulado en local: se copian solo agent, whisper, scripts, los compose y los .md.
   `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config` valida sin `client/` (exit 0).
+- El límite de gasto de la experiencia simplificada pausa el proyecto según el PRONÓSTICO del mes,
+  no el gasto real: con USD 0,48 gastados, encender la g4dn.xlarge proyectó USD 344 (uso continuo)
+  y AWS pausó el proyecto (detiene la instancia y una SCP bloquea ec2:StartInstances).
+  Con límite de USD 20 la GPU no se puede usar. Solución en el spike: límite temporal de USD 400
+  y apagado automático con `shutdown -h +120` en cada sesión.
+  Implicación para producción: este control de costos no sirve para GPU de uso intermitente;
+  se necesita apagado automático de la instancia y alertas propias.
+- GPU con small (sala gpu-01): fin de voz → transcripción en 1,17 / 0,95 / 1,00 s (CPU: 3,0–3,5 s).
+  Cumple U1 (< 3 s) con margen. ~0,65–0,75 s es espera del VAD; Whisper en sí, ~0,3–0,4 s.
+- El disco raíz por defecto de la Deep Learning Base AMI (35 GB) se llena con la imagen CUDA de speaches,
+  las imágenes del agente y los modelos: la descarga de large-v3-turbo falló con "no space left on device"
+  (speaches respondió 500). Se amplió el volumen a 80 GB. Recomendación: lanzar con ≥ 80 GB.
+  La g4dn.xlarge trae además 116 GB de almacenamiento local (/opt/dlami/nvme) que se borra al detenerla.
+- GPU con large-v3-turbo (deepdml/faster-whisper-large-v3-turbo-ct2, sala gpu-02): 1,21 / 1,13 s
+  (small: 0,95–1,17 s). Cumple U1 con margen; ~0,1–0,2 s más que small.
+- Calidad: "Ayer desplegué el servicio de Whisper en la instancia de prueba. Hoy mido la latencia con
+  el modelo grande." transcrita exacta (en CPU con small: "distancia", "de la gente").
+  "Keycloak" → "Kiklook": los nombres propios no se resuelven con un modelo mayor; requieren prompt
+  de vocabulario.
+- Memoria de GPU: small 822 MiB; con turbo cargado, 2.883 MiB en total (los dos modelos residentes
+  por WHISPER__TTL=-1). En producción, un solo modelo fijo.
+- Recomendación: large-v3-turbo como modelo de Agilina.
+
+## Ajuste · Prompt de vocabulario para Whisper
+- livekit-plugins-openai 1.8.4: el parámetro de `openai.STT` es `prompt` (`NotGivenOr[str]`). En la transcripción sin
+  streaming se envía como campo `prompt` de `/audio/transcriptions`, y si está vacío lo omite
+  (`prompt=transcription.prompt or openai.omit`). También existe `keywords`, pensado para los modelos de OpenAI; no se usa.
+- speaches 0.8.3 recibe `prompt` como campo del formulario y lo pasa a faster-whisper como `initial_prompt`
+  (`routers/stt.py`).
+- El agente lee `WHISPER_PROMPT` (opcional, vacío por defecto = sin prompt). Pendiente medir su efecto en términos como
+  "Keycloak", "API" e "instancia" con el mismo guion, con y sin prompt.
 
 ## Pendientes para el informe
 - Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.

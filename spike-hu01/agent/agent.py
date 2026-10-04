@@ -50,6 +50,8 @@ async def entrypoint(ctx: JobContext):
             api_key="no-se-usa",  # speaches no valida la llave
             model=os.environ.get("WHISPER_MODEL", "Systran/faster-whisper-small"),
             language="es",
+            # Vocabulario para Whisper (initial_prompt en speaches). Vacío = sin prompt: el plugin lo omite.
+            prompt=os.environ.get("WHISPER_PROMPT", ""),
         ),
         llm=llm,
         tts=elevenlabs.TTS(
