@@ -46,15 +46,33 @@ spike-hu01/
 | Servicio | Qué hace |
 |---|---|
 | `client` | Cliente Angular en http://localhost:4200. URL y token se pegan en pantalla. |
-| `whisper` | speaches 0.8.3 (`/openapi.json` dice v0.8.2; API compatible con OpenAI) en :8000, imagen CPU fijada por digest. `WHISPER__TTL=-1`. |
+| `whisper` | speaches 0.8.3 (`/openapi.json` dice v0.8.2; API compatible con OpenAI), imagen fijada por digest: CPU en el Mac (:8000), CUDA en la instancia (sin puerto publicado). `WHISPER__TTL=-1`. |
 | `whisper-warmup` | Espera a Whisper, descarga el modelo (`POST /v1/models/...`) y envía `warmup.wav` para cargarlo. speaches no tiene opción de precarga ni descarga sola. |
 | `agent` | Worker de LiveKit. Arranca solo si `whisper-warmup` terminó bien. Despacho automático: entra a toda sala nueva. |
 
 Variables de `.env`: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `GOOGLE_API_KEY`, `GEMINI_MODEL`,
-`USAR_LLM`, `ELEVEN_API_KEY`, `ELEVEN_VOICE_ID`, `ELEVEN_MODEL`, `WHISPER_BASE_URL`, `WHISPER_MODEL`.
+`USAR_LLM`, `ELEVEN_API_KEY`, `ELEVEN_VOICE_ID`, `ELEVEN_MODEL`, `WHISPER_BASE_URL`, `WHISPER_MODEL`, `WHISPER_PROMPT`.
 
 - `USAR_LLM=0`: Agilina responde con plantilla ("Gracias, quedó anotado."), coherente con AD-19.
 - `USAR_LLM=1`: responde Gemini (resumen en una frase).
+
+## Configuración por entorno
+
+| | Mac | Instancia GPU |
+|---|---|---|
+| speaches | `0.8.3-cpu` | `0.8.3-cuda` (`docker-compose.gpu.yml`) |
+| `WHISPER_MODEL` | `Systran/faster-whisper-small` | `deepdml/faster-whisper-large-v3-turbo-ct2` |
+| `WHISPER_PROMPT` | igual en ambos | igual en ambos |
+| `WHISPER_BASE_URL` | `http://whisper:8000/v1` | `http://whisper:8000/v1` |
+
+## Operación de la GPU
+
+- Encender la instancia → anotar la IP (cambia en cada encendido) → `scripts/subir-gpu.sh <ip>` → copiar el `.env` aparte.
+- Lo primero en cada sesión, dentro de la instancia: `sudo shutdown -h +120`.
+- En la instancia, todo `docker compose` va con `-f docker-compose.yml -f docker-compose.gpu.yml`.
+- Antes de medir, solo debe correr el agente de la instancia; en el Mac, solo el cliente.
+- Al cerrar la sesión, **detener** (no terminar) la instancia.
+- Límite de gasto de AWS en USD 400, temporal; volver a USD 20 al terminar el spike.
 
 ## Comandos
 
@@ -76,18 +94,20 @@ Hecho (pasos 1–16):
 - HU-01.4 cumplida: el cliente Angular compila en modo estricto y conecta a la sala.
 - Agente con cadena STT → LLM/plantilla → TTS funcionando en una sala con un participante.
 - Línea base en CPU (Whisper small, precargado): **3,4–3,5 s** desde el fin del habla hasta la transcripción.
-- Paso 13: turnos entre dos participantes funcionando (sala `turnos-06`; 3,0–3,5 s fin de voz → transcripción).
-  Cliente con botón de micrófono (`publishDefaults.stopMicTrackOnMute`, entra apagado).
-  Agente: fin de turno por STT (`turn_detection="stt"`, `min_delay` 1,0 s), ignora turnos de < 3 palabras en
-  modo plantilla, espera al primer participante para saludarlo por nombre.
-- Pasos 14–16: g4dn.xlarge (Tesla T4, Deep Learning Base AMI Ubuntu 24.04, disco ampliado a 80 GB) con whisper,
-  whisper-warmup y agent (`docker-compose.gpu.yml`, speaches `0.8.3-cuda`); el agente usa Whisper por la red interna.
-  Fin de voz → transcripción: small 0,95–1,17 s; `deepdml/faster-whisper-large-v3-turbo-ct2` 1,13–1,21 s (cumple U1).
-  Recomendación: large-v3-turbo. Con `WHISPER_PROMPT`, "Keycloak" se transcribe bien sin costo de latencia.
+- Pasos 13 a 16 cumplidos:
+  - Turnos entre dos participantes (sala `turnos-06`). Cliente con botón de micrófono (entra apagado); agente con fin de
+    turno por STT (`turn_detection="stt"`, `min_delay` 1,0 s), ignora turnos de < 3 palabras en modo plantilla y saluda
+    al primer participante por nombre.
+  - Agente y Whisper corren juntos en la g4dn.xlarge (us-east-2, Tesla T4, disco ampliado a 80 GB).
+  - Fin de voz → transcripción: small **0,95–1,17 s**; large-v3-turbo **1,12–1,21 s** (cumplen U1).
+    Con `WHISPER_PROMPT`, "Keycloak" se transcribe bien sin costo medible.
+  - **Modelo elegido: large-v3-turbo + prompt de vocabulario.**
+
+Siguiente:
+17. Registrar métricas por tramo en CSV (ChatMessage.metrics; probado en CPU), grabar la sala, `nvidia-smi` durante las pruebas.
+18. Diez interacciones con dos personas reales (Diego y Angélica), una sala nueva por sesión de pruebas.
 
 Pendiente:
-17. Registrar métricas por tramo en CSV (ChatMessage.metrics), grabar la sala, `nvidia-smi` durante las pruebas.
-18. Diez interacciones con dos personas reales (Diego y Angélica), una sala nueva por sesión de pruebas.
 19. Medir Gemini sobre una transcripción sintética de ~15 min (si se acordó en el Planning).
 20. Informe en `docs/spikes/` (main, por PR) contra `UMBRALES.md`; decisión según la regla de decisión.
 21. Firma de ambos. 22. Decisiones a flujos y ADR. 23. Terminar la instancia GPU y archivar la rama.
@@ -108,11 +128,16 @@ Deuda conocida del prototipo (anotar, no necesariamente resolver):
   `gemini-3.8-flash` se satura (503/504); respaldo verificado: `gemini-3.5-flash-lite`. `gemini-2.5-flash` no existe para usuarios nuevos.
 - **ElevenLabs**: el plan gratuito no permite voces de la Voice Library por API; solo voces predeterminadas.
 - **Audio**: usar audífonos; sin ellos, Agilina se transcribe a sí misma. El micrófono solo funciona en localhost o HTTPS.
-- **AWS**: el límite de gasto pausa el proyecto según el pronóstico del mes, no el gasto real; al encender la GPU con
-  límite de USD 20, AWS detuvo la instancia. Límite temporal USD 400 y `sudo shutdown -h +120` en cada sesión.
-- **Instancia GPU**: la IP pública cambia en cada encendido. El disco de 35 GB por defecto no alcanza (usar ≥ 80 GB).
-- **.env**: al agregar variables con `echo >> .env`, si el archivo no termina en salto de línea la variable queda
-  pegada a la anterior. Verificar con `printenv` dentro del contenedor.
+- **AWS**: el límite de gasto pausa el proyecto según el **pronóstico** del mes, no el gasto real: al encender la GPU
+  con límite de USD 20, AWS pausó el proyecto y detuvo la instancia.
+- **Instancia GPU**: el disco por defecto de la AMI (35 GB) no alcanza para la imagen CUDA, el agente y los modelos
+  (usar ≥ 80 GB). La IP pública cambia en cada encendido.
+- **.env**: `echo >> .env` sin salto de línea final pega la variable a la anterior y el agente no la recibe.
+  Verificar con `printenv` dentro del contenedor.
+- **Logs del agente**: en modo `start` salen en JSON, y las líneas de depuración (`transcript_delay`,
+  "user turn committed") requieren `--log-level debug` (ya está en el Dockerfile).
+- **Workers**: con dos workers registrados (Mac e instancia), LiveKit puede despachar la sala a cualquiera.
+  Antes de medir, detener el agente del Mac.
 
 ## Cómo trabajamos
 
