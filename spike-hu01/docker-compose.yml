@@ -15,6 +15,7 @@ services:
     volumes:
       - ./agent:/app
   whisper:
+    # speaches 0.8.3-cpu (era latest-cpu al fijarlo); /openapi.json reporta v0.8.2.
     image: ghcr.io/speaches-ai/speaches@sha256:21e3df06d842fb7802ab470dd77c25f0e8c0d22950e8d8c6ae886e851af53ef8
     ports:
       - "8000:8000"
@@ -32,7 +33,11 @@ services:
       - sh
       - -c
       - |
+        set -e
         until curl -sf -o /dev/null http://whisper:8000/v1/models; do sleep 1; done
+        # speaches no descarga modelos solo; si ya está descargado, responde 200 igual.
+        curl -sf -X POST http://whisper:8000/v1/models/${WHISPER_MODEL}
+        echo
         curl -sf http://whisper:8000/v1/audio/transcriptions -F file=@/warmup.wav -F model=${WHISPER_MODEL}
     restart: "no"
 
