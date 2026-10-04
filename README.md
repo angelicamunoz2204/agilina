@@ -16,25 +16,28 @@ Muñoz; asesor: Oscar Bedoya.
 
 ## Levantar el entorno
 
+Solo necesitas Docker con Compose y `make` (más `bash`, `curl` y `openssl`, que
+casi todo sistema ya trae); no se instala Python, Node ni nada más.
+
 ```bash
 git clone git@github.com:angelicamunoz2204/agilina.git && cd agilina
 make up
 ```
 
-`make up` crea el `.env` con claves locales generadas, instala las
-dependencias de Python y de la web, levanta Postgres y Keycloak, espera a que
-respondan y aplica las migraciones.
-Después, en terminales separadas:
+`make up` crea el `.env` con claves locales generadas, construye las imágenes,
+levanta Postgres, Keycloak, Mailpit, la API y la web, espera a que respondan y
+aplica las migraciones. Después:
 
-```bash
-make api     # http://localhost:8000/docs
-make stt     # http://localhost:8001/docs
-make web     # http://localhost:4200
-make agent   # registra el worker en LiveKit
-```
+| Qué | Dónde |
+| --- | --- |
+| Aplicación web | <http://localhost:4200> |
+| API y su documentación | <http://localhost:8000/docs> |
+| Correo de pruebas (Mailpit) | <http://localhost:8025> |
+| Keycloak | <http://localhost:8080> |
 
-Con la API y la web arriba, <http://localhost:4200> muestra el estado del
-entorno: es la comprobación de que las piezas se hablan.
+La web muestra el estado del entorno: es la comprobación de que las piezas se
+hablan. La voz es opcional: `make stt` levanta la transcripción y `make agent` el
+worker, que registra en LiveKit. Los logs, con `make logs s=api`.
 
 Requisitos, qué corre dónde y qué hacer cuando algo falla:
 [docs/entorno-local.md](docs/entorno-local.md).
@@ -43,13 +46,13 @@ Requisitos, qué corre dónde y qué hacer cuando algo falla:
 
 ```bash
 make test      # pruebas de los tres desplegables, el paquete común y la web
-make verify    # exactamente lo que corre el pipeline, en tu máquina
+make verify    # exactamente lo que corre el pipeline, en contenedores
 ```
 
 `make verify` ejecuta formato, análisis estático, tipado estricto, reglas de
-arquitectura, pruebas con cobertura, compilación de la web y sus pruebas. Si pasa en local, el pull request no
-debería fallar por análisis ni por pruebas. `make` sin argumentos lista todo lo
-demás.
+arquitectura, pruebas con cobertura, compilación de la web y sus pruebas. Si
+pasa en local, el pull request no debería fallar por análisis ni por pruebas.
+`make` sin argumentos lista todo lo demás.
 
 ## Estructura
 
@@ -60,7 +63,7 @@ agilina/
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre en la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper sobre GPU
 ├── web/       Aplicación web en Angular
-├── infra/     Compose de Postgres y Keycloak, realm versionado
+├── infra/     Compose del entorno, Dockerfile de Python, realm versionado
 ├── docs/      Documentación técnica y decisiones arquitectónicas
 └── .github/   Pipeline de verificación y plantillas
 ```
