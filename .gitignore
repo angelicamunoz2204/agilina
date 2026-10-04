@@ -41,6 +41,8 @@ infra/datos/
 modelos/
 *.bin
 *.wav
+# Excepción: audio sintético (ElevenLabs) para precalentar Whisper en el spike; sin voz real ni datos personales
+!spike-hu01/whisper/warmup.wav
 *.mp3
 *.ogg
 

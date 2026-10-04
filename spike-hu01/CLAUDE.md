@@ -23,7 +23,9 @@ Antes de trabajar, lee `README.md`, `UMBRALES.md` y `HALLAZGOS.md`.
 - Formato: `tipo(ámbito): descripción`, ámbitos permitidos: `api`, `agent`, `stt`, `web`, `infra`, `docs`.
 - Pie obligatorio: `Refs: HU-01` (usar `git commit -m "..." -m "Refs: HU-01"`).
 - **Un solo autor: Diego.** Sin `Co-Authored-By`, sin menciones a Claude ni líneas de atribución.
-- Antes de cada commit, `git status` para confirmar que no entra `.env`, audios ni CSV de métricas.
+- Antes de cada commit, `git status` para confirmar que no entra `.env` ni CSV de métricas.
+- No entran grabaciones de personas (voz real); la única excepción es `whisper/warmup.wav`, audio sintético de
+  calentamiento sin datos personales.
 
 ## Estructura
 
