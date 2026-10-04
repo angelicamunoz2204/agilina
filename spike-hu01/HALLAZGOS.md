@@ -184,6 +184,14 @@
 - Errores de transcripción: "instancia" → "distancia", "API" → "IPI", "Keycloak" → "KeyClub" (otra vez),
   "mediodía" sin tilde. Insumo para comparar con el modelo grande y el `prompt` de vocabulario.
 
+## Ajuste · Agente en modo `start`
+- El Dockerfile pasó de `python agent.py dev` (deprecado) a `python agent.py start --log-level debug`.
+  `start` registra en INFO por defecto: sin `--log-level debug` se pierden `transcript_delay` y "user turn committed",
+  que se usan para medir. También acepta la variable `LIVEKIT_LOG_LEVEL`.
+- En `start` los logs salen en JSON (una línea por evento, sin colores); el `grep` de `transcript_delay` sigue sirviendo.
+- `start` precalienta procesos al arrancar (4 inicializados en el Mac). En `dev` el primer trabajo esperaba
+  ~1,4–1,5 s a que se creara un proceso ("no warmed process available"); verificar en la próxima sala.
+
 ## Pendientes para el informe
 - Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.
 - TTFB de eleven_v4_turbo frente a eleven_flash_v2_5.

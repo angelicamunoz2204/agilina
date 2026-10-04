@@ -90,7 +90,6 @@ Pendiente:
 Deuda conocida del prototipo (anotar, no necesariamente resolver):
 - Probar `prompt` de vocabulario en Whisper ("Keycloak" se transcribe como "KeyClub").
 - Cargar Silero VAD una vez por proceso (hoy bloquea ~160 ms al iniciar cada sesión).
-- `python agent.py dev` está deprecado: usar `start` en el Dockerfile.
 - La rotación de turnos no termina nunca (en la app real, la ceremonia acaba cuando todos hablaron, HU-26).
 - Si quien tiene la palabra se desconecta, se cierra la sesión del agente (`close_on_disconnect=True` por defecto).
 

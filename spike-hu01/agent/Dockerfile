@@ -4,4 +4,4 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN python agent.py download-files
-CMD ["python", "agent.py", "dev"]
+CMD ["python", "agent.py", "start", "--log-level", "debug"]
