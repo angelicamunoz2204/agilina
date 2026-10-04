@@ -26,3 +26,17 @@
   Tiempos en CPU (solo referencia): transcripción 5,60 s; respuesta registrada ~8,1 s después del turno.
   "Keycloak" volvió a transcribirse como "KeyClub", y Gemini repitió el error en el resumen:
   los errores del STT se propagan al LLM sin corrección.
+- Desglose de los 5,60 s: ~0,8 s VAD + 2,38 s carga del modelo + 2,42 s transcripción (6,4 s de audio).
+  WHISPER__TTL=-1 evita descargar el modelo, pero no lo carga al arrancar: hace falta precargarlo
+  (PRELOAD_MODELS). Sin carga en frío, la transcripción en CPU queda en ~3,2 s.
+- Cargar Silero VAD en el entrypoint bloquea el agente ~160 ms al iniciar cada sesión;
+  en producción conviene cargarlo una vez por proceso.
+- Línea base en CPU sin carga en frío (modelo small precargado): transcripción en 3,53 s desde el fin del habla.
+- "agente" se transcribió como "de la gente" (error fonético comprensible).
+- Gemini agregó contenido inexistente al resumir ("con datos reales"): el LLM no solo propaga errores
+  del STT, también inventa detalles. Para el resumen de cierre: instrucciones estrictas de fidelidad
+  y validación contra la transcripción (insumo para la HU del resumen).
+- Segunda prueba sin carga en frío: transcripción exacta ("endpoint", "API"), 3,41 s; resumen fiel.
+  Línea base en CPU (small): 3,4–3,5 s desde el fin del habla.
+- Si alguien entra a la sala antes de que LiveKit cierre la anterior, no se despacha un agente nuevo.
+  Protocolo de medición: una sala nueva por sesión de pruebas.
