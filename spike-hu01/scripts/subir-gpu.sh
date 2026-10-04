@@ -32,4 +32,4 @@ rsync -az -e "$SSH_CMD" \
 
 echo "Subido a $USUARIO@$IP:$DESTINO"
 echo "El .env no se sube. Cópialo aparte (y revisa WHISPER_MODEL y WHISPER_BASE_URL=http://whisper:8000/v1):"
-echo "  scp ${GPU_LLAVE:+-i $GPU_LLAVE }$RAIZ/.env $USUARIO@$IP:$DESTINO/.env"
+echo "  scp ${GPU_LLAVE:+-i '$GPU_LLAVE' }'$RAIZ/.env' $USUARIO@$IP:$DESTINO/.env"
