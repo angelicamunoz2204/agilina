@@ -21,8 +21,11 @@ type Estado = 'desconectado' | 'conectando' | 'conectado';
         Entrar a la sala
       </button>
       <button (click)="salir()" [disabled]="estado() !== 'conectado'">Salir de la sala</button>
+      <button (click)="alternarMicrofono()" [disabled]="estado() !== 'conectado'">
+        {{ micActivo() ? 'Silenciar micrófono' : 'Activar micrófono' }}
+      </button>
 
-      <p>Estado: {{ estado() }}</p>
+      <p>Estado: {{ estado() }} · Micrófono: {{ micActivo() ? 'activo' : 'apagado' }}</p>
       @if (error()) {
         <p class="error">{{ error() }}</p>
       }
@@ -45,10 +48,13 @@ type Estado = 'desconectado' | 'conectando' | 'conectado';
   `,
 })
 export class App implements OnDestroy {
-  private readonly room = new Room();
+  // Al silenciar se detiene la pista y se libera el dispositivo: varias ventanas del mismo equipo
+  // pueden turnarse el micrófono sin capturarlo a la vez.
+  private readonly room = new Room({ publishDefaults: { stopMicTrackOnMute: true } });
 
   readonly estado = signal<Estado>('desconectado');
   readonly participantes = signal<string[]>([]);
+  readonly micActivo = signal(false);
   readonly error = signal<string | null>(null);
 
   constructor() {
@@ -66,6 +72,7 @@ export class App implements OnDestroy {
       .on(RoomEvent.Disconnected, () => {
         this.estado.set('desconectado');
         this.participantes.set([]);
+        this.micActivo.set(false);
       });
   }
 
@@ -76,13 +83,24 @@ export class App implements OnDestroy {
       await this.room.connect(url.trim(), token.trim());
       // Se llama dentro del clic para que el navegador permita reproducir audio.
       await this.room.startAudio();
-      await this.room.localParticipant.setMicrophoneEnabled(true);
+      // Se entra con el micrófono apagado; se activa con el botón.
       this.estado.set('conectado');
       this.actualizarParticipantes();
     } catch (e) {
       this.error.set(`No se pudo entrar a la sala: ${e instanceof Error ? e.message : String(e)}`);
       await this.room.disconnect();
       this.estado.set('desconectado');
+    }
+  }
+
+  async alternarMicrofono(): Promise<void> {
+    this.error.set(null);
+    const activar = !this.micActivo();
+    try {
+      await this.room.localParticipant.setMicrophoneEnabled(activar);
+      this.micActivo.set(activar);
+    } catch (e) {
+      this.error.set(`No se pudo cambiar el micrófono: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
