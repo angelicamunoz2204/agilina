@@ -167,6 +167,16 @@
   transcripciones pendientes. Por eso no se evalúa el partido de turnos por pausas del VAD.
   Para la medición: registrar también el tiempo del clic a la última transcripción.
 
+## Paso 14 · Instancia GPU
+- g4dn.xlarge en us-east-2: USD 0,526/h (Linux, on-demand), exactamente en el límite de U4 (≤ 0,526). Cumple sin margen.
+- AMI: Deep Learning Base AMI with Single CUDA (Ubuntu 24.04, x86). Trae driver NVIDIA 595.91, CUDA 13.2,
+  Docker y NVIDIA Container Toolkit: `docker run --gpus all` ve la GPU sin instalar nada.
+- GPU: Tesla T4, 15 GB de memoria.
+- Security group solo con SSH desde la IP de Diego; ningún puerto de servicio expuesto.
+- La apelación funcionó: AWS aprobó 8 vCPU G/VT en us-east-2 tras reducir el pedido a una instancia
+  y detallar el caso de uso. Para cuentas nuevas: la cuota de GPU no es inmediata; hay que pedirla
+  con justificación y prever días de espera en la planificación.
+
 ### Prueba en sala `turnos-06` (dos ventanas, `USAR_LLM=0`, fin de turno por STT)
 - Funcionó: saludo con nombre ("diego, tienes la palabra"), tres turnos completos alternando diego → andres → diego,
   cada uno cerrado justo al llegar la transcripción (`source: stt`), sin avisos de transcripción tardía
