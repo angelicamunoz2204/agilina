@@ -20,7 +20,7 @@ PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
         lint format typecheck arch test test-python test-web coverage verify \
-        lock hooks keycloak-admin clean
+        mail-test lock hooks keycloak-admin clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -76,6 +76,11 @@ migrate: env ## Apply the pending database migrations
 
 migration: env ## Create a new migration: make migration m="description"
 	$(COMPOSE) run --rm --build -w /app/api api alembic revision --autogenerate -m "$(m)"
+
+# ------------------------------------------------------------------ Email ---
+mail-test: env ## Send a test email with the configured SMTP: make mail-test to=you@example.com [lang=en]
+	@test -n "$(to)" || { echo "Usage: make mail-test to=address@example.com [lang=es|en]"; exit 1; }
+	$(COMPOSE) run --rm --no-deps --build api python -m agilina_api.bootstrap.send_test_email --to "$(to)" $(if $(lang),--lang "$(lang)",)
 
 # ------------------------------------------------------------------ Voice ---
 stt: env ## Start the transcription service (simulated unless you set a GPU)
