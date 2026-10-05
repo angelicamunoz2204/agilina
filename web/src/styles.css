@@ -1,0 +1,35 @@
+/* Global styles: Tailwind and the design tokens (docs/adr/0027). The definitive visual
+   design arrives with the interface stories; for now this keeps the app readable. */
+@import 'tailwindcss';
+
+/* The tokens are the source of truth: a theme (light, dark) is a different set of values
+   for these variables, and nothing else has to change. */
+:root {
+  --agl-background: #0f1419;
+  --agl-surface: #1a2029;
+  --agl-border: #2a323d;
+  --agl-text: #e6eaf0;
+  --agl-text-muted: #9aa5b1;
+  --agl-accent: #4a9d7f;
+  --agl-error: #d9534f;
+}
+
+/* Tailwind reads the tokens as its theme, so `bg-surface`, `text-muted` or `border-border`
+   follow whichever values the variables have. `inline` keeps the reference to the variable
+   instead of copying its value. */
+@theme inline {
+  --color-background: var(--agl-background);
+  --color-surface: var(--agl-surface);
+  --color-border: var(--agl-border);
+  --color-foreground: var(--agl-text);
+  --color-muted: var(--agl-text-muted);
+  --color-accent: var(--agl-accent);
+  --color-danger: var(--agl-error);
+}
+
+@layer base {
+  html,
+  body {
+    @apply min-h-full bg-background text-foreground;
+  }
+}

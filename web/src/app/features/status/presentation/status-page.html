@@ -1,21 +1,26 @@
-<section class="card" *transloco="let t; prefix: 'status'">
-  <h1>{{ t('title') }}</h1>
-  <p class="description">{{ t('description') }}</p>
+<section
+  class="max-w-xl rounded-lg border border-border bg-surface p-6"
+  *transloco="let t; prefix: 'status'"
+>
+  <h1 class="mb-2 text-lg font-semibold">{{ t('title') }}</h1>
+  <p class="mb-4 text-sm text-muted">{{ t('description') }}</p>
 
   @if (serviceStatus(); as api) {
-    <dl>
-      <dt>{{ t('api') }}</dt>
-      <dd class="available">{{ t('available') }}</dd>
-      <dt>{{ t('version') }}</dt>
+    <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+      <dt class="text-muted">{{ t('api') }}</dt>
+      <dd class="text-accent">{{ t('available') }}</dd>
+      <dt class="text-muted">{{ t('version') }}</dt>
       <dd>{{ api.version }}</dd>
-      <dt>{{ t('environment') }}</dt>
+      <dt class="text-muted">{{ t('environment') }}</dt>
       <dd>{{ api.environment }}</dd>
     </dl>
   } @else if (checking()) {
     <p>{{ t('checking') }}</p>
   } @else if (failed()) {
-    <p class="unavailable">{{ t('unavailable') }}</p>
-    <p class="hint">{{ t('error_hint') }}</p>
-    <button type="button" (click)="refresh()">{{ t('retry') }}</button>
+    <p class="text-danger">{{ t('unavailable') }}</p>
+    <p class="text-sm text-muted">{{ t('error_hint') }}</p>
+    <button aglButton variant="secondary" type="button" class="mt-4" (click)="refresh()">
+      {{ t('retry') }}
+    </button>
   }
 </section>

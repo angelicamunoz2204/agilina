@@ -6,7 +6,11 @@
   "overrides": [
     {
       "files": "*.html",
-      "options": { "parser": "angular" }
+      "options": {
+        "parser": "angular"
+      }
     }
-  ]
+  ],
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "tailwindStylesheet": "./src/styles.css"
 }

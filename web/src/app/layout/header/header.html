@@ -1,4 +1,7 @@
-<header class="header" *transloco="let t; prefix: 'app'">
-  <span class="brand">{{ brand }}</span>
-  <span class="tagline">{{ t('tagline') }}</span>
+<header
+  class="flex items-baseline gap-3 border-b border-border px-6 py-4"
+  *transloco="let t; prefix: 'app'"
+>
+  <span class="text-xl font-semibold text-accent">{{ brand }}</span>
+  <span class="text-sm text-muted">{{ t('tagline') }}</span>
 </header>

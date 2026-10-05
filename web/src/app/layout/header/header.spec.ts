@@ -11,9 +11,8 @@ describe('Header', () => {
     await fixture.whenStable();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('.brand')?.textContent).toBe('Agilina');
-    expect(element.querySelector('.tagline')?.textContent).toBe(
-      'Scrum Master virtual para la reunión diaria',
-    );
+    const [brand, tagline] = Array.from(element.querySelectorAll('span'));
+    expect(brand?.textContent).toBe('Agilina');
+    expect(tagline?.textContent).toBe('Scrum Master virtual para la reunión diaria');
   });
 });
