@@ -33,6 +33,7 @@ aplica las migraciones. Después:
 | Aplicación web | <http://localhost:4200> |
 | API y su documentación | <http://localhost:8000/docs> |
 | Correo de pruebas (Mailpit) | <http://localhost:8025> |
+| Base de datos (pgAdmin) | <http://localhost:5051> (credenciales: `make credentials`) |
 | Keycloak | <http://localhost:8080> |
 
 La web muestra el estado del entorno: es la comprobación de que las piezas se
@@ -45,7 +46,7 @@ Requisitos, qué corre dónde y qué hacer cuando algo falla:
 ## Probar y verificar
 
 ```bash
-make test      # pruebas de los tres desplegables, el paquete común y la web
+make test      # pruebas de los tres desplegables, el paquete común, las de integración y la web
 make verify    # exactamente lo que corre el pipeline, en contenedores
 ```
 

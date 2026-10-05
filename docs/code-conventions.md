@@ -52,6 +52,34 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 - Solo la raíz de composición (`bootstrap/`, `main.py`, `app.config.ts`) conoce
   qué adaptador concreto atiende cada puerto.
 
+## Persistencia
+
+- Un repositorio **no filtra por estado calculado**: un estado que depende del tiempo
+  (una invitación vencida) se *calcula* en el agregado (`state_at`); el repositorio solo
+  guarda lo que el agregado ya decidió. Por eso `find_pending` devuelve lo *almacenado*
+  como pendiente, que puede estar vencido: quien invita de nuevo debe llamar a
+  `expire_if_due`, guardar y recién entonces insertar la nueva.
+- **Una excepción a «el `team_id` va en toda firma»:** buscar una invitación por el hash de
+  su token. El token (impredecible) es la credencial que identifica la invitación y, con
+  ella, el equipo; es el único punto de entrada donde el tenant no se conoce de antemano.
+  Todo lo demás exige el `team_id`.
+- Cuando dos peticiones pueden disputarse un agregado (activar el mismo enlace dos veces),
+  el repositorio lo bloquea con `SELECT … FOR UPDATE` al cargarlo: la segunda espera y
+  encuentra el enlace ya usado. Hay una prueba de integración que falla si se quita el
+  bloqueo.
+- Los modelos ORM de un contexto **no declaran claves foráneas hacia otro contexto**: las
+  define la migración y las hace cumplir la base de datos. Así un contexto no conoce las
+  tablas de otro.
+- Un repositorio escribe solo las columnas que el dominio conoce; lo demás (por ejemplo
+  `team_member.slack_user_id`, de una historia posterior) queda como está.
+- **Las migraciones se escriben a mano, en SQL.** El *autogenerate* de Alembic no sirve
+  aquí: al probarlo contra el esquema real proponía decenas de operaciones, entre ellas
+  borrar columnas que existen (`updated_at`, `slack_user_id`, los umbrales de ceremonia) y
+  restricciones, índices parciales y claves entre contextos que el ORM no declara. Los
+  modelos ORM son un subconjunto deliberado de las tablas. `make migration` crea una
+  migración vacía para escribirla en SQL; el test de migraciones comprueba que cada columna
+  del ORM exista en la base de datos con la misma nulabilidad.
+
 ## Comandos y consultas (CQRS)
 
 - **Comando:** cambia estado. Cargar el agregado por su repositorio, ejecutar su
@@ -128,11 +156,12 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 | --- | --- |
 | `domain` | Pruebas unitarias puras, sin base de datos ni red; se escriben antes que el código (TDD) |
 | `application` | Con puertos falsos que cumplen el `Protocol` |
-| `infrastructure` | De integración, contra Postgres y Keycloak reales en contenedores |
+| `infrastructure` | De integración, contra un PostgreSQL real (`make test-integration`; cada ejecución crea una base temporal con todas las migraciones aplicadas). Keycloak real, cuando exista su adaptador |
 | `presentation` | Contra la aplicación con un cliente HTTP; verifican el contrato, no la lógica |
 
-- La **meta de cobertura** es 90 % como mínimo en `domain` y `application`. Aún
-  no se hace cumplir en la CI: se activa cuando existan esos paquetes.
+- La **meta de cobertura** es 90 % como mínimo en `domain` y `application` (hoy el dominio
+  de `identity` y de `teams` está en 100 %). Aún no se hace cumplir en la CI: se activa
+  cuando haya casos de uso.
 - Una prueba describe un comportamiento, no un método: `test_an_expired_link_is_rejected`.
 - Una prueba no depende de otra ni del orden; el reloj y la aleatoriedad se
   inyectan.

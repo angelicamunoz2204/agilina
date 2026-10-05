@@ -89,8 +89,8 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | Contexto | Responsabilidad | Estado |
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
-| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Estructura creada, sin código (HU-02, 03, 04) |
-| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Estructura creada, sin código (HU-02 lo usa; HU-05, 06, 07…) |
+| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Dominio y persistencia hechos (HU-02); casos de uso y API pendientes; HU-03 y HU-04 después |
+| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Dominio y persistencia del equipo y sus membresías (HU-02); lo demás con HU-05, 06, 07… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
 
@@ -117,8 +117,8 @@ api/
 │   │   ├── application/              Consultas de salud y los puertos Clock, UnitOfWork, Mailer y EmailRenderer
 │   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL, correo SMTP y plantillas de correo (Jinja2)
 │   │   └── presentation/http/        Router de salud y dependencias declaradas
-│   ├── identity/                     Contexto (HU-02): las cuatro capas, aún sin código
-│   ├── teams/                        Contexto (HU-02 lo necesita, HU-05 en adelante lo construye): las cuatro capas, aún sin código
+│   ├── identity/                     Contexto (HU-02): dominio (Invitation, AppUser), puertos y DTO de lectura, persistencia
+│   ├── teams/                        Contexto (HU-02 lo necesita; HU-05 en adelante lo amplía): dominio (Team con sus membresías) y persistencia
 │   └── ceremonies/
 │       └── presentation/http/        Router del contrato del agente
 └── tests/
@@ -208,7 +208,7 @@ Todo corre en contenedores (solo hacen falta Docker y `make`):
 
 | Archivo | Para qué |
 | --- | --- |
-| `docker-compose.yml` | El entorno: `postgres`, `keycloak`, `mailpit`, `api` y `web`; con el perfil `voice`, `stt` y `agent`; con el perfil `tools`, los contenedores de un solo uso de las pruebas y verificaciones |
+| `docker-compose.yml` | El entorno: `postgres`, `pgadmin`, `keycloak`, `mailpit`, `api` y `web`; con el perfil `voice`, `stt` y `agent`; con el perfil `tools`, los contenedores de un solo uso de las pruebas y verificaciones |
 | `docker/python.Dockerfile` | Imagen de Python con varios objetivos: `dev` (todas las dependencias y las herramientas; el código se monta en `/app`) y `api` (producción: solo sus dependencias, código instalado, sin uv y sin root) |
 | `../web/Dockerfile` | Imagen de la web: `dev` (`ng serve`), `test` (con Chromium), `build` y `prod` (nginx sin privilegios) |
 | `keycloak/realm-agilina.json` | Realm, clientes y roles versionados: no se configura a mano |

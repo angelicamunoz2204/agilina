@@ -9,6 +9,7 @@ ya trae). No se instala Python, uv, Node ni nada más.
 | Pieza | Contenedor | Dónde escucha | Cuándo |
 | --- | --- | --- | --- |
 | Postgres | `postgres` | `localhost:5432` | `make up` |
+| pgAdmin (cliente web de la base) | `pgadmin` | `localhost:5051` (solo desde tu máquina) | `make up` |
 | Keycloak | `keycloak` | `localhost:8080`, sondas en `:9000` | `make up` |
 | Mailpit (correo de pruebas) | `mailpit` | Bandeja en `localhost:8025`, SMTP en `:1025` | `make up` |
 | API | `api` | `localhost:8000`, documentación en `/docs` | `make up` |
@@ -53,8 +54,9 @@ verificaciones, y `make verify` las corre en contenedores.
 ## Si ya tenías un `.env`
 
 Desde HU-02 las variables y los objetivos de `make` están en inglés. `make env`
-no sobrescribe un `.env` existente: renómbralo y deja que `make env` genere uno
-nuevo, o cambia los nombres a mano según `.env.example` (por ejemplo
+no sobrescribe un `.env` existente (solo le agrega las variables nuevas y genera las claves
+que falten): renómbralo y deja que `make env` genere uno nuevo, o cambia los nombres a mano
+según `.env.example` (por ejemplo
 `POSTGRES_USUARIO` → `POSTGRES_USER`, `POSTGRES_CLAVE` → `POSTGRES_PASSWORD`,
 `AGILINA_URL_BD` → `AGILINA_DB_URL`, `AGILINA_NIVEL_LOG` → `AGILINA_LOG_LEVEL`).
 La contraseña de Postgres debe seguir siendo la misma si conservas el volumen.
@@ -62,6 +64,24 @@ La contraseña de Postgres debe seguir siendo la misma si conservas el volumen.
 Dentro de la red de contenedores los servicios se alcanzan por nombre
 (`postgres`, `keycloak`, `stt`, `api`): el compose ya sobrescribe esas variables
 para los contenedores, de modo que el `.env` sigue apuntando a `localhost`.
+
+## Ver la base de datos con pgAdmin
+
+pgAdmin viene con el entorno: <http://localhost:5051>. Escucha solo en tu máquina
+(`127.0.0.1`), porque puede leer y cambiar toda la base.
+
+- **Credenciales:** `make credentials` las imprime todas (Postgres, pgAdmin y Keycloak).
+  Las de pgAdmin son `PGADMIN_ADMIN_EMAIL` y `PGADMIN_ADMIN_PASSWORD` del `.env`; la clave
+  la genera `make env`. Es la cuenta de pgAdmin, no la de Postgres.
+- **El servidor «Agilina» ya está registrado** y conecta sin pedir la contraseña de
+  Postgres: la lee de un archivo que el Compose genera a partir del `.env`. Las tablas
+  están en *Servers → Agilina → Databases → agilina → Schemas → public → Tables*.
+- **Puerto de Postgres:** `5432` en tu máquina (`POSTGRES_PORT`), para un cliente de
+  escritorio con servidor `localhost`. Dentro de la red de Compose es `postgres:5432`.
+- El servidor se registra solo la primera vez que arranca pgAdmin con su volumen vacío. Si
+  cambias `POSTGRES_USER` o `POSTGRES_DB` después, bórralo con `make clean` (o borra el
+  volumen `agilina_pgadmin-data`).
+- Si `make credentials` no muestra `PGADMIN_*`, `make env` las agrega a un `.env` anterior.
 
 ## Entrar a Keycloak
 
@@ -205,12 +225,14 @@ La imagen con CUDA para transcribir de verdad llega con el despliegue en la nube
 make                # lista todos los objetivos
 make up             # construye, levanta todo, espera y migra
 make down           # detiene los contenedores sin borrar datos
+make credentials    # URLs y credenciales de Postgres, pgAdmin y Keycloak
 make logs s=api     # logs de un servicio (sin s=, de todos)
 make ps             # qué está corriendo
 make migrate        # aplica las migraciones pendientes
 make mail-test to=a@b.com   # envía un correo de prueba con el SMTP configurado
-make migration m="crear tabla equipos"   # nueva migración de Alembic
-make test           # pruebas de Python y de la web
+make migration m="crear tabla equipos"   # migración vacía de Alembic: se escribe a mano, en SQL
+make test           # pruebas de Python, de integración (PostgreSQL real) y de la web
+make test-integration   # solo las de integración: levanta Postgres y usa una base temporal
 make lint           # ruff y ESLint
 make typecheck      # mypy en modo estricto
 make arch           # reglas de arquitectura (capas y fronteras entre contextos)
