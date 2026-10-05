@@ -1,0 +1,155 @@
+<section
+  class="mx-auto my-6 w-full max-w-md rounded-lg border border-border bg-surface p-6"
+  *transloco="let t; prefix: 'identity.activate'"
+>
+  @switch (phase()) {
+    @case ('checking') {
+      <p role="status">{{ t('checking') }}</p>
+    }
+
+    @case ('unavailable') {
+      <h1 class="mb-2 text-xl font-semibold">{{ t('unavailable.title') }}</h1>
+      <p class="text-sm text-muted">{{ t('unavailable.text') }}</p>
+      <button aglButton type="button" class="mt-4 w-full" (click)="retry()">
+        {{ t('retry') }}
+      </button>
+    }
+
+    @case ('link_problem') {
+      @let problem = linkProblem() ?? 'not_found';
+      <h1 class="mb-2 text-xl font-semibold">{{ t('link.' + problem + '.title') }}</h1>
+      <p class="text-sm text-muted">{{ t('link.' + problem + '.text') }}</p>
+
+      @if (canRequestNew()) {
+        @if (request() === 'idle' || request() === 'sending') {
+          <button
+            aglButton
+            type="button"
+            class="mt-4 w-full"
+            [disabled]="request() === 'sending'"
+            (click)="requestNew()"
+          >
+            {{ request() === 'sending' ? t('requesting') : t('request_new') }}
+          </button>
+        } @else {
+          <p
+            class="mt-4 text-sm"
+            [class.text-accent]="request() === 'sent'"
+            [class.text-danger]="request() !== 'sent'"
+            [attr.role]="request() === 'sent' ? 'status' : 'alert'"
+          >
+            {{ t('request_result.' + request()) }}
+          </p>
+        }
+        @if (request() === 'unavailable') {
+          <button aglButton type="button" class="mt-4 w-full" (click)="requestNew()">
+            {{ t('request_new') }}
+          </button>
+        }
+        @if (problem === 'used') {
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="mt-3 w-full"
+            (click)="goToLogin()"
+          >
+            {{ t('login') }}
+          </button>
+        }
+      } @else {
+        <p class="mt-4 text-sm text-muted">{{ t('ask_admin') }}</p>
+      }
+    }
+
+    @case ('activated') {
+      <h1 class="mb-2 text-xl font-semibold">{{ t('activated.title') }}</h1>
+      <p role="status" class="text-sm text-muted">{{ t('activated.text') }}</p>
+      @if (loginFailed()) {
+        <p role="alert" class="mt-2 text-sm text-danger">{{ t('problems.login_failed') }}</p>
+      }
+      <button aglButton type="button" class="mt-4 w-full" (click)="goToLogin()">
+        {{ t('login') }}
+      </button>
+    }
+
+    @default {
+      <h1 class="mb-2 text-xl font-semibold">{{ t('title') }}</h1>
+      <p class="text-sm text-muted">{{ t('subtitle') }}</p>
+
+      @if (invitation(); as invited) {
+        <p class="mt-4 font-semibold break-words">
+          {{ t('invitation_for', { email: invited.email }) }}
+        </p>
+      }
+
+      <form class="mt-4 flex flex-col" (submit)="submit(); $event.preventDefault()" novalidate>
+        <!-- Lets the password manager file the new password under the right account. -->
+        <input
+          type="text"
+          name="username"
+          autocomplete="username"
+          class="sr-only"
+          tabindex="-1"
+          aria-hidden="true"
+          readonly
+          [value]="invitation()?.email ?? ''"
+        />
+
+        <label for="password" class="mb-1 text-sm">{{ t('password') }}</label>
+        <input
+          aglTextField
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          aria-describedby="password-hint"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+        />
+        <p id="password-hint" class="mt-1 mb-4 text-sm text-muted">{{ t('password_hint') }}</p>
+
+        <label for="confirmation" class="mb-1 text-sm">{{ t('confirmation') }}</label>
+        <input
+          aglTextField
+          id="confirmation"
+          name="confirmation"
+          type="password"
+          autocomplete="new-password"
+          [ngModel]="confirmation()"
+          (ngModelChange)="confirmation.set($event)"
+        />
+
+        @if (rejections().length > 0) {
+          <div role="alert" class="mt-4 text-sm text-danger">
+            <p class="mb-1">{{ t('reasons_title') }}</p>
+            <ul class="list-disc pl-5">
+              @for (reason of rejections(); track reason) {
+                <li>{{ t('reasons.' + reason) }}</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (formProblem(); as problem) {
+          <p role="alert" class="mt-4 text-sm text-danger">{{ t('problems.' + problem) }}</p>
+          @if (problem === 'account_exists') {
+            <button
+              aglButton
+              variant="secondary"
+              type="button"
+              class="mt-3 w-full"
+              (click)="goToLogin()"
+            >
+              {{ t('login') }}
+            </button>
+          }
+        }
+
+        <button aglButton type="submit" class="mt-4 w-full" [disabled]="phase() === 'submitting'">
+          {{ phase() === 'submitting' ? t('submitting') : t('submit') }}
+        </button>
+      </form>
+    }
+  }
+</section>
