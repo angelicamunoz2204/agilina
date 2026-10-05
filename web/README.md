@@ -111,7 +111,7 @@ concepto se llame igual en todo el sistema:
 | Funcionalidad | Qué contiene | Estado |
 | --- | --- | --- |
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
-| `identity` | Activación de la cuenta desde la invitación (`/activar`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
+| `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
 | `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05). El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 

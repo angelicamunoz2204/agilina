@@ -10,7 +10,7 @@ import { ActivationFacade } from '../application/activation.facade';
 import { readActivationToken } from '../domain/activation-link';
 
 /**
- * Account activation (`/activar#t=<token>`): the person opens the link from the invitation
+ * Account activation (`/activate#t=<token>`): the person opens the link from the invitation
  * email, chooses a password and goes on to sign in. The token is read once and then removed
  * from the address bar, so it does not stay in the browser's history or in a screenshot.
  */

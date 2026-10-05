@@ -36,7 +36,7 @@ def _handler(uow: FakeIdentityUnitOfWork, mailer: FakeMailer, clock: FakeClock |
         FakeRenderer(),
         mailer,
         clock or FakeClock(),
-        activation_url="https://app.example.test/activar",
+        activation_url="https://app.example.test/activate",
     )
 
 
@@ -69,7 +69,7 @@ async def test_the_link_travels_in_the_email_inside_the_url_fragment():
     [message] = mailer.sent
 
     assert message.to == "julian@example.test"
-    assert "activation_url=https://app.example.test/activar#t=" + TOKEN in message.text_body
+    assert "activation_url=https://app.example.test/activate#t=" + TOKEN in message.text_body
     assert "name=Julián Torres" in message.text_body and "team_name=Atlas" in message.text_body
     assert "inviter_name=Diego" in message.text_body
     assert "expires_on=2026-10-11" in message.text_body

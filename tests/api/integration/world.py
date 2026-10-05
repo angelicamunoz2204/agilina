@@ -53,7 +53,7 @@ class World:
             FakeRenderer(),
             self.mailer,
             self.clock,
-            "https://app.test/activar",
+            "https://app.test/activate",
         )
         self.activate = ActivateAccountHandler(uow, self.provider, self.clock)
         self.status = GetInvitationStatusHandler(SqlInvitationQueries(session_factory), self.clock)

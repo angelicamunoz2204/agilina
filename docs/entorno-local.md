@@ -94,8 +94,8 @@ make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=mem
 ```
 
 Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
-Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) abre la pantalla
-de activación de la web (<http://localhost:4200/activar>): comprueba el enlace, pide la
+Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activate#t=<token>`) abre la pantalla
+de activación de la web (<http://localhost:4200/activate>): comprueba el enlace, pide la
 contraseña con su confirmación y, al activar, lleva a Keycloak con el correo ya escrito. La
 web lee el token del fragmento, lo quita de la barra de direcciones y llama a la API:
 

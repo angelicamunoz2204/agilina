@@ -80,7 +80,7 @@ def build_container(settings: Settings) -> Container:
     identity_uow = identity_unit_of_work_factory(session_factory, team_membership_factory(clock))
     teams_uow = teams_unit_of_work_factory(session_factory)
     team_queries = SqlTeamQueries(session_factory)
-    activation_url = f"{settings.web_public_url.rstrip('/')}/activar"
+    activation_url = f"{settings.web_public_url.rstrip('/')}/activate"
 
     return Container(
         invitation_status=GetInvitationStatusHandler(SqlInvitationQueries(session_factory), clock),
