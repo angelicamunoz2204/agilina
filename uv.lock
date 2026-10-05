@@ -76,6 +76,7 @@ dependencies = [
     { name = "alembic" },
     { name = "apscheduler" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "jinja2" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -86,7 +87,6 @@ dependencies = [
 
 [package.optional-dependencies]
 integraciones = [
-    { name = "httpx" },
     { name = "openpyxl" },
 ]
 
@@ -96,7 +96,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "apscheduler", specifier = ">=3.10,<4" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", marker = "extra == 'integraciones'", specifier = ">=0.27" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "openpyxl", marker = "extra == 'integraciones'", specifier = ">=3.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },

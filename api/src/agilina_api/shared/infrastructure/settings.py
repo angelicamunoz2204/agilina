@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     api_public_url: str = "http://localhost:8000"
+    web_public_url: str = "http://localhost:4200"
+    """Where the web application is served: the activation link in an invitation points here."""
     allowed_origins: str = "http://localhost:4200"
 
     # ------------------------------------------------------------ postgres --
@@ -56,6 +58,8 @@ class Settings(BaseSettings):
     keycloak_web_client: str = "agilina-web"
     keycloak_worker_client: str = "agilina-worker"
     keycloak_worker_secret: str = ""
+    keycloak_api_client: str = "agilina-api"
+    keycloak_api_secret: SecretStr = SecretStr("")
 
     # ---------------------------------------------------------------- email --
     # Which server delivers the email is only configuration (AD-23). The defaults point
