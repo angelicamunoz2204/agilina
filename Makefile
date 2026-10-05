@@ -19,7 +19,7 @@ WEB       := $(COMPOSE) run --rm --no-deps --build web
 PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
-        lint format typecheck arch test test-python test-web coverage verify \
+        lint format typecheck arch test test-python test-integration test-web coverage verify \
         mail-test lock hooks keycloak-admin clean
 
 help: ## Show this help
@@ -74,8 +74,11 @@ keycloak-admin: env ## Show the Keycloak admin console and its credentials
 migrate: env ## Apply the pending database migrations
 	$(COMPOSE) run --rm --build -w /app/api api alembic upgrade head
 
-migration: env ## Create a new migration: make migration m="description"
-	$(COMPOSE) run --rm --build -w /app/api api alembic revision --autogenerate -m "$(m)"
+# Autogenerate is deliberately not used (see docs/code-conventions.md): this creates an
+# empty revision to fill in by hand, in SQL.
+migration: env ## Create an empty migration to write in SQL: make migration m="description"
+	@test -n "$(m)" || { echo 'Usage: make migration m="description"'; exit 1; }
+	$(COMPOSE) run --rm --build -w /app/api api alembic revision -m "$(m)"
 
 # ------------------------------------------------------------------ Email ---
 mail-test: env ## Send a test email with the configured SMTP: make mail-test to=you@example.com [lang=en]
@@ -108,10 +111,13 @@ typecheck: env ## Strict type checking of the Python packages
 arch: env ## Check the architecture rules (layers and context boundaries)
 	$(TOOLS) lint-imports
 
-test: test-python test-web ## Run all the tests
+test: test-python test-integration test-web ## Run all the tests
 
 test-python: env ## Tests of the Python packages
 	$(TOOLS) pytest
+
+test-integration: env ## Integration tests against a real PostgreSQL (starts it)
+	$(COMPOSE) --profile tools run --rm --build tools pytest -m integration
 
 test-web: env ## Tests of the Angular application (headless Chromium)
 	$(COMPOSE) --profile tools run --rm --no-deps --build web-test
@@ -121,6 +127,7 @@ coverage: env ## Python tests with a coverage report
 
 verify: env ## The same the pipeline runs, in containers
 	$(TOOLS) sh -c "ruff format --check . && ruff check . && mypy $(PYPACKAGES) && lint-imports && pytest --cov --cov-report=term-missing"
+	$(MAKE) test-integration
 	$(WEB) sh -c "npm run lint && npm run build"
 	$(MAKE) test-web
 	@echo ""

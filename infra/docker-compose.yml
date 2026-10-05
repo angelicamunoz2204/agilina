@@ -137,9 +137,16 @@ services:
       AGILINA_KEYCLOAK_URL: http://keycloak:8080
 
   # One-off containers: `make test`, `make lint`, `make verify`...
+  # Unit tests run with --no-deps; the integration tests start Postgres through depends_on.
   tools:
     <<: *python-dev
     profiles: ["tools"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web-test:
     build:

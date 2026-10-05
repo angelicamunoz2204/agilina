@@ -83,7 +83,8 @@ minversion = "8.0"
 testpaths = ["shared/tests", "api/tests", "agent/tests", "stt/tests"]
 pythonpath = ["shared/src", "api/src", "agent/src", "stt/src"]
 asyncio_mode = "auto"
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers -m 'not integration'"
+markers = ["integration: needs a real PostgreSQL (make test-integration)"]
 
 # -------------------------------------------------------------- coverage ----
 [tool.coverage.run]
@@ -93,7 +94,13 @@ omit = ["*/tests/*", "api/migrations/*"]
 
 [tool.coverage.report]
 skip_empty = true
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '^\s*\.\.\.$',  # the body of a Protocol method
+    ': \.\.\.$',
+]
 
 # ------------------------------------------------------------------ mypy ----
 [tool.mypy]
