@@ -13,6 +13,7 @@ en el espacio del proyecto y se enlazan desde aquí.
 | [contrato-worker-api.md](contrato-worker-api.md) | Las dos operaciones que cruzan la frontera entre el worker y la API |
 | [github.md](github.md) | Configuración del repositorio: protección de `main`, revisión y etiquetas |
 | [adr/](adr/) | Decisiones arquitectónicas que se toman de aquí en adelante |
+| [spikes/](spikes/) | Informes de spikes: pregunta, resultados contra los umbrales y decisión |
 
 La convención de ramas, commits, pull requests y code review está en
 [CONTRIBUTING.md](../CONTRIBUTING.md), en la raíz, porque GitHub la muestra
