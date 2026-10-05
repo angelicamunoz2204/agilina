@@ -8,6 +8,5 @@ import { Header } from '@layout/header/header';
   selector: 'agl-root',
   imports: [RouterOutlet, Header],
   templateUrl: './app.html',
-  styleUrl: './app.scss',
 })
 export class App {}

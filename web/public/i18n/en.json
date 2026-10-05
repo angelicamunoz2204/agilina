@@ -40,5 +40,69 @@
       "loading": "Loading the team…",
       "failed": "This team could not be opened."
     }
+  },
+  "identity": {
+    "activate": {
+      "title": "Activate your account",
+      "subtitle": "Set your password to join the team.",
+      "invitation_for": "Invitation for: {{ email }}",
+      "password": "Password",
+      "password_hint": "At least 12 characters. It cannot be the same as your email or your username.",
+      "confirmation": "Confirm password",
+      "submit": "Activate and sign in",
+      "submitting": "Activating…",
+      "checking": "Checking your invitation…",
+      "retry": "Retry",
+      "login": "Sign in",
+      "reasons_title": "Your password does not meet the security policy:",
+      "reasons": {
+        "min_length": "It must have at least 12 characters.",
+        "not_username": "It cannot be the same as your username.",
+        "not_email": "It cannot be the same as your email address.",
+        "other": "It breaks one of the security rules. Try a longer, different password."
+      },
+      "problems": {
+        "empty": "Type your password.",
+        "mismatch": "The passwords do not match.",
+        "account_exists": "An account with this email already exists. Sign in to get in.",
+        "unavailable": "We could not activate your account right now. Try again in a few minutes.",
+        "login_failed": "We could not take you to the sign-in. Press the button to try again."
+      },
+      "unavailable": {
+        "title": "We could not check your invitation",
+        "text": "The service is not responding right now. Try again in a few minutes."
+      },
+      "link": {
+        "used": {
+          "title": "This link was already used",
+          "text": "Your account was already activated with this link. If that was you, sign in. If not, ask for a new invitation."
+        },
+        "expired": {
+          "title": "This link has expired",
+          "text": "Invitation links are valid for 7 days. Ask for a new invitation to activate your account."
+        },
+        "revoked": {
+          "title": "This invitation was cancelled",
+          "text": "Whoever invited you no longer has it in force. Ask for a new invitation."
+        },
+        "not_found": {
+          "title": "This link is not valid",
+          "text": "The link is incomplete or was changed. Open it again from the invitation email."
+        }
+      },
+      "request_new": "Request a new invitation",
+      "requesting": "Sending…",
+      "request_result": {
+        "sent": "Done: we told your team's admins so they can send you a new invitation.",
+        "no_admins": "Your team has no active admins to tell. Contact whoever invited you.",
+        "still_valid": "Your invitation is still valid. Open the link in the email to activate your account.",
+        "unavailable": "We could not send the notice. Try again."
+      },
+      "ask_admin": "If the problem continues, ask your admin for a new invitation.",
+      "activated": {
+        "title": "Account activated",
+        "text": "Taking you to the sign-in…"
+      }
+    }
   }
 }

@@ -93,7 +93,7 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | Contexto | Responsabilidad | Estado |
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
-| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas en el servidor: dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; HU-03 y HU-04 después |
+| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas: en el servidor, dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; en la web, la pantalla `/activar`; HU-03 y HU-04 después |
 | `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio (con el nombre como objeto de valor `TeamName`), comandos (`CreateTeam` y `AddTeamMember` de HU-02, `CreateTeamAsAdmin` de HU-05), consultas (administradores, `ListMyTeams`, `GetTeam` y el rol de un integrante), persistencia y API HTTP (`/v1/teams`, HU-05); lo demás con HU-06, 07… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
@@ -221,9 +221,10 @@ web/
 ```
 
 Hoy existen `features/status` (la pantalla de estado del entorno) y
-`features/teams` (HU-05: el selector mínimo, el formulario para crear un equipo y el
-dashboard del equipo, que por ahora solo muestra su nombre). Las demás (`identity`,
-`ceremonies`) llegan con sus historias. El detalle,
+`features/identity` (la pantalla `/activar`, HU-02) y `features/teams` (HU-05: el selector
+mínimo, el formulario para crear un equipo y el dashboard del equipo, que por ahora solo
+muestra su nombre). Las demás (`ceremonies` y el resto de `identity`) llegan con sus
+historias. El detalle,
 las convenciones y el porqué están en [web/README.md](../web/README.md) y en
 [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 
@@ -293,6 +294,7 @@ en el code review.
 
 ## Dónde está el porqué
 
+- Cómo se da estilo a la web (Tailwind CSS con los tokens `--agl-*` como tema): [AD-27](adr/0027-dar-estilo-a-la-web-con-tailwind-css.md).
 - Cómo se organizan las pruebas (árbol espejo, *Data Builders*, cobertura del 100 %): [AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
 - Cómo se envía el correo (SMTP, Mailpit y el proveedor por configuración): [AD-23](adr/0023-enviar-correo-por-smtp-con-mailpit-y-proveedor-configurable.md).

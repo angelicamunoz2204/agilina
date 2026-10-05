@@ -40,5 +40,69 @@
       "loading": "Cargando el equipo…",
       "failed": "No se pudo abrir este equipo."
     }
+  },
+  "identity": {
+    "activate": {
+      "title": "Activar cuenta",
+      "subtitle": "Define tu contraseña para unirte al equipo.",
+      "invitation_for": "Invitación para: {{ email }}",
+      "password": "Contraseña",
+      "password_hint": "Mínimo 12 caracteres. No puede ser igual a tu correo ni a tu nombre de usuario.",
+      "confirmation": "Confirmar contraseña",
+      "submit": "Activar y entrar",
+      "submitting": "Activando…",
+      "checking": "Comprobando tu invitación…",
+      "retry": "Reintentar",
+      "login": "Iniciar sesión",
+      "reasons_title": "Tu contraseña no cumple la política de seguridad:",
+      "reasons": {
+        "min_length": "Debe tener al menos 12 caracteres.",
+        "not_username": "No puede ser igual a tu nombre de usuario.",
+        "not_email": "No puede ser igual a tu correo electrónico.",
+        "other": "No cumple una de las reglas de seguridad. Prueba con una contraseña más larga y distinta."
+      },
+      "problems": {
+        "empty": "Escribe tu contraseña.",
+        "mismatch": "Las contraseñas no coinciden.",
+        "account_exists": "Ya existe una cuenta con este correo. Inicia sesión para entrar.",
+        "unavailable": "No pudimos activar tu cuenta en este momento. Inténtalo de nuevo en unos minutos.",
+        "login_failed": "No pudimos llevarte al inicio de sesión. Pulsa el botón para intentarlo de nuevo."
+      },
+      "unavailable": {
+        "title": "No pudimos comprobar tu invitación",
+        "text": "El servicio no responde en este momento. Inténtalo de nuevo en unos minutos."
+      },
+      "link": {
+        "used": {
+          "title": "Este enlace ya se usó",
+          "text": "Tu cuenta ya se activó con este enlace. Si eres tú, inicia sesión. Si no, pide una invitación nueva."
+        },
+        "expired": {
+          "title": "Este enlace venció",
+          "text": "Los enlaces de invitación valen 7 días. Pide una invitación nueva para activar tu cuenta."
+        },
+        "revoked": {
+          "title": "Esta invitación fue cancelada",
+          "text": "Quien te invitó ya no la tiene vigente. Pide una invitación nueva."
+        },
+        "not_found": {
+          "title": "Este enlace no es válido",
+          "text": "El enlace está incompleto o fue modificado. Ábrelo de nuevo desde el correo de invitación."
+        }
+      },
+      "request_new": "Solicitar una invitación nueva",
+      "requesting": "Enviando…",
+      "request_result": {
+        "sent": "Listo: avisamos a los administradores de tu equipo para que te envíen una invitación nueva.",
+        "no_admins": "Tu equipo no tiene administradores activos a quienes avisar. Contacta a quien te invitó.",
+        "still_valid": "Tu invitación sigue vigente. Abre el enlace del correo para activar tu cuenta.",
+        "unavailable": "No pudimos enviar el aviso. Inténtalo de nuevo."
+      },
+      "ask_admin": "Si el problema sigue, pide una invitación nueva a tu administrador.",
+      "activated": {
+        "title": "Cuenta activada",
+        "text": "Te llevamos al inicio de sesión…"
+      }
+    }
   }
 }

@@ -21,7 +21,8 @@ guía está en [AD-26](../docs/adr/0026-organizar-y-equipar-la-aplicacion-web.md
 | Textos | [Transloco](https://jsverse.gitbook.io/transloco) (`@jsverse/transloco`), español e inglés |
 | Formularios | Reactive Forms tipados (`@angular/forms`) |
 | Análisis estático | ESLint con `angular-eslint`, `typescript-eslint` (reglas *type-checked*) e `import-x` |
-| Formato | Prettier |
+| Estilos | Tailwind CSS 4, con tokens `--agl-*` como tema ([AD-27](../docs/adr/0027-dar-estilo-a-la-web-con-tailwind-css.md)) |
+| Formato | Prettier, con el ordenador de clases de Tailwind |
 | Pruebas | Jasmine con Karma sobre Chromium sin interfaz |
 | Ejecución | Todo corre dockerizado: en desarrollo `ng serve`, en producción nginx sin privilegios |
 
@@ -74,7 +75,7 @@ web/
 ├── scripts/                      render-runtime-config.mjs (config.json en desarrollo)
 └── src/
     ├── main.ts                   Carga config.json y arranca la aplicación
-    ├── styles.scss               Tokens de diseño (--agl-*) y estilos globales
+    ├── styles.css                Tailwind, tokens de diseño (--agl-*) y estilos globales
     ├── testing/                  Utilidades de prueba compartidas (@testing/*)
     └── app/
         ├── app.config.ts         Raíz de composición: enlaza puertos con adaptadores
@@ -110,7 +111,7 @@ concepto se llame igual en todo el sistema:
 | Funcionalidad | Qué contiene | Estado |
 | --- | --- | --- |
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
-| `identity` | Activación de la cuenta desde la invitación, inicio y cierre de sesión | Llega con HU-02/03/04 |
+| `identity` | Activación de la cuenta desde la invitación (`/activar`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
 | `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05). El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
@@ -151,7 +152,7 @@ en inglés.
 
 | Qué | Archivo | Clase o símbolo |
 | --- | --- | --- |
-| Página enrutada | `team-settings-page.ts` (+ `.html`, `.scss`) | `TeamSettingsPage`, selector `agl-team-settings-page` |
+| Página enrutada | `team-settings-page.ts` (+ `.html`) | `TeamSettingsPage`, selector `agl-team-settings-page` |
 | Componente | `participant-tile.ts` | `ParticipantTile`, selector `agl-participant-tile` |
 | Puerto | `room.port.ts` | `RoomPort` (clase abstracta) |
 | *Facade* | `room.facade.ts` | `RoomFacade` |
@@ -180,7 +181,8 @@ en inglés.
 - Dependencias con `inject()`, nunca por constructor. *(ESLint.)*
 - Entradas y salidas con `input()`, `input.required()`, `output()` y
   `model()`; consultas con `viewChild()` y `contentChild()`. *(ESLint.)*
-- Plantilla y estilos en archivos aparte (`templateUrl`, `styleUrl`); control
+- Plantilla en archivo aparte (`templateUrl`) y los estilos como clases de Tailwind en
+  ella; control
   de flujo nativo (`@if`, `@for`, `@switch`), con `track` en todo `@for`.
 - Lo que solo usa la plantilla es `protected`; lo que nadie fuera usa,
   `private`. Nunca `public` explícito. *(ESLint.)*
@@ -344,11 +346,22 @@ Para agregar una: declárala en `.env.example`, pásala al servicio `web` en
 
 ## Estilos
 
-- Los colores, espacios y tipografía son tokens `--agl-*` en `styles.scss`. Un
-  componente usa los tokens, no valores sueltos.
-- Cada componente con su `.scss` encapsulado; nada de estilos en línea.
-  *(ESLint.)*
-- Presupuesto de 4 kB por hoja de estilos de componente (falla a los 8 kB).
+Tailwind CSS 4 ([AD-27](../docs/adr/0027-dar-estilo-a-la-web-con-tailwind-css.md)): los
+estilos de una pantalla son **clases de utilidad en su plantilla**.
+
+- Los colores salen de los tokens `--agl-*` de `styles.css`, que Tailwind lee como tema:
+  `bg-surface`, `bg-background`, `text-foreground`, `text-muted`, `text-accent`,
+  `text-danger`, `border-border`. **No se escriben colores sueltos** (`#fff`, `bg-blue-500`):
+  un tema nuevo cambia los valores de las variables y nada más.
+- Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `button[aglButton]`
+  (con `variant="primary" | "secondary"`) y `input[aglTextField]`, directivas sobre el elemento
+  nativo. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
+- El orden de las clases lo decide Prettier (`make format`); no se discute en el review.
+- Nada de estilos en línea (`style="…"`). *(ESLint.)*
+- Un `.scss` de componente (`styleUrl`) es la excepción, solo para lo que las utilidades no
+  expresan (por ejemplo una animación); se justifica en el pull request.
+- Una prueba no busca un elemento por su clase de estilo: usa el texto, el rol o la etiqueta.
+- Adaptable por defecto: se escribe primero para móvil y se amplía con `sm:`, `md:`…
 
 ## Accesibilidad
 
@@ -435,7 +448,8 @@ Estos puntos no están decididos; se preguntan antes de decidir:
   directo) y cómo se renueva el token.
 - Migrar las pruebas de Karma a Vitest (el valor por defecto desde Angular 21;
   Karma está archivado).
-- Librería de componentes o sistema de diseño para `shared/ui`.
+- Librería de componentes (diálogos, tablas, menús) para `shared/ui`; si se adopta una,
+  que se apoye en Tailwind (AD-27).
 - Herramienta de pruebas de punta a punta en el navegador (por ejemplo,
   Playwright en su propio contenedor). Hoy los flujos se cubren con la
   integración HTTP de la API contra PostgreSQL y con pruebas de componentes con

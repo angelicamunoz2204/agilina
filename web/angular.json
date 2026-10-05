@@ -27,7 +27,7 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"],
+            "styles": ["src/styles.css"],
             "inlineStyleLanguage": "scss"
           },
           "configurations": {
@@ -90,7 +90,7 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"],
+            "styles": ["src/styles.css"],
             "inlineStyleLanguage": "scss"
           }
         },

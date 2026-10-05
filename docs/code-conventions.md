@@ -212,6 +212,9 @@ esencial:
   peticiones HTTP.
 - Ningún texto de usuario escrito en una plantilla: siempre una clave de
   Transloco.
+- Los estilos son clases de **Tailwind CSS** en la plantilla ([AD-27](adr/0027-dar-estilo-a-la-web-con-tailwind-css.md)),
+  con colores solo de los tokens `--agl-*` (`bg-surface`, `text-muted`…); lo que se repite es una
+  pieza de `shared/ui`, no un grupo de clases copiado.
 - Los errores se registran con el puerto `Logger`; `console.*` está prohibido
   fuera de su adaptador. *(ESLint.)*
 - La configuración llega en `config.json`, generado desde variables de entorno
