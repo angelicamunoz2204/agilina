@@ -1,0 +1,95 @@
+# Cómo se prueba
+
+Guía práctica de las pruebas de Python. La decisión y sus motivos están en
+[AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md); las
+reglas generales de código, en [code-conventions.md](code-conventions.md).
+
+## Dónde van
+
+```
+tests/
+├── api/
+│   ├── builders/       Data Builders: cómo se arman los datos
+│   ├── doubles/        Dobles en memoria de los puertos
+│   ├── conftest.py     Reloj de identificadores, entorno y cliente HTTP
+│   ├── unit/           Sin servidores: corre en segundos
+│   │   ├── shared_kernel/  shared/{application,infrastructure,presentation}/
+│   │   ├── identity/{domain,application,presentation,infrastructure}/
+│   │   ├── teams/{domain,application}/   ceremonies/presentation/   bootstrap/
+│   └── integration/    PostgreSQL y Keycloak reales, misma estructura que unit/
+├── agent/unit/   stt/unit/   shared/unit/
+```
+
+**La ruta de una prueba es la de su módulo en `src/`.** Para saber dónde probar
+`identity/application/commands/activate_account.py`, busca
+`tests/api/unit/identity/application/commands/test_activate_account.py`. Los nombres de
+archivo se repiten entre `unit/` e `integration/`; por eso pytest usa
+`--import-mode=importlib`.
+
+## Qué se prueba en cada capa
+
+| Capa | Cómo | Árbol |
+| --- | --- | --- |
+| `domain` | Unitarias puras, con builders, sin dobles | `unit/` |
+| `application` | Casos de uso con los dobles en memoria de `doubles/` | `unit/` |
+| `presentation` | La aplicación real con un cliente HTTP y los casos de uso doblados | `unit/` |
+| `infrastructure` | Repositorios y consultas contra PostgreSQL real; Keycloak con `httpx.MockTransport` y, además, contra el real; SMTP con un `smtplib` falso. Los errores que un servidor real casi no produce (una restricción desconocida, un fallo de red) se simulan con `doubles/database.py` | `integration/` y `unit/` |
+| `bootstrap` | El grafo se construye sin conectarse, la aplicación registra sus rutas, el ciclo de vida arranca y para el planificador, y los comandos del operador (`make invite`, `make mail-test`) leen sus argumentos | `unit/`; los flujos con base de datos, en `integration/` |
+
+## Los *Data Builders*
+
+```python
+from tests.api.builders import InvitationBuilder, TeamBuilder, next_id
+
+invitation = InvitationBuilder().for_team(team_id).as_admin().build()
+used       = InvitationBuilder().accepted_by(next_id()).build()
+overdue    = InvitationBuilder().past_its_deadline().build()
+await InvitationBuilder().for_team(team.id).saved_in(uow.invitations)
+```
+
+Reglas:
+
+- Los valores por defecto son **válidos y fijos**; un fallo se reproduce igual cada vez.
+- Cada `with_…`/`as_…` devuelve **un builder nuevo**: un builder compartido como punto de
+  partida no se altera.
+- `build()` usa las **reglas del dominio** (`Invitation.issue`, `Team.create`): si el
+  dato es inválido, falla igual que en producción.
+- Un estado se alcanza **por comportamiento** (`accepted_by` llama a `accept`), nunca
+  escribiendo atributos privados. Lo que el dominio todavía no sabe hacer (una invitación
+  *revocada*) se restaura con `restored_as(...)`.
+- `saved_in(repositorio)` sirve para el doble en memoria y para el repositorio SQL.
+- En integración, `tests/api/integration/support.py` guarda con *commit* un equipo, un
+  usuario o una invitación como datos de partida. La base impide dos invitaciones con el
+  mismo token o dos usuarios con el mismo correo: `with_unique_token()` y
+  `with_unique_email()` evitan el choque.
+- Si te falta un builder, **agrégalo en `builders/`**, no en el archivo de la prueba.
+
+## Reglas de cada prueba
+
+- Describe un comportamiento, no un método: `test_an_expired_link_cannot_be_used`.
+- No depende de otra ni del orden; el reloj es `FakeClock` y los identificadores salen de
+  `next_id()` (un contador que se reinicia en cada prueba).
+- Una prueba no tiene condicionales sobre el entorno (`if status == 503`): si depende de
+  un servidor, se simula o va a `integration/`.
+- Todo error corregido deja una prueba que lo habría detectado.
+
+## Comandos
+
+| Quiero… | Comando |
+| --- | --- |
+| Las pruebas unitarias | `make test-python` |
+| Las de integración (levanta PostgreSQL) | `make test-integration` |
+| Las del adaptador de Keycloak real | `make test-keycloak` |
+| La cobertura, con el umbral del 100 % | `make coverage` |
+| Todo lo que corre la CI | `make verify` |
+
+## Cobertura
+
+La API (`api/src`) y el contrato (`shared/src`) están en **100 % de líneas y ramas**,
+sumando unitarias e integración, y la CI falla por debajo. Las pruebas de Keycloak real
+(`make test-keycloak`) no cuentan para el umbral: el adaptador ya se cubre con el servidor
+simulado, y la CI no levanta Keycloak. `agent/` y `stt/` no están en el umbral todavía.
+
+Una línea que no se pueda probar se excluye con `# pragma: no cover` y una razón al lado,
+o por las reglas de `pyproject.toml` (cuerpos de un `Protocol`, `if __name__ == "__main__"`).
+Agregar una exclusión es una decisión que se revisa en el pull request.

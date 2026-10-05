@@ -80,6 +80,21 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
   migración vacía para escribirla en SQL; el test de migraciones comprueba que cada columna
   del ORM exista en la base de datos con la misma nulabilidad.
 
+## Entre contextos
+
+- Un contexto **declara como puerto** lo que necesita de otro (`TeamMembership`,
+  `TeamContactsDirectory` en `identity`) y la **raíz de composición** lo implementa llamando
+  al caso de uso del otro (`bootstrap/context_adapters.py`). Ningún contexto importa a otro;
+  import-linter lo impide.
+- Un manejador que **abre su propia transacción** (`CreateTeam`, `ActivateAccount`) recibe una
+  fábrica de unidad de trabajo. Uno que existe para usarse **dentro** de la transacción de
+  otro (`AddTeamMember`) recibe el repositorio y deja el commit al que lo llama.
+- Un efecto en un sistema externo que no puede ir en la transacción (crear la cuenta en
+  Keycloak) tiene su **compensación**: si el resto falla, se deshace, y el error original
+  es el que se propaga (AD-24).
+- Lo irreversible va al final y lo que puede fallar, antes: el correo de una invitación se
+  envía antes del commit para que, si el servidor lo rechaza, no quede nada guardado.
+
 ## Comandos y consultas (CQRS)
 
 - **Comando:** cambia estado. Cargar el agregado por su repositorio, ejecutar su
@@ -152,16 +167,17 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 
 ## Pruebas
 
-| Capa | Cómo se prueba |
-| --- | --- |
-| `domain` | Pruebas unitarias puras, sin base de datos ni red; se escriben antes que el código (TDD) |
-| `application` | Con puertos falsos que cumplen el `Protocol` |
-| `infrastructure` | De integración, contra un PostgreSQL real (`make test-integration`; cada ejecución crea una base temporal con todas las migraciones aplicadas). Keycloak real, cuando exista su adaptador |
-| `presentation` | Contra la aplicación con un cliente HTTP; verifican el contrato, no la lógica |
+Dónde van, cómo se arman los datos (*Data Builders*) y qué se prueba en cada capa:
+[testing.md](testing.md), con su decisión en
+[AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 
-- La **meta de cobertura** es 90 % como mínimo en `domain` y `application` (hoy el dominio
-  de `identity` y de `teams` está en 100 %). Aún no se hace cumplir en la CI: se activa
-  cuando haya casos de uso.
+- Las pruebas están en `tests/` (raíz), con un árbol `unit/` y otro `integration/`, cada
+  uno con la estructura de `src/`.
+- Cada capa tiene sus pruebas: `domain` (puras), `application` (con puertos falsos que
+  cumplen el `Protocol`), `presentation` (cliente HTTP), `infrastructure` (PostgreSQL y
+  Keycloak reales) y `bootstrap` (cableado y comandos del operador).
+- La **cobertura de la API y del contrato compartido es del 100 %** y la CI falla por
+  debajo (`make coverage`).
 - Una prueba describe un comportamiento, no un método: `test_an_expired_link_is_rejected`.
 - Una prueba no depende de otra ni del orden; el reloj y la aleatoriedad se
   inyectan.
