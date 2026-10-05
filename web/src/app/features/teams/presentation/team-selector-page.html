@@ -1,0 +1,22 @@
+<section class="card" *transloco="let t; prefix: 'teams.selector'">
+  <h1>{{ t('title') }}</h1>
+
+  @if (teams(); as teams) {
+    <ul class="teams">
+      @for (team of teams; track team.id) {
+        <li>
+          <a [routerLink]="['/teams', team.id]">{{ team.name }}</a>
+        </li>
+      }
+    </ul>
+    @if (teams.length === 0) {
+      <p class="hint">{{ t('empty') }}</p>
+    }
+  } @else if (loading()) {
+    <p>{{ t('loading') }}</p>
+  } @else if (failed()) {
+    <p class="error" role="alert">{{ t('failed') }}</p>
+  }
+
+  <a class="button" routerLink="/teams/new">{{ t('create') }}</a>
+</section>

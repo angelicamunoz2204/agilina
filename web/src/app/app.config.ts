@@ -8,6 +8,8 @@ import { provideI18n } from '@core/i18n/provide-i18n';
 import { provideLogging } from '@core/logging/provide-logging';
 import { HealthPort } from '@features/status/application/health.port';
 import { HttpHealthApi } from '@features/status/infrastructure/http-health.api';
+import { TeamsPort } from '@features/teams/application/teams.port';
+import { HttpTeamsApi } from '@features/teams/infrastructure/http-teams.api';
 
 import { routes } from './app.routes';
 
@@ -26,6 +28,7 @@ export function createAppConfig(runtimeConfig: RuntimeConfig): ApplicationConfig
 
       // Ports of the features, bound to their adapters.
       { provide: HealthPort, useClass: HttpHealthApi },
+      { provide: TeamsPort, useClass: HttpTeamsApi },
     ],
   };
 }

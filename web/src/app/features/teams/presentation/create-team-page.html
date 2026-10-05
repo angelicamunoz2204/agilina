@@ -1,0 +1,39 @@
+<section class="card" *transloco="let t; prefix: 'teams.create'">
+  <h1>{{ t('title') }}</h1>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label for="team-name">{{ t('name_label') }}</label>
+    <input
+      id="team-name"
+      type="text"
+      formControlName="name"
+      autocomplete="off"
+      aria-describedby="team-name-hint team-name-problem"
+      [attr.aria-invalid]="nameProblem() !== null"
+    />
+    <p id="team-name-hint" class="hint">{{ t('name_hint', { max: maxLength }) }}</p>
+    <p id="team-name-problem" class="error" aria-live="polite">
+      @switch (nameProblem()) {
+        @case ('blank') {
+          {{ t('errors.blank') }}
+        }
+        @case ('too_long') {
+          {{ t('errors.too_long', { max: maxLength }) }}
+        }
+      }
+    </p>
+
+    <p class="hint">{{ t('defaults_hint') }}</p>
+
+    @if (failed()) {
+      <p class="error" role="alert">{{ t('failed') }}</p>
+    }
+
+    <div class="actions">
+      <button type="submit" [disabled]="form.invalid || saving()">
+        {{ saving() ? t('saving') : t('submit') }}
+      </button>
+      <a routerLink="/teams">{{ t('cancel') }}</a>
+    </div>
+  </form>
+</section>

@@ -19,6 +19,7 @@ guía está en [AD-26](../docs/adr/0026-organizar-y-equipar-la-aplicacion-web.md
 | Sala de audio | `livekit-client`. No se usan los componentes prearmados de LiveKit, que son solo para React |
 | Identidad | Keycloak (OIDC) con `keycloak-js`. La API emite el token de LiveKit |
 | Textos | [Transloco](https://jsverse.gitbook.io/transloco) (`@jsverse/transloco`), español e inglés |
+| Formularios | Reactive Forms tipados (`@angular/forms`) |
 | Análisis estático | ESLint con `angular-eslint`, `typescript-eslint` (reglas *type-checked*) e `import-x` |
 | Formato | Prettier |
 | Pruebas | Jasmine con Karma sobre Chromium sin interfaz |
@@ -110,7 +111,7 @@ concepto se llame igual en todo el sistema:
 | --- | --- | --- |
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `identity` | Activación de la cuenta desde la invitación, inicio y cierre de sesión | Llega con HU-02/03/04 |
-| `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Llega con HU-05 en adelante |
+| `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05). El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
@@ -158,6 +159,7 @@ en inglés.
 | Otro adaptador | `livekit-room.adapter.ts` | `LiveKitRoomAdapter` |
 | Modelo de dominio | `turn.ts` | `Turn` |
 | Interceptor, *guard*, *pipe* | `auth.interceptor.ts`, `admin.guard.ts`, `local-date.pipe.ts` | `authInterceptor`, `adminGuard` (funciones), `LocalDatePipe` |
+| Validador de formulario | `team-name.validator.ts` | `teamNameValidator` (función) |
 | Proveedores de un módulo de `core` | `provide-logging.ts` | `provideLogging()` |
 | Prueba | junto al archivo, `*.spec.ts` | — |
 
@@ -204,6 +206,27 @@ en inglés.
   `takeUntilDestroyed()`. *(ESLint verifica que se use en un contexto válido.)*
 - `effect()` solo para sincronizar con el mundo exterior (DOM, LiveKit,
   `localStorage`), nunca para derivar estado: para eso está `computed()`.
+
+## Formularios
+
+- **Reactive Forms tipados** (`ReactiveFormsModule`): un `FormGroup` con sus
+  `FormControl` creados con `nonNullable: true`, como campos `protected` de la
+  página. Se envía con `(ngSubmit)` sobre `[formGroup]`.
+- **La regla vive en `domain`** como función pura (por ejemplo,
+  `teamNameProblem` en `features/teams/domain/team-name.ts`), con su prueba sin
+  `TestBed`. El validador es una función de `presentation`
+  (`team-name.validator.ts`) que solo delega en esa regla: no repite la regla.
+- **La validación del cliente es comodidad; la autoridad es la API.** La API
+  aplica la misma regla y responde con un `code` (`invalid_team_name`). Hoy la
+  pantalla muestra un error genérico traducido ante cualquier fallo; traducir
+  cada `code` llega cuando una historia lo necesite.
+- El botón de enviar queda deshabilitado mientras el formulario sea inválido o
+  se esté guardando. Los mensajes de validación se muestran cuando el usuario ya
+  escribió en el campo o salió de él.
+- Todo control tiene su `<label for>`, y el mensaje de error se asocia con
+  `aria-describedby` y `aria-invalid`.
+- El envío lo hace la *facade* (`saving`, `failed` y un método que devuelve una
+  `Promise`); la página solo decide adónde navegar con el resultado.
 
 ## Comunicación con la API
 
@@ -413,3 +436,7 @@ Estos puntos no están decididos; se preguntan antes de decidir:
 - Migrar las pruebas de Karma a Vitest (el valor por defecto desde Angular 21;
   Karma está archivado).
 - Librería de componentes o sistema de diseño para `shared/ui`.
+- Herramienta de pruebas de punta a punta en el navegador (por ejemplo,
+  Playwright en su propio contenedor). Hoy los flujos se cubren con la
+  integración HTTP de la API contra PostgreSQL y con pruebas de componentes con
+  el Router real. Se decide cuando exista el inicio de sesión (HU-03).

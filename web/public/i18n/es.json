@@ -13,5 +13,32 @@
     "environment": "Entorno",
     "retry": "Reintentar",
     "error_hint": "Levanta la API con make api y vuelve a intentarlo."
+  },
+  "teams": {
+    "selector": {
+      "title": "Tus equipos",
+      "loading": "Cargando tus equipos…",
+      "failed": "No se pudieron cargar tus equipos. Inténtalo de nuevo más tarde.",
+      "empty": "Todavía no perteneces a ningún equipo.",
+      "create": "Crear equipo"
+    },
+    "create": {
+      "title": "Crear equipo",
+      "name_label": "Nombre del equipo",
+      "name_hint": "Máximo {{ max }} caracteres.",
+      "errors": {
+        "blank": "Escribe el nombre del equipo.",
+        "too_long": "El nombre no puede pasar de {{ max }} caracteres."
+      },
+      "defaults_hint": "El equipo se creará en modo soporte y con idioma inglés. Tú quedarás como su Administrador.",
+      "submit": "Crear equipo",
+      "saving": "Creando…",
+      "failed": "No se pudo crear el equipo. Inténtalo de nuevo.",
+      "cancel": "Cancelar"
+    },
+    "dashboard": {
+      "loading": "Cargando el equipo…",
+      "failed": "No se pudo abrir este equipo."
+    }
   }
 }

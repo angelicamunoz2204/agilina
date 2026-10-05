@@ -1,0 +1,9 @@
+<section class="card" *transloco="let t; prefix: 'teams.dashboard'">
+  @if (team(); as team) {
+    <h1>{{ team.name }}</h1>
+  } @else if (loading()) {
+    <p>{{ t('loading') }}</p>
+  } @else if (failed()) {
+    <p class="error" role="alert">{{ t('failed') }}</p>
+  }
+</section>

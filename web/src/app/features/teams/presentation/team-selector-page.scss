@@ -1,0 +1,53 @@
+.card {
+  max-width: 34rem;
+  padding: 1.5rem;
+  border: 1px solid var(--agl-border);
+  border-radius: 0.5rem;
+  background: var(--agl-surface);
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.125rem;
+}
+
+.teams {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.teams li + li {
+  border-top: 1px solid var(--agl-border);
+}
+
+.teams a {
+  display: block;
+  padding: 0.5rem 0;
+  color: var(--agl-text);
+  text-decoration: none;
+}
+
+.teams a:hover,
+.teams a:focus-visible {
+  color: var(--agl-accent);
+}
+
+.hint {
+  color: var(--agl-text-muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  color: var(--agl-error);
+}
+
+.button {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--agl-accent);
+  border-radius: 0.375rem;
+  color: var(--agl-text);
+  text-decoration: none;
+}

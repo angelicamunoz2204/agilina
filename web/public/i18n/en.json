@@ -13,5 +13,32 @@
     "environment": "Environment",
     "retry": "Retry",
     "error_hint": "Start the API with make api and try again."
+  },
+  "teams": {
+    "selector": {
+      "title": "Your teams",
+      "loading": "Loading your teams…",
+      "failed": "Your teams could not be loaded. Try again later.",
+      "empty": "You do not belong to any team yet.",
+      "create": "Create team"
+    },
+    "create": {
+      "title": "Create team",
+      "name_label": "Team name",
+      "name_hint": "Up to {{ max }} characters.",
+      "errors": {
+        "blank": "Enter the team's name.",
+        "too_long": "The name cannot be longer than {{ max }} characters."
+      },
+      "defaults_hint": "The team will be created in support mode with English as its language. You will be its Administrator.",
+      "submit": "Create team",
+      "saving": "Creating…",
+      "failed": "The team could not be created. Try again.",
+      "cancel": "Cancel"
+    },
+    "dashboard": {
+      "loading": "Loading the team…",
+      "failed": "This team could not be opened."
+    }
   }
 }
