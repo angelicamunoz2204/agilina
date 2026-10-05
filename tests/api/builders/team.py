@@ -22,6 +22,7 @@ class TeamBuilder:
     created_by: UUID | None = None
     created_at: datetime = NOW
     members: tuple[tuple[UUID, TeamRole], ...] = ()
+    creating_admin: UUID | None = None
 
     def with_id(self, team_id: UUID) -> Self:
         return replace(self, team_id=team_id)
@@ -47,8 +48,33 @@ class TeamBuilder:
     def with_admin(self, user_id: UUID) -> Self:
         return self.with_member(user_id, TeamRole.ADMIN)
 
+    def created_with_admin(self, user_id: UUID) -> Self:
+        """Created by ``user_id`` through ``Team.create_with_admin``, who becomes its admin.
+
+        That path always starts in support mode and English, so ``in_mode``,
+        ``in_language`` and ``created_by_user`` do not apply to it.
+        """
+        return replace(self, creating_admin=user_id)
+
     def build(self) -> Team:
-        team = Team.create(
+        team = self._create()
+        for user_id, role in self.members:
+            team.add_member(
+                membership_id=next_id(), user_id=user_id, role=role, now=self.created_at
+            )
+        team.pull_events()
+        return team
+
+    def _create(self) -> Team:
+        if self.creating_admin is not None:
+            return Team.create_with_admin(
+                team_id=self.team_id,
+                name=self.name,
+                user_id=self.creating_admin,
+                membership_id=next_id(),
+                now=self.created_at,
+            )
+        return Team.create(
             team_id=self.team_id,
             name=self.name,
             created_by=self.created_by,
@@ -56,12 +82,6 @@ class TeamBuilder:
             mode=self.mode,
             language=self.language,
         )
-        for user_id, role in self.members:
-            team.add_member(
-                membership_id=next_id(), user_id=user_id, role=role, now=self.created_at
-            )
-        team.pull_events()
-        return team
 
     async def saved_in(self, repository: "TeamStore") -> Team:
         team = self.build()

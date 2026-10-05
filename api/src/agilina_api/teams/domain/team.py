@@ -11,8 +11,9 @@ from enum import StrEnum
 from uuid import UUID
 
 from agilina_api.shared_kernel import AggregateRoot, Entity
-from agilina_api.teams.domain.errors import AlreadyMemberError, InvalidTeamNameError
+from agilina_api.teams.domain.errors import AlreadyMemberError
 from agilina_api.teams.domain.events import MemberJoinedTeam
+from agilina_api.teams.domain.team_name import TeamName
 from agilina_shared.enums import Language, OperationMode, TeamRole
 
 
@@ -109,19 +110,37 @@ class Team(AggregateRoot[UUID]):
         """A new team, in support mode and English by default (as the schema does).
 
         ``created_by`` is the user who created it, or ``None`` when the platform operator
-        did, to give a team its first admin (AD-22).
+        did, to give a team its first admin (AD-22). The name follows ``TeamName``:
+        trimmed, not blank and at most 80 characters, on either path.
         """
-        clean_name = name.strip()
-        if not clean_name:
-            raise InvalidTeamNameError("A team's name cannot be blank")
         return cls(
             team_id=team_id,
-            name=clean_name,
+            name=TeamName(name).value,
             mode=mode,
             language=language,
             created_by=created_by,
             created_at=now,
         )
+
+    @classmethod
+    def create_with_admin(  # noqa: PLR0913
+        cls,
+        *,
+        team_id: UUID,
+        name: str,
+        user_id: UUID,
+        membership_id: UUID,
+        now: datetime,
+    ) -> "Team":
+        """A team created by a user, who becomes its admin (HU-05).
+
+        It starts in support mode and English, like every new team. Making the creator its
+        admin lives here and not in the use case, so no path can create a team this way and
+        leave it without one.
+        """
+        team = cls.create(team_id=team_id, name=name, created_by=user_id, now=now)
+        team.add_member(membership_id=membership_id, user_id=user_id, role=TeamRole.ADMIN, now=now)
+        return team
 
     # ------------------------------------------------------------ read state --
     @property

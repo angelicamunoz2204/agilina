@@ -7,6 +7,7 @@ import pytest
 from alembic import command
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agilina_api.identity.infrastructure.persistence import orm_models as identity_models
@@ -85,6 +86,18 @@ async def test_the_partial_unique_index_on_pending_invitations_exists(engine: As
         ).scalar_one()
 
     assert "UNIQUE" in definition and "status = 'pending'" in definition
+
+
+async def test_the_database_rejects_a_team_name_longer_than_80(engine: AsyncEngine):
+    """The ``team_name_max_length`` check backs the domain rule: 80 is fine, 81 is not."""
+    insert = text("INSERT INTO team (name) VALUES (:name)")
+    async with engine.begin() as connection:
+        await connection.execute(insert, {"name": "x" * 80})
+        await connection.execute(insert, {"name": "🚀" * 80})  # characters, not bytes
+
+    with pytest.raises(IntegrityError, match="team_name_max_length"):
+        async with engine.begin() as connection:
+            await connection.execute(insert, {"name": "x" * 81})
 
 
 def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
