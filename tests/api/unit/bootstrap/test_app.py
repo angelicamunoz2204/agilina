@@ -34,6 +34,8 @@ def test_every_context_exposes_its_routes():
     assert "/health" in paths
     assert "/v1/invitations/activate" in paths
     assert "/v1/ceremonies/{ceremony_id}/context" in paths
+    assert "/v1/teams" in paths
+    assert "/v1/teams/{team_id}" in paths
 
 
 async def test_the_scheduler_starts_with_the_application_and_stops_with_it(

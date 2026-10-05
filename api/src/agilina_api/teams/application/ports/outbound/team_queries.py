@@ -3,10 +3,34 @@
 from typing import Protocol
 from uuid import UUID
 
-from agilina_api.teams.application.dtos import TeamSummary
+from agilina_api.teams.application.dtos import TeamSummary, TeamView, UserTeamView
+from agilina_shared.enums import TeamRole
 
 
 class TeamQueries(Protocol):
     async def get_summary(self, team_id: UUID) -> TeamSummary | None:
         """The team's name, language and active admins, or ``None`` if it does not exist."""
+        ...
+
+    async def list_for_user(self, user_id: UUID) -> tuple[UserTeamView, ...]:
+        """The teams where the user is an active member, with their role in each, ordered
+        by name ignoring case and then by id; empty when there is none.
+
+        The one query keyed by the user instead of the team: it is how a user finds out
+        which tenants they belong to, so the team cannot be known beforehand. It only
+        returns the user's own memberships.
+        """
+        ...
+
+    async def get_team(self, team_id: UUID) -> TeamView | None:
+        """The team's name, mode and language, or ``None`` if it does not exist."""
+        ...
+
+    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
+        """The user's role in the team while their membership is active; ``None`` when
+        they were never a member, were removed, or the team does not exist.
+
+        It serves the shared ``TeamAccess`` port: the composition root hands this query to
+        the dependency that keeps every route of a team to its members.
+        """
         ...

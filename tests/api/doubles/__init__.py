@@ -1,5 +1,6 @@
 """Doubles of the ports: in-memory implementations the use case tests run against."""
 
+from tests.api.doubles.access import FakeAuthenticatedUsers, FakeTeamAccess
 from tests.api.doubles.clock import FakeClock
 from tests.api.doubles.identity import (
     FakeIdentityProvider,
@@ -12,17 +13,20 @@ from tests.api.doubles.identity import (
     InMemoryUserRepository,
 )
 from tests.api.doubles.mail import FakeMailer, FakeRenderer
-from tests.api.doubles.teams import FakeTeamsUnitOfWork, InMemoryTeamRepository
+from tests.api.doubles.teams import FakeTeamQueries, FakeTeamsUnitOfWork, InMemoryTeamRepository
 
 __all__ = [
+    "FakeAuthenticatedUsers",
     "FakeClock",
     "FakeIdentityProvider",
     "FakeIdentityUnitOfWork",
     "FakeInvitationQueries",
     "FakeMailer",
     "FakeRenderer",
+    "FakeTeamAccess",
     "FakeTeamContactsDirectory",
     "FakeTeamMembership",
+    "FakeTeamQueries",
     "FakeTeamsUnitOfWork",
     "FakeTokenGenerator",
     "InMemoryInvitationRepository",

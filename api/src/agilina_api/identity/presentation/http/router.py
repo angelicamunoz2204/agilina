@@ -25,16 +25,15 @@ from agilina_api.identity.presentation.http.dependencies import (
     get_invitation_status_handler,
     get_request_new_invitation_handler,
 )
-from agilina_api.identity.presentation.http.errors import error_response
 from agilina_api.identity.presentation.http.presenters import present_activated, present_status
 from agilina_api.identity.presentation.http.schemas import (
     ActivatedAccountResponse,
     ActivateRequest,
-    ErrorResponse,
     InvitationStatusResponse,
     RequestedResponse,
     TokenRequest,
 )
+from agilina_api.shared.presentation.http.errors import ErrorResponse, error_response
 
 
 def _no_store(response: Response) -> None:

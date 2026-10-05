@@ -6,6 +6,7 @@ graph, so they cannot drift apart.
 
 from dataclasses import dataclass
 
+from agilina_api.bootstrap.authentication import ClosedAuthenticatedUsers
 from agilina_api.bootstrap.context_adapters import TeamsBackedContacts, team_membership_factory
 from agilina_api.identity.application.commands.activate_account import ActivateAccountHandler
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitationHandler
@@ -22,13 +23,17 @@ from agilina_api.identity.infrastructure.persistence.unit_of_work import (
 )
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.identity.infrastructure.tokens import SecretsActivationTokenGenerator
+from agilina_api.shared.application.access import AuthenticatedUsers, TeamAccess
 from agilina_api.shared.infrastructure.clock import SystemClock
 from agilina_api.shared.infrastructure.database.session import get_session_factory
 from agilina_api.shared.infrastructure.mail.renderer import JinjaEmailRenderer
 from agilina_api.shared.infrastructure.mail.smtp_mailer import SmtpMailer
 from agilina_api.shared.infrastructure.settings import Settings
 from agilina_api.teams.application.commands.create_team import CreateTeamHandler
+from agilina_api.teams.application.commands.create_team_as_admin import CreateTeamAsAdminHandler
 from agilina_api.teams.application.ports.outbound import TeamQueries
+from agilina_api.teams.application.queries.get_team import GetTeamHandler
+from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit_of_work_factory
 
@@ -40,7 +45,12 @@ class Container:
     request_new_invitation: RequestNewInvitationHandler
     issue_invitation: IssueInvitationHandler
     create_team: CreateTeamHandler
+    create_team_as_admin: CreateTeamAsAdminHandler
+    list_my_teams: ListMyTeamsHandler
+    get_team: GetTeamHandler
     team_queries: TeamQueries
+    authenticated_users: AuthenticatedUsers
+    team_access: TeamAccess
     identity_provider: KeycloakIdentityProvider
 
     async def aclose(self) -> None:
@@ -68,6 +78,7 @@ def build_container(settings: Settings) -> Container:
         client_secret=settings.keycloak_api_secret.get_secret_value(),
     )
     identity_uow = identity_unit_of_work_factory(session_factory, team_membership_factory(clock))
+    teams_uow = teams_unit_of_work_factory(session_factory)
     team_queries = SqlTeamQueries(session_factory)
     activation_url = f"{settings.web_public_url.rstrip('/')}/activar"
 
@@ -84,7 +95,15 @@ def build_container(settings: Settings) -> Container:
         issue_invitation=IssueInvitationHandler(
             identity_uow, SecretsActivationTokenGenerator(), renderer, mailer, clock, activation_url
         ),
-        create_team=CreateTeamHandler(teams_unit_of_work_factory(session_factory), clock),
+        create_team=CreateTeamHandler(teams_uow, clock),
+        create_team_as_admin=CreateTeamAsAdminHandler(teams_uow, clock),
+        list_my_teams=ListMyTeamsHandler(team_queries),
+        get_team=GetTeamHandler(team_queries),
         team_queries=team_queries,
+        # TODO(HU-03): the adapter that validates Keycloak access tokens.
+        authenticated_users=ClosedAuthenticatedUsers(),
+        # The teams query answers the shared port as it is: the membership is checked
+        # against the stored role, never against a claim of the token.
+        team_access=team_queries,
         identity_provider=identity_provider,
     )

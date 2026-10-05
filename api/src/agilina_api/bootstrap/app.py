@@ -14,17 +14,22 @@ from agilina_api.bootstrap.container import build_container
 from agilina_api.ceremonies.presentation.http import router as ceremonies_router
 from agilina_api.identity.presentation.http import dependencies as identity_dependencies
 from agilina_api.identity.presentation.http import router as identity_router
-from agilina_api.identity.presentation.http.errors import register_error_handlers
+from agilina_api.identity.presentation.http.errors import IDENTITY_ERRORS
 from agilina_api.shared.application.health import GetLiveness, GetReadiness
 from agilina_api.shared.infrastructure.database_probe import SqlDatabaseProbe
 from agilina_api.shared.infrastructure.logging_setup import configure_logging, get_logger
 from agilina_api.shared.infrastructure.scheduler import create_scheduler
 from agilina_api.shared.infrastructure.settings import get_settings
 from agilina_api.shared.presentation.http import health_router
+from agilina_api.shared.presentation.http.access import get_authenticated_users, get_team_access
 from agilina_api.shared.presentation.http.dependencies import (
     get_liveness_query,
     get_readiness_query,
 )
+from agilina_api.shared.presentation.http.errors import SHARED_ERRORS, register_error_handlers
+from agilina_api.teams.presentation.http import dependencies as teams_dependencies
+from agilina_api.teams.presentation.http import router as teams_router
+from agilina_api.teams.presentation.http.errors import TEAMS_ERRORS
 
 logger = get_logger(__name__)
 
@@ -83,7 +88,8 @@ def create_app() -> FastAPI:
     app.include_router(health_router.router)
     app.include_router(ceremonies_router.router)
     app.include_router(identity_router.router)
-    register_error_handlers(app)
+    app.include_router(teams_router.router)
+    register_error_handlers(app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS))
 
     # Wiring: presentation declares what it needs, this is where it is provided.
     liveness = GetLiveness(__version__, settings.environment)
@@ -99,6 +105,15 @@ def create_app() -> FastAPI:
     app.dependency_overrides[identity_dependencies.get_request_new_invitation_handler] = (
         lambda: container.request_new_invitation
     )
+    app.dependency_overrides[teams_dependencies.get_create_team_as_admin_handler] = (
+        lambda: container.create_team_as_admin
+    )
+    app.dependency_overrides[teams_dependencies.get_list_my_teams_handler] = (
+        lambda: container.list_my_teams
+    )
+    app.dependency_overrides[teams_dependencies.get_get_team_handler] = lambda: container.get_team
+    app.dependency_overrides[get_authenticated_users] = lambda: container.authenticated_users
+    app.dependency_overrides[get_team_access] = lambda: container.team_access
     app.dependency_overrides[get_liveness_query] = lambda: liveness
     app.dependency_overrides[get_readiness_query] = lambda: readiness
     return app
