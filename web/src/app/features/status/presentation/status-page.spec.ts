@@ -1,57 +1,69 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { Subject, type Observable } from 'rxjs';
 
-import { environment } from '../../../../environments/environment';
-import { HealthPort } from '../application/health.port';
-import { HttpHealthApi } from '../infrastructure/http-health.api';
+import { provideTestI18n } from '@testing/i18n';
+
 import { StatusPage } from './status-page';
+import { HealthPort } from '../application/health.port';
+import { type ServiceStatus } from '../domain/service-status';
+
+/** Port double: each check() waits until the test answers it. */
+class FakeHealthPort extends HealthPort {
+  pending = new Subject<ServiceStatus>();
+  calls = 0;
+
+  check(): Observable<ServiceStatus> {
+    this.calls++;
+    this.pending = new Subject<ServiceStatus>();
+    return this.pending;
+  }
+}
 
 describe('StatusPage', () => {
   let fixture: ComponentFixture<StatusPage>;
-  let http: HttpTestingController;
+  let health: FakeHealthPort;
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    health = new FakeHealthPort();
+    TestBed.configureTestingModule({
       imports: [StatusPage],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: HealthPort, useClass: HttpHealthApi },
-      ],
-    }).compileComponents();
-
+      providers: [provideTestI18n(), { provide: HealthPort, useValue: health }],
+    });
     fixture = TestBed.createComponent(StatusPage);
-    http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
+  function text(): string {
+    return (fixture.nativeElement as HTMLElement).textContent;
+  }
 
-  it('shows the version reported by the API', () => {
-    fixture.detectChanges();
+  it('says it is checking while the API has not answered', () => {
+    expect(text()).toContain('Consultando…');
+  });
 
-    http.expectOne(`${environment.apiUrl}/health`).flush({
+  it('shows the version reported by the API', async () => {
+    health.pending.next({
       service: 'agilina-api',
       version: '0.1.0',
       environment: 'local',
       status: 'alive',
     });
-    fixture.detectChanges();
+    await fixture.whenStable();
 
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain('0.1.0');
+    expect(text()).toContain('Disponible');
+    expect(text()).toContain('0.1.0');
   });
 
-  it('warns when the API does not respond and offers to retry', () => {
+  it('warns when the API does not respond and retries on demand', async () => {
+    health.pending.error(new Error('No connection'));
+    await fixture.whenStable();
+
+    expect(text()).toContain('No disponible');
+    (fixture.nativeElement as HTMLElement).querySelector('button')?.click();
+    // Not whenStable: the new check stays pending until the test answers it.
     fixture.detectChanges();
 
-    http
-      .expectOne(`${environment.apiUrl}/health`)
-      .error(new ProgressEvent('error'), { status: 0, statusText: 'No connection' });
-    fixture.detectChanges();
-
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('.unavailable')).toBeTruthy();
-    expect(element.querySelector('button')).toBeTruthy();
+    expect(health.calls).toBe(2);
+    expect(text()).toContain('Consultando…');
   });
 });

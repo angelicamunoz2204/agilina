@@ -17,7 +17,7 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 - **Español:** commits, pull requests, ADR y documentación de `docs/`.
 - **Textos que ve el usuario:** nunca dentro del código; van en español e inglés
   mediante i18n (`shared/.../i18n.py` para lo que Agilina dice y
-  `web/src/app/core/i18n/*.json` para la interfaz). Una prueba falla si una clave
+  `web/public/i18n/*.json` para la interfaz). Una prueba falla si una clave
   existe en un idioma y no en el otro.
 - Los nombres de dominio salen del [glosario](glossary.md): si un concepto no
   está, se agrega ahí antes de usarlo en el código.
@@ -193,13 +193,26 @@ Dónde van, cómo se arman los datos (*Data Builders*) y qué se prueba en cada 
 
 ## Angular y TypeScript
 
-- Componentes `standalone`, con `OnPush` y señales; prefijo `agl` en los
-  selectores. *(ESLint.)*
-- Estructura `core/` y `features/<contexto>/{domain,application,infrastructure,presentation}`.
-  Presentación no importa infraestructura y el dominio no conoce Angular ni
-  rxjs. *(ESLint.)*
-- Los **puertos** son clases abstractas que sirven de token de inyección; el
-  adaptador HTTP se enlaza en `app.config.ts`.
-- Los componentes de presentación leen señales de un *facade* de `application`
-  y no hacen peticiones HTTP.
-- Ningún texto de usuario escrito en una plantilla: siempre una clave de i18n.
+La guía completa de la web está en [web/README.md](../web/README.md) y sus
+decisiones en [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md). Lo
+esencial:
+
+- Angular 22 zoneless; componentes *standalone* y `OnPush` (los valores por
+  defecto), signals para el estado y `inject()` para las dependencias; prefijo
+  `agl` en los selectores. *(ESLint.)*
+- Prettier decide el formato y ESLint (*type-checked*) el resto. *(`make verify`.)*
+- Estructura `core/`, `layout/`, `shared/` y
+  `features/<contexto>/{domain,application,infrastructure,presentation}`, con
+  alias `@core/*`, `@shared/*`, `@layout/*` y `@features/*`. Las capas apuntan
+  hacia adentro, una funcionalidad no importa a otra y el dominio no conoce
+  Angular ni rxjs. *(ESLint, sobre el archivo resuelto.)*
+- Los **puertos** son clases abstractas que sirven de token de inyección; los
+  adaptadores se enlazan en `app.config.ts`.
+- Las páginas leen signals de una *facade* de `application` y no hacen
+  peticiones HTTP.
+- Ningún texto de usuario escrito en una plantilla: siempre una clave de
+  Transloco.
+- Los errores se registran con el puerto `Logger`; `console.*` está prohibido
+  fuera de su adaptador. *(ESLint.)*
+- La configuración llega en `config.json`, generado desde variables de entorno
+  al arrancar el contenedor: ninguna URL en el código.

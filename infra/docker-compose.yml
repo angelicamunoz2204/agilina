@@ -155,6 +155,14 @@ services:
       context: ../web
       target: dev
     container_name: agilina-web
+    # Rendered into config.json at startup. Only what the browser may see: the web
+    # never gets the whole .env, which holds secrets.
+    environment:
+      AGILINA_API_PUBLIC_URL: ${AGILINA_API_PUBLIC_URL:?AGILINA_API_PUBLIC_URL is missing in .env}
+      AGILINA_KEYCLOAK_URL: ${AGILINA_KEYCLOAK_URL:?AGILINA_KEYCLOAK_URL is missing in .env}
+      AGILINA_KEYCLOAK_REALM: ${AGILINA_KEYCLOAK_REALM:?AGILINA_KEYCLOAK_REALM is missing in .env}
+      AGILINA_KEYCLOAK_WEB_CLIENT: ${AGILINA_KEYCLOAK_WEB_CLIENT:?AGILINA_KEYCLOAK_WEB_CLIENT is missing in .env}
+      AGILINA_LOG_LEVEL: ${AGILINA_LOG_LEVEL:-INFO}
     ports:
       - "4200:4200"
     volumes:

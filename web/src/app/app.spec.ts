@@ -1,29 +1,21 @@
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { provideTestI18n } from '@testing/i18n';
+
 import { App } from './app';
-import { routes } from './app.routes';
 
 describe('App', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  it('renders the layout around the routed screen', async () => {
+    TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter(routes), provideHttpClient(), provideHttpClientTesting()],
-    }).compileComponents();
-  });
-
-  it('is created', () => {
+      providers: [provideRouter([]), provideTestI18n()],
+    });
     const fixture = TestBed.createComponent(App);
-    expect(fixture.componentInstance).toBeTruthy();
-  });
-
-  it('shows the product brand', () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('.brand')?.textContent).toContain('Agilina');
+    expect(element.querySelector('agl-header')).not.toBeNull();
+    expect(element.querySelector('main router-outlet')).not.toBeNull();
   });
 });

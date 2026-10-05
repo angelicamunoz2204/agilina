@@ -1,6 +1,14 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 
-import { App } from './app/app';
-import { appConfig } from './app/app.config';
+import { loadRuntimeConfig } from '@core/config/load-runtime-config';
 
-bootstrapApplication(App, appConfig).catch((error) => console.error(error));
+import { App } from './app/app';
+import { createAppConfig } from './app/app.config';
+
+// The runtime config is loaded first so that every provider can read it
+// synchronously. Nothing else exists yet, hence the console.
+loadRuntimeConfig()
+  .then((runtimeConfig) => bootstrapApplication(App, createAppConfig(runtimeConfig)))
+  .catch((error: unknown) => {
+    console.error('Agilina could not start', error);
+  });

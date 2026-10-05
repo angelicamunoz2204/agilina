@@ -1,0 +1,10 @@
+# Generated or installed: Prettier only formats what we write.
+node_modules/
+dist/
+coverage/
+.angular/
+out-tsc/
+runtime/
+package-lock.json
+# Documentation: written by hand, reviewed as prose.
+*.md
