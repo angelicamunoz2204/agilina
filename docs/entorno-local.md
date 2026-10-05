@@ -83,6 +83,46 @@ pgAdmin viene con el entorno: <http://localhost:5051>. Escucha solo en tu máqui
   volumen `agilina_pgadmin-data`).
 - Si `make credentials` no muestra `PGADMIN_*`, `make env` las agrega a un `.env` anterior.
 
+## Invitar a alguien y activar su cuenta (HU-02)
+
+No hay registro público: la primera persona de un equipo la invita el operador de la
+plataforma (AD-22), con el entorno levantado (`make up`):
+
+```bash
+make invite team="Atlas" email=julian@example.com name="Julián Torres" lang=es
+make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=member   # a un equipo que ya existe
+```
+
+Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
+Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) lo abre la web
+(HU-02 aún no tiene esa pantalla) y llama a la API:
+
+| Operación | Qué hace |
+| --- | --- |
+| `POST /v1/invitations/status` | Qué muestra la página: correo y nombre si el enlace sirve; `410` si ya se usó, venció o fue revocado; `404` si fue alterado |
+| `POST /v1/invitations/activate` | Con `token`, `password` y `confirmation`: crea la cuenta en Keycloak, el usuario y la membresía; `201`. `422` si la contraseña no coincide o incumple la política (con los motivos), `409` si el correo ya tiene cuenta |
+| `POST /v1/invitations/request-new` | Avisa por correo a los administradores del equipo; `202`. `409` si el enlace aún sirve |
+
+El token va en el cuerpo, nunca en la URL, y ninguna respuesta lo repite. La
+documentación interactiva está en <http://localhost:8000/docs>. Todos los fallos
+responden `{"code": …}` con un código estable (`invitation_expired`, `password_policy`…).
+
+La política de contraseñas es la de Keycloak: mínimo 12 caracteres, distinta del correo
+(AD-24). La API crea la cuenta con su propia cuenta de servicio, `agilina-api`, cuyo secreto
+(`AGILINA_KEYCLOAK_API_SECRET`) genera `make env`.
+
+### Si cambias el realm de Keycloak
+
+`infra/keycloak/realm-agilina.json` solo se importa cuando Keycloak arranca con su volumen
+vacío. Para aplicar un cambio (por ejemplo, el cliente `agilina-api` o la política de
+contraseñas) en un entorno que ya existía:
+
+```bash
+make keycloak-reset    # borra los datos de Keycloak (no los de Postgres) y reimporta el realm
+```
+
+`make test-keycloak` ejecuta las pruebas contra ese Keycloak real.
+
 ## Entrar a Keycloak
 
 La consola de administración está en <http://localhost:8080/admin> (con el
@@ -233,6 +273,9 @@ make mail-test to=a@b.com   # envía un correo de prueba con el SMTP configurado
 make migration m="crear tabla equipos"   # migración vacía de Alembic: se escribe a mano, en SQL
 make test           # pruebas de Python, de integración (PostgreSQL real) y de la web
 make test-integration   # solo las de integración: levanta Postgres y usa una base temporal
+make test-keycloak      # pruebas contra el Keycloak real (levanta Keycloak y lo espera)
+make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos)
+make invite team=… email=… name=…   # crea un equipo e invita a su primer administrador
 make lint           # ruff y ESLint
 make typecheck      # mypy en modo estricto
 make arch           # reglas de arquitectura (capas y fronteras entre contextos)
