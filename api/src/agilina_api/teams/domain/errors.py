@@ -9,3 +9,7 @@ class InvalidTeamNameError(DomainError):
 
 class AlreadyMemberError(DomainError):
     """That person is already an active member of the team."""
+
+
+class TeamNotFoundError(DomainError):
+    """There is no team with that identifier."""
