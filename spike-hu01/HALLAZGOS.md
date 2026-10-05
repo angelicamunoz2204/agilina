@@ -14,7 +14,7 @@
 | TTS | ElevenLabs eleven_v4_turbo, voz predeterminada |
 | LLM | gemini-3.5-flash-lite (respaldo; gemini-3.8-flash saturado), cuenta secundaria en nivel gratuito |
 | Salas | LiveKit Cloud, proyecto agilina; worker registrado en US East B |
-| Nube | AWS, experiencia simplificada, us-east-2, límite de gasto USD 20/mes; cuota GPU G/VT de 8 vCPU solicitada |
+| Nube | AWS, experiencia simplificada, us-east-2, límite de gasto USD 400 temporal (USD 20 al terminar); cuota GPU G/VT de 8 vCPU aprobada; g4dn.xlarge con disco de 80 GB |
 
 ## Fase 0 · Cuentas y servicios
 - AWS asigna a las cuentas nuevas una experiencia simplificada organizada en proyectos, con límite de gasto
@@ -249,6 +249,8 @@
   Implicación: el vocabulario del equipo (herramientas, nombres propios) debe ser configurable por equipo (insumo para HU-24).
 - Trampa: al agregar variables con `echo >> .env`, si el archivo no termina en salto de línea la variable queda
   pegada a la anterior y el agente no la recibe. Verificar con `printenv` dentro del contenedor.
+- U2 (TTFB ElevenLabs, eleven_v4_turbo, endpoint /stream, medido desde Colombia): 0,58 / 0,47 / 0,51 s. Cumple (< 2 s).
+- U3 estimado (no medido): U1 GPU ~1,1–1,2 s + TTFB ~0,5 s + red ≈ 1,8–2 s sin LLM. Cumple incluso el deseable (≤ 3 s).
 
 ## Ajuste · Prompt de vocabulario para Whisper
 - livekit-plugins-openai 1.8.4: el parámetro de `openai.STT` es `prompt` (`NotGivenOr[str]`). En la transcripción sin
@@ -258,6 +260,13 @@
   (`routers/stt.py`).
 - El agente lee `WHISPER_PROMPT` (opcional, vacío por defecto = sin prompt). Medido en la sala gpu-04 (ver paso 15):
   "Keycloak" correcto con prompt, sin costo de latencia medible.
+
+## Cierre · Estimaciones de costo (U5, U6)
+- U5 (estimado): ~20 min de instancia por ceremonia (15 de daily + ~5 de arranque) × USD 0,526/h ≈ USD 0,18
+  (20/60 × 0,526 = 0,175).
+- U6 (estimado): ~45 caracteres por participante (respuesta + anuncio de turno) + ~45 del saludo ≈ 315 por daily
+  de 6 personas (6 × 45 + 45). eleven_v4_turbo cobra 0,5 créditos por carácter: ~160 créditos por daily
+  (315 × 0,5 = 157,5). El cupo mensual del plan gratuito queda por confirmar en la cuenta.
 
 ## Pendientes para el informe
 - Criterio 2 de HU-01 (LLM en el bucle): validado en CPU con gemini-3.5-flash-lite; reportar U3 con y sin LLM.
