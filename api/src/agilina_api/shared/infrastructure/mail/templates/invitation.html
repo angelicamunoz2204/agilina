@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% from "components.html" import button with context %}
+{% block content %}
+<h1 class="t-fg" style="margin:0 0 16px 0;font-family:{{ fonts.heading }};font-size:22px;line-height:28px;font-weight:700;color:{{ c.foreground }};">{{ t.title }}</h1>
+<p class="t-fg" style="margin:0 0 8px 0;color:{{ c.foreground }};">{{ t.greeting }}</p>
+<p class="t-muted" style="margin:0 0 4px 0;color:{{ c.muted_foreground }};">{% if inviter_name %}{{ t.intro_by }}{% else %}{{ t.intro }}{% endif %}</p>
+<p class="t-muted" style="margin:0;color:{{ c.muted_foreground }};">{{ t.steps }}</p>
+{{ button(activation_url, t.cta) }}
+<p class="t-muted" style="margin:0 0 24px 0;font-size:14px;line-height:20px;color:{{ c.muted_foreground }};">{{ t.expiry }}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="panel" style="background-color:{{ c.muted }};border:1px solid {{ c.border }};border-radius:12px;">
+  <tr>
+    <td style="padding:14px 16px;font-size:13px;line-height:20px;">
+      <div class="t-muted" style="margin:0 0 6px 0;color:{{ c.muted_foreground }};">{{ t.fallback }}</div>
+      <a href="{{ activation_url }}" class="t-primary" style="color:{{ c.primary }};word-break:break-all;">{{ activation_url }}</a>
+    </td>
+  </tr>
+</table>
+<p class="t-muted" style="margin:24px 0 0 0;font-size:13px;line-height:20px;color:{{ c.muted_foreground }};">{{ t.ignore }}</p>
+{% endblock %}

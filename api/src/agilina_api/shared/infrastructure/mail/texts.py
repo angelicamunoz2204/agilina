@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (a catalog of user-facing sentences: wrapping them would only hurt reading them)
 """Texts of the emails, in the two languages of the product.
 
 Like the spoken texts (``agilina_shared.i18n``), nothing user-facing is written inside
@@ -51,6 +52,58 @@ TEMPLATES: dict[str, dict[Language, dict[str, str]]] = {
             "security_starttls": "Encrypted with STARTTLS",
             "security_tls": "Encrypted with TLS",
             "sender": "Sender",
+        },
+    },
+    "invitation": {
+        Language.ES: {
+            "subject": "Te invitaron a {{ team_name }} en Agilina",
+            "preheader": "Activa tu cuenta para entrar al equipo {{ team_name }}.",
+            "title": "Te invitaron a {{ team_name }}",
+            "greeting": "Hola {{ name }},",
+            "intro": "Te invitaron a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "intro_by": "{{ inviter_name }} te invitó a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "cta": "Activar mi cuenta",
+            "steps": "Elige una contraseña y entrarás directo a tu equipo.",
+            "expiry": "El enlace vence el {{ expires_on }} y solo puede usarse una vez.",
+            "fallback": "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+            "ignore": "Si no esperabas esta invitación, ignora este mensaje: sin activar el enlace no pasa nada.",
+        },
+        Language.EN: {
+            "subject": "You were invited to {{ team_name }} on Agilina",
+            "preheader": "Activate your account to join the {{ team_name }} team.",
+            "title": "You were invited to {{ team_name }}",
+            "greeting": "Hi {{ name }},",
+            "intro": "You were invited to join the {{ team_name }} team on Agilina, the virtual Scrum Master of your daily.",
+            "intro_by": "{{ inviter_name }} invited you to join the {{ team_name }} team on Agilina, the virtual Scrum Master of your daily.",
+            "cta": "Activate my account",
+            "steps": "Choose a password and you will go straight to your team.",
+            "expiry": "The link expires on {{ expires_on }} and can only be used once.",
+            "fallback": "If the button does not work, copy and paste this link into your browser:",
+            "ignore": "If you were not expecting this invitation, ignore this message: nothing happens unless the link is activated.",
+        },
+    },
+    "new_invitation_request": {
+        Language.ES: {
+            "subject": "{{ requester_name }} necesita una invitación nueva a {{ team_name }}",
+            "preheader": "Su enlace de invitación ya no sirve.",
+            "title": "{{ requester_name }} necesita una invitación nueva",
+            "greeting": "Hola {{ admin_name }},",
+            "intro": "{{ requester_name }} ({{ requester_email }}) intentó activar su cuenta del equipo {{ team_name }} y pidió una invitación nueva.",
+            "reason_expired": "Su enlace venció: las invitaciones duran 7 días.",
+            "reason_accepted": "Su enlace ya se había usado: puede que ya tenga una cuenta.",
+            "reason_revoked": "Su invitación fue cancelada.",
+            "action": "Si quieres que entre al equipo, invítalo de nuevo desde la configuración del equipo.",
+        },
+        Language.EN: {
+            "subject": "{{ requester_name }} needs a new invitation to {{ team_name }}",
+            "preheader": "Their invitation link no longer works.",
+            "title": "{{ requester_name }} needs a new invitation",
+            "greeting": "Hi {{ admin_name }},",
+            "intro": "{{ requester_name }} ({{ requester_email }}) tried to activate their account in the {{ team_name }} team and asked for a new invitation.",
+            "reason_expired": "Their link expired: invitations last 7 days.",
+            "reason_accepted": "Their link had already been used: they may already have an account.",
+            "reason_revoked": "Their invitation was cancelled.",
+            "action": "If you want them in the team, invite them again from the team settings.",
         },
     },
 }

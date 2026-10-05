@@ -1,0 +1,11 @@
+{#- Reusable pieces of the email design. Import with:
+      {% from "components.html" import button with context %} -#}
+{% macro button(url, label) %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+  <tr>
+    <td class="btn" style="border-radius:10px;background-color:{{ c.primary }};">
+      <a href="{{ url }}" style="display:inline-block;padding:14px 28px;font-family:{{ fonts.body }};font-size:16px;line-height:24px;font-weight:600;color:{{ c.primary_foreground }};text-decoration:none;border-radius:10px;">{{ label }}</a>
+    </td>
+  </tr>
+</table>
+{% endmacro %}

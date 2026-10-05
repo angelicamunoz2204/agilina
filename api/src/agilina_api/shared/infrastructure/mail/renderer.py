@@ -43,8 +43,7 @@ class JinjaEmailRenderer(EmailRenderer):
         except KeyError as error:
             raise KeyError(f"No email template '{template}' for language '{language}'") from error
 
-        context = {
-            "t": texts,
+        base = {
             "layout": LAYOUT[language],
             "lang": language.value,
             "c": LIGHT,
@@ -52,7 +51,11 @@ class JinjaEmailRenderer(EmailRenderer):
             "fonts": FONTS,
             **params,
         }
-        subject = self._text.from_string(texts["subject"]).render(context)
+        # The texts may carry placeholders ("Hola {{ name }}"): they are filled in as plain
+        # text first, and the HTML template escapes the result when it prints it.
+        resolved = {key: self._text.from_string(value).render(base) for key, value in texts.items()}
+        context = {**base, "t": resolved}
+        subject = resolved["subject"]
         return RenderedEmail(
             subject=subject,
             text_body=self._text.get_template(f"{template}.txt").render(context),

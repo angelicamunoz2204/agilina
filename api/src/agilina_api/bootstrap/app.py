@@ -10,7 +10,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from agilina_api import __version__
+from agilina_api.bootstrap.container import build_container
 from agilina_api.ceremonies.presentation.http import router as ceremonies_router
+from agilina_api.identity.presentation.http import dependencies as identity_dependencies
+from agilina_api.identity.presentation.http import router as identity_router
+from agilina_api.identity.presentation.http.errors import register_error_handlers
 from agilina_api.shared.application.health import GetLiveness, GetReadiness
 from agilina_api.shared.infrastructure.database_probe import SqlDatabaseProbe
 from agilina_api.shared.infrastructure.logging_setup import configure_logging, get_logger
@@ -55,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await app.state.container.aclose()
     if scheduler is not None and scheduler.running:
         scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
@@ -77,10 +82,23 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router.router)
     app.include_router(ceremonies_router.router)
+    app.include_router(identity_router.router)
+    register_error_handlers(app)
 
     # Wiring: presentation declares what it needs, this is where it is provided.
     liveness = GetLiveness(__version__, settings.environment)
     readiness = GetReadiness(SqlDatabaseProbe(), __version__, settings.environment)
+    container = build_container(settings)
+    app.state.container = container
+    app.dependency_overrides[identity_dependencies.get_invitation_status_handler] = (
+        lambda: container.invitation_status
+    )
+    app.dependency_overrides[identity_dependencies.get_activate_account_handler] = (
+        lambda: container.activate_account
+    )
+    app.dependency_overrides[identity_dependencies.get_request_new_invitation_handler] = (
+        lambda: container.request_new_invitation
+    )
     app.dependency_overrides[get_liveness_query] = lambda: liveness
     app.dependency_overrides[get_readiness_query] = lambda: readiness
     return app

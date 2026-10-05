@@ -1,0 +1,16 @@
+{{ t.title }}
+
+{{ t.greeting }}
+
+{% if inviter_name %}{{ t.intro_by }}{% else %}{{ t.intro }}{% endif %} {{ t.steps }}
+
+{{ t.cta }}:
+{{ activation_url }}
+
+{{ t.expiry }}
+
+{{ t.ignore }}
+
+--
+Agilina · {{ layout.tagline }}
+{{ layout.footer }}
