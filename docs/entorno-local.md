@@ -94,8 +94,10 @@ make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=mem
 ```
 
 Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
-Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) lo abre la web
-(HU-02 aún no tiene esa pantalla) y llama a la API:
+Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) abre la pantalla
+de activación de la web (<http://localhost:4200/activar>): comprueba el enlace, pide la
+contraseña con su confirmación y, al activar, lleva a Keycloak con el correo ya escrito. La
+web lee el token del fragmento, lo quita de la barra de direcciones y llama a la API:
 
 | Operación | Qué hace |
 | --- | --- |
@@ -108,7 +110,9 @@ documentación interactiva está en <http://localhost:8000/docs>. Todos los fall
 responden `{"code": …}` con un código estable (`invitation_expired`, `password_policy`…).
 
 La política de contraseñas es la de Keycloak: mínimo 12 caracteres, distinta del correo
-(AD-24). La API crea la cuenta con su propia cuenta de servicio, `agilina-api`, cuyo secreto
+(AD-24); la pantalla muestra esa misma regla y los motivos que la API devuelve. Al terminar,
+la web envía a la página de inicio de sesión de Keycloak, pero **todavía no se inicia sesión
+en la aplicación**: ese paso es HU-03. La API crea la cuenta con su propia cuenta de servicio, `agilina-api`, cuyo secreto
 (`AGILINA_KEYCLOAK_API_SECRET`) genera `make env`.
 
 ### Si cambias el realm de Keycloak
