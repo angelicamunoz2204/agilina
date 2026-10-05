@@ -9,6 +9,7 @@ ya trae). No se instala Python, uv, Node ni nada más.
 | Pieza | Contenedor | Dónde escucha | Cuándo |
 | --- | --- | --- | --- |
 | Postgres | `postgres` | `localhost:5432` | `make up` |
+| pgAdmin (cliente web de la base) | `pgadmin` | `localhost:5051` (solo desde tu máquina) | `make up` |
 | Keycloak | `keycloak` | `localhost:8080`, sondas en `:9000` | `make up` |
 | Mailpit (correo de pruebas) | `mailpit` | Bandeja en `localhost:8025`, SMTP en `:1025` | `make up` |
 | API | `api` | `localhost:8000`, documentación en `/docs` | `make up` |
@@ -53,8 +54,9 @@ verificaciones, y `make verify` las corre en contenedores.
 ## Si ya tenías un `.env`
 
 Desde HU-02 las variables y los objetivos de `make` están en inglés. `make env`
-no sobrescribe un `.env` existente: renómbralo y deja que `make env` genere uno
-nuevo, o cambia los nombres a mano según `.env.example` (por ejemplo
+no sobrescribe un `.env` existente (solo le agrega las variables nuevas y genera las claves
+que falten): renómbralo y deja que `make env` genere uno nuevo, o cambia los nombres a mano
+según `.env.example` (por ejemplo
 `POSTGRES_USUARIO` → `POSTGRES_USER`, `POSTGRES_CLAVE` → `POSTGRES_PASSWORD`,
 `AGILINA_URL_BD` → `AGILINA_DB_URL`, `AGILINA_NIVEL_LOG` → `AGILINA_LOG_LEVEL`).
 La contraseña de Postgres debe seguir siendo la misma si conservas el volumen.
@@ -62,6 +64,64 @@ La contraseña de Postgres debe seguir siendo la misma si conservas el volumen.
 Dentro de la red de contenedores los servicios se alcanzan por nombre
 (`postgres`, `keycloak`, `stt`, `api`): el compose ya sobrescribe esas variables
 para los contenedores, de modo que el `.env` sigue apuntando a `localhost`.
+
+## Ver la base de datos con pgAdmin
+
+pgAdmin viene con el entorno: <http://localhost:5051>. Escucha solo en tu máquina
+(`127.0.0.1`), porque puede leer y cambiar toda la base.
+
+- **Credenciales:** `make credentials` las imprime todas (Postgres, pgAdmin y Keycloak).
+  Las de pgAdmin son `PGADMIN_ADMIN_EMAIL` y `PGADMIN_ADMIN_PASSWORD` del `.env`; la clave
+  la genera `make env`. Es la cuenta de pgAdmin, no la de Postgres.
+- **El servidor «Agilina» ya está registrado** y conecta sin pedir la contraseña de
+  Postgres: la lee de un archivo que el Compose genera a partir del `.env`. Las tablas
+  están en *Servers → Agilina → Databases → agilina → Schemas → public → Tables*.
+- **Puerto de Postgres:** `5432` en tu máquina (`POSTGRES_PORT`), para un cliente de
+  escritorio con servidor `localhost`. Dentro de la red de Compose es `postgres:5432`.
+- El servidor se registra solo la primera vez que arranca pgAdmin con su volumen vacío. Si
+  cambias `POSTGRES_USER` o `POSTGRES_DB` después, bórralo con `make clean` (o borra el
+  volumen `agilina_pgadmin-data`).
+- Si `make credentials` no muestra `PGADMIN_*`, `make env` las agrega a un `.env` anterior.
+
+## Invitar a alguien y activar su cuenta (HU-02)
+
+No hay registro público: la primera persona de un equipo la invita el operador de la
+plataforma (AD-22), con el entorno levantado (`make up`):
+
+```bash
+make invite team="Atlas" email=julian@example.com name="Julián Torres" lang=es
+make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=member   # a un equipo que ya existe
+```
+
+Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
+Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) lo abre la web
+(HU-02 aún no tiene esa pantalla) y llama a la API:
+
+| Operación | Qué hace |
+| --- | --- |
+| `POST /v1/invitations/status` | Qué muestra la página: correo y nombre si el enlace sirve; `410` si ya se usó, venció o fue revocado; `404` si fue alterado |
+| `POST /v1/invitations/activate` | Con `token`, `password` y `confirmation`: crea la cuenta en Keycloak, el usuario y la membresía; `201`. `422` si la contraseña no coincide o incumple la política (con los motivos), `409` si el correo ya tiene cuenta |
+| `POST /v1/invitations/request-new` | Avisa por correo a los administradores del equipo; `202`. `409` si el enlace aún sirve |
+
+El token va en el cuerpo, nunca en la URL, y ninguna respuesta lo repite. La
+documentación interactiva está en <http://localhost:8000/docs>. Todos los fallos
+responden `{"code": …}` con un código estable (`invitation_expired`, `password_policy`…).
+
+La política de contraseñas es la de Keycloak: mínimo 12 caracteres, distinta del correo
+(AD-24). La API crea la cuenta con su propia cuenta de servicio, `agilina-api`, cuyo secreto
+(`AGILINA_KEYCLOAK_API_SECRET`) genera `make env`.
+
+### Si cambias el realm de Keycloak
+
+`infra/keycloak/realm-agilina.json` solo se importa cuando Keycloak arranca con su volumen
+vacío. Para aplicar un cambio (por ejemplo, el cliente `agilina-api` o la política de
+contraseñas) en un entorno que ya existía:
+
+```bash
+make keycloak-reset    # borra los datos de Keycloak (no los de Postgres) y reimporta el realm
+```
+
+`make test-keycloak` ejecuta las pruebas contra ese Keycloak real.
 
 ## Entrar a Keycloak
 
@@ -101,6 +161,84 @@ datos de Postgres y de Keycloak). Si el `.env` se perdió, hay que hacer lo mism
 porque `make env` generaría una contraseña nueva que no coincide con la que ya
 guardó el volumen.
 
+## Correo
+
+Todo correo que envía la aplicación (por ejemplo el enlace de activación de una
+invitación) sale por SMTP, y **qué servidor lo entrega es solo configuración**
+(AD-23). Por defecto es **Mailpit**: atrapa los mensajes y los muestra en
+<http://localhost:8025>; nada sale de tu máquina. Es lo que usan el desarrollo y la CI.
+
+Para comprobar el envío en cualquier momento (con `make up` o `make infra` activos):
+
+```bash
+make mail-test to=alguien@example.com            # en el idioma por defecto
+make mail-test to=alguien@example.com lang=en    # en inglés (lang=es o lang=en)
+```
+
+Con Mailpit, el mensaje aparece en su bandeja; la dirección puede ser cualquiera. Es un
+correo con el diseño real (HTML) y su versión de texto: en Mailpit puedes alternar entre
+las pestañas *HTML*, *Text* y *HTML Source*, y ver cómo se adapta a un ancho de móvil.
+
+### Plantillas de correo
+
+Los correos no llevan texto escrito en el código: se arman con plantillas en
+`api/src/agilina_api/shared/infrastructure/mail/`.
+
+| Archivo | Qué es |
+| --- | --- |
+| `templates/layout.html` | El marco común: cabecera con la marca, tarjeta de contenido y pie |
+| `templates/<nombre>.html` | El contenido de un correo; extiende el marco |
+| `templates/<nombre>.txt` | La versión de texto plano, que muestran los clientes sin HTML |
+| `texts.py` | Todos los textos, en español y en inglés |
+| `theme.py` | Los colores y las tipografías |
+
+Para ver un cambio de diseño: edita la plantilla, ejecuta `make mail-test to=...` y
+abre Mailpit (la API recarga sola, y el comando renderiza la plantilla en cada
+ejecución). Reglas del diseño: los colores y las tipografías **son los tokens de los mockups**
+(`context/mockups.md`: índigo `#3b5bd4`, tarjeta blanca sobre fondo azul pálido,
+Plus Jakarta Sans e Inter) y viven solo en `theme.py`; una prueba los reconvierte desde
+los valores originales del mockup y falla si uno se desvía. Además, tema oscuro con
+`prefers-color-scheme` para los clientes que lo soportan. Sin imágenes ni hojas de estilo
+remotas (los clientes de correo las bloquean), estilos en línea y maquetación con tablas;
+por eso el logo es la inicial «A» sobre un cuadrado índigo y no el icono del mockup. Los valores que entran
+en el HTML se escapan solos, y un parámetro que falta hace fallar el envío en vez de
+mandar un correo a medias.
+
+### Cambiar a Amazon SES (sandbox)
+
+Sirve para una demo con correo real o para probar el camino de producción. Los pasos de
+la consola de AWS son los que conozco; confírmalos allí.
+
+1. En la consola de **SES**, elige la región (la misma donde se desplegará; el servidor
+   SMTP depende de ella).
+2. **Identities → Create identity → Email address**, para la dirección que será el
+   remitente y para cada destinatario de prueba (tú, Diego…). Cada una recibe un correo
+   con un enlace de verificación. En *sandbox*, SES solo entrega a identidades verificadas.
+3. **SMTP settings → Create SMTP credentials.** Crea un usuario de IAM y muestra su
+   usuario y contraseña SMTP **una sola vez**; no son las de tu cuenta de AWS.
+4. En tu `.env` (nunca en el repositorio):
+
+   ```bash
+   AGILINA_SMTP_HOST=email-smtp.<región>.amazonaws.com
+   AGILINA_SMTP_PORT=587
+   AGILINA_SMTP_USER=<usuario SMTP>
+   AGILINA_SMTP_PASSWORD=<contraseña SMTP>
+   AGILINA_SMTP_SECURITY=starttls
+   AGILINA_MAIL_FROM='Agilina <la-direccion-verificada>'
+   ```
+5. `make restart` (la API lee el `.env` al crearse) y luego
+   `make mail-test to=<una dirección verificada>`. Si dice «Not sent», revisa la región,
+   la verificación de las dos direcciones y las credenciales.
+
+Límites mientras no haya dominio propio: *sandbox* (cerca de 200 correos por día y solo a
+destinatarios verificados) y, como el remitente no tiene SPF ni DKIM propios, los correos
+pueden llegar a spam. Salir del *sandbox* y enviar a cualquiera se pide en AWS y requiere
+un dominio verificado: llega con el despliegue (HU-38).
+
+Para **volver a Mailpit**, restaura esas variables a los valores de `.env.example`
+(servidor `mailpit`, puerto `1025`, sin usuario ni contraseña, seguridad `none`) y
+`make restart`.
+
 ## El secreto del worker
 
 El realm de Keycloak se importa desde `infra/keycloak/realm-agilina.json` y el
@@ -127,11 +265,17 @@ La imagen con CUDA para transcribir de verdad llega con el despliegue en la nube
 make                # lista todos los objetivos
 make up             # construye, levanta todo, espera y migra
 make down           # detiene los contenedores sin borrar datos
+make credentials    # URLs y credenciales de Postgres, pgAdmin y Keycloak
 make logs s=api     # logs de un servicio (sin s=, de todos)
 make ps             # qué está corriendo
 make migrate        # aplica las migraciones pendientes
-make migration m="crear tabla equipos"   # nueva migración de Alembic
-make test           # pruebas de Python y de la web
+make mail-test to=a@b.com   # envía un correo de prueba con el SMTP configurado
+make migration m="crear tabla equipos"   # migración vacía de Alembic: se escribe a mano, en SQL
+make test           # pruebas de Python, de integración (PostgreSQL real) y de la web
+make test-integration   # solo las de integración: levanta Postgres y usa una base temporal
+make test-keycloak      # pruebas contra el Keycloak real (levanta Keycloak y lo espera)
+make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos)
+make invite team=… email=… name=…   # crea un equipo e invita a su primer administrador
 make lint           # ruff y ESLint
 make typecheck      # mypy en modo estricto
 make arch           # reglas de arquitectura (capas y fronteras entre contextos)

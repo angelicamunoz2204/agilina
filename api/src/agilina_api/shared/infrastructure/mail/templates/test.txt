@@ -1,0 +1,12 @@
+{{ t.title }}
+
+{{ t.intro }}
+
+{{ t.details }}
+- {{ t.server }}: {{ server }}
+- {{ t.security }}: {{ t['security_' ~ security] }}
+- {{ t.sender }}: {{ sender }}
+
+--
+Agilina · {{ layout.tagline }}
+{{ layout.footer }}

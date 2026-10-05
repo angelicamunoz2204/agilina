@@ -69,10 +69,10 @@ extend-immutable-calls = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agilina_agent", "agilina_api", "agilina_shared", "agilina_stt"]
+known-first-party = ["agilina_agent", "agilina_api", "agilina_shared", "agilina_stt", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
-"*/tests/*" = ["S105", "S106"]
+"tests/**" = ["S105", "S106"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -80,20 +80,37 @@ quote-style = "double"
 # ---------------------------------------------------------------- pytest ----
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["shared/tests", "api/tests", "agent/tests", "stt/tests"]
-pythonpath = ["shared/src", "api/src", "agent/src", "stt/src"]
+testpaths = ["tests"]
+# "." lets the tests import their shared support code as ``tests.api.doubles``.
+pythonpath = [".", "shared/src", "api/src", "agent/src", "stt/src"]
+# Unit and integration trees mirror each other, so file names repeat across them.
 asyncio_mode = "auto"
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers --import-mode=importlib -m 'not integration and not keycloak'"
+markers = [
+    "integration: needs a real PostgreSQL (make test-integration)",
+    "keycloak: needs the real Keycloak with the agilina realm (make test-keycloak)",
+]
 
 # -------------------------------------------------------------- coverage ----
 [tool.coverage.run]
 branch = true
 source = ["shared/src", "api/src", "agent/src", "stt/src"]
-omit = ["*/tests/*", "api/migrations/*"]
+omit = ["tests/*", "api/migrations/*"]
 
 [tool.coverage.report]
 skip_empty = true
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+# The API and the shared contract are held to 100 % (docs/testing.md). The agent and the
+# transcription service are still skeletons from the HU-01 spike: they join this list when
+# the stories that implement them write their tests.
+include = ["api/src/*", "shared/src/*"]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '^\s*\.\.\.$',  # the body of a Protocol method
+    ': \.\.\.$',
+    'if __name__ == .__main__.:',  # the entry point of a module that is also a command
+]
 
 # ------------------------------------------------------------------ mypy ----
 [tool.mypy]

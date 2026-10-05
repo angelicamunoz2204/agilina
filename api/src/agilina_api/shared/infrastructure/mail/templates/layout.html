@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>{{ t.subject }}</title>
+  {#- Email clients ignore most CSS: layout is tables and every style is inline. The only
+      <style> is the dark theme, which the clients that do not support it simply skip. -#}
+  <style>
+    :root { color-scheme: light dark; supported-color-schemes: light dark; }
+    @media (prefers-color-scheme: dark) {
+      .bg-page { background-color: {{ d.background }} !important; }
+      .card { background-color: {{ d.card }} !important; border-color: {{ d.border }} !important; }
+      .panel { background-color: {{ d.muted }} !important; border-color: {{ d.border }} !important; }
+      .btn { background-color: {{ d.primary }} !important; }
+      .btn a { color: {{ d.primary_foreground }} !important; }
+      .logo { background-color: {{ d.primary }} !important; color: {{ d.primary_foreground }} !important; }
+      .t-fg { color: {{ d.foreground }} !important; }
+      .t-muted { color: {{ d.muted_foreground }} !important; }
+      .t-primary { color: {{ d.primary }} !important; }
+    }
+  </style>
+</head>
+<body class="bg-page" style="margin:0;padding:0;background-color:{{ c.background }};">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">{{ t.preheader }}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bg-page" style="background-color:{{ c.background }};">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                <tr>
+                  <td class="logo" width="48" height="48" align="center" valign="middle" style="width:48px;height:48px;border-radius:12px;background-color:{{ c.primary }};color:{{ c.primary_foreground }};font-family:{{ fonts.heading }};font-size:24px;line-height:48px;font-weight:800;">A</td>
+                </tr>
+              </table>
+              <div class="t-fg" style="margin-top:16px;font-family:{{ fonts.heading }};font-size:28px;line-height:34px;font-weight:800;color:{{ c.foreground }};">Agilina</div>
+              <div class="t-muted" style="margin-top:4px;font-family:{{ fonts.body }};font-size:14px;line-height:20px;color:{{ c.muted_foreground }};">{{ layout.tagline }}</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="card t-fg" style="background-color:{{ c.card }};border:1px solid {{ c.border }};border-radius:16px;padding:32px;font-family:{{ fonts.body }};font-size:16px;line-height:24px;color:{{ c.foreground }};box-shadow:0 1px 2px rgba(16,24,40,0.06);">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td align="center" class="t-muted" style="padding:24px 16px 0 16px;font-family:{{ fonts.body }};font-size:12px;line-height:18px;color:{{ c.muted_foreground }};">{{ layout.footer }}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

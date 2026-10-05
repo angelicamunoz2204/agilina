@@ -1,0 +1,13 @@
+{{ t.title }}
+
+{{ t.greeting }}
+
+{{ t.intro }}
+
+{{ t['reason_' ~ reason] }}
+
+{{ t.action }}
+
+--
+Agilina · {{ layout.tagline }}
+{{ layout.footer }}

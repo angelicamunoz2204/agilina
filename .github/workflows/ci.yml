@@ -39,6 +39,22 @@ jobs:
     name: API, worker y transcripción
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Las pruebas de integración usan un PostgreSQL real (las variables POSTGRES_* por
+    # defecto de la API coinciden con estas).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agilina
+          POSTGRES_PASSWORD: agilina
+          POSTGRES_DB: agilina
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agilina -d agilina"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
@@ -62,8 +78,16 @@ jobs:
       - name: Reglas de arquitectura
         run: uv run lint-imports
 
-      - name: Pruebas con cobertura
-        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: Pruebas unitarias
+        run: uv run pytest --cov --cov-report=
+
+      - name: Pruebas de integración (PostgreSQL real)
+        run: uv run pytest -m integration --cov --cov-append --cov-report=
+
+      - name: Cobertura del 100 % (API y contrato compartido)
+        run: |
+          uv run coverage report --show-missing --skip-covered --fail-under=100
+          uv run coverage xml
 
       - name: Publicar la cobertura en el resumen
         if: always()

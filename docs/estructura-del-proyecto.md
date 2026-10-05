@@ -18,6 +18,7 @@ agilina/
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre durante la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper (GPU)
 ├── web/       Aplicación web en Angular
+├── tests/     Pruebas de Python: un árbol por pieza, con unit/ e integration/ (ver testing.md)
 ├── infra/     Compose del entorno, Dockerfile de Python, realm versionado, scripts
 ├── docs/      Documentación técnica y decisiones arquitectónicas (ADR)
 ├── .github/   Pipeline de verificación, plantillas y validación de commits
@@ -89,8 +90,8 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | Contexto | Responsabilidad | Estado |
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
-| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Estructura creada, sin código (HU-02, 03, 04) |
-| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Estructura creada, sin código (HU-02 lo usa; HU-05, 06, 07…) |
+| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas en el servidor: dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; HU-03 y HU-04 después |
+| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio, casos de uso (`CreateTeam`, `AddTeamMember`), consulta de administradores y persistencia (HU-02); lo demás con HU-05, 06, 07… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
 
@@ -111,18 +112,20 @@ api/
 ├── migrations/                       Alembic; env.py lee la URL de la configuración
 │   └── versions/
 ├── src/agilina_api/
-│   ├── bootstrap/app.py              Raíz de composición: fábrica de la app, lifespan, cableado
+│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams) e invite.py (`make invite`)
 │   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
-│   │   ├── application/              Consultas de salud y los puertos Clock y UnitOfWork
-│   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL
+│   │   ├── application/              Consultas de salud y los puertos Clock, UnitOfWork, Mailer y EmailRenderer
+│   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL, correo SMTP y plantillas de correo (Jinja2)
 │   │   └── presentation/http/        Router de salud y dependencias declaradas
-│   ├── identity/                     Contexto (HU-02): las cuatro capas, aún sin código
-│   ├── teams/                        Contexto (HU-02 lo necesita, HU-05 en adelante lo construye): las cuatro capas, aún sin código
+│   ├── identity/                     Contexto (HU-02): dominio (Invitation, AppUser), puertos y DTO de lectura, persistencia
+│   ├── teams/                        Contexto (HU-02 lo necesita; HU-05 en adelante lo amplía): dominio (Team con sus membresías) y persistencia
 │   └── ceremonies/
 │       └── presentation/http/        Router del contrato del agente
-└── tests/
 ```
+
+Las pruebas de la API no están aquí sino en `tests/api/`, con la misma estructura
+(ver [testing.md](testing.md)).
 
 La forma que tendrá cada contexto con dominio (por ejemplo `identity`):
 
@@ -208,7 +211,7 @@ Todo corre en contenedores (solo hacen falta Docker y `make`):
 
 | Archivo | Para qué |
 | --- | --- |
-| `docker-compose.yml` | El entorno: `postgres`, `keycloak`, `mailpit`, `api` y `web`; con el perfil `voice`, `stt` y `agent`; con el perfil `tools`, los contenedores de un solo uso de las pruebas y verificaciones |
+| `docker-compose.yml` | El entorno: `postgres`, `pgadmin`, `keycloak`, `mailpit`, `api` y `web`; con el perfil `voice`, `stt` y `agent`; con el perfil `tools`, los contenedores de un solo uso de las pruebas y verificaciones |
 | `docker/python.Dockerfile` | Imagen de Python con varios objetivos: `dev` (todas las dependencias y las herramientas; el código se monta en `/app`) y `api` (producción: solo sus dependencias, código instalado, sin uv y sin root) |
 | `../web/Dockerfile` | Imagen de la web: `dev` (`ng serve`), `test` (con Chromium), `build` y `prod` (nginx sin privilegios) |
 | `keycloak/realm-agilina.json` | Realm, clientes y roles versionados: no se configura a mano |
@@ -267,7 +270,9 @@ en el code review.
 
 ## Dónde está el porqué
 
+- Cómo se organizan las pruebas (árbol espejo, *Data Builders*, cobertura del 100 %): [AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
+- Cómo se envía el correo (SMTP, Mailpit y el proveedor por configuración): [AD-23](adr/0023-enviar-correo-por-smtp-con-mailpit-y-proveedor-configurable.md).
 - Cómo nace el primer Administrador sin registro público: [AD-22](adr/0022-emitir-por-cli-la-invitacion-del-primer-administrador.md).
 - Cómo se escribe el código dentro de esta estructura: [code-conventions.md](code-conventions.md).
 - El vocabulario del dominio: [glossary.md](glossary.md).

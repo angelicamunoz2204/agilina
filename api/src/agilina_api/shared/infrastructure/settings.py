@@ -8,9 +8,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from agilina_api.shared.infrastructure.mail.smtp_mailer import SmtpSecurity
 from agilina_shared.enums import Language
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -39,6 +40,8 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     api_public_url: str = "http://localhost:8000"
+    web_public_url: str = "http://localhost:4200"
+    """Where the web application is served: the activation link in an invitation points here."""
     allowed_origins: str = "http://localhost:4200"
 
     # ------------------------------------------------------------ postgres --
@@ -55,6 +58,18 @@ class Settings(BaseSettings):
     keycloak_web_client: str = "agilina-web"
     keycloak_worker_client: str = "agilina-worker"
     keycloak_worker_secret: str = ""
+    keycloak_api_client: str = "agilina-api"
+    keycloak_api_secret: SecretStr = SecretStr("")
+
+    # ---------------------------------------------------------------- email --
+    # Which server delivers the email is only configuration (AD-23). The defaults point
+    # to Mailpit, the development and CI inbox; see .env.example for Amazon SES.
+    smtp_host: str = "mailpit"
+    smtp_port: int = 1025
+    smtp_user: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_security: SmtpSecurity = "none"
+    mail_from: str = "Agilina <no-reply@agilina.local>"
 
     # ------------------------------------------------------------- livekit --
     livekit_url: str = ""

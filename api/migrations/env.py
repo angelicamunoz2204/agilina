@@ -5,6 +5,7 @@ environment variables: the repository stores no credentials, not even in the
 Alembic file.
 """
 
+from importlib import import_module
 from logging.config import fileConfig
 
 from alembic import context
@@ -16,13 +17,21 @@ from agilina_api.shared.infrastructure.settings import get_settings
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 config.set_main_option("sqlalchemy.url", get_settings().dsn)
 
-# The ORM models of each context are imported here as the stories add them, so
-# that `alembic revision --autogenerate` sees them:
-#   from agilina_api.identity.infrastructure.persistence import orm_models  # noqa: F401
+# `import_module` registers each context's ORM models in `Base.metadata`, for the tools
+# that read it. Do NOT use `alembic revision --autogenerate`: the ORM models are a
+# deliberate subset of the tables (no foreign keys between contexts, no partial indexes,
+# no triggers), so it proposes dropping real columns and constraints. Migrations are
+# written by hand, in SQL (see docs/code-conventions.md).
+for module in (
+    "agilina_api.identity.infrastructure.persistence.orm_models",
+    "agilina_api.teams.infrastructure.persistence.orm_models",
+):
+    import_module(module)
+
 target_metadata = Base.metadata
 
 
