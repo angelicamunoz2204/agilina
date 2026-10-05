@@ -77,9 +77,12 @@ Dos consecuencias prácticas:
 - Una sola base de datos, sin *event sourcing* y sin bus genérico: cada
   endpoint recibe su manejador por inyección de dependencias.
 
-Hoy solo existen consultas (`GetLiveness` y `GetReadiness`, en
-`api/.../shared/application/health.py`); los comandos llegan con las primeras
-historias de dominio.
+Ya existen las dos clases. En `identity` (HU-02) están los comandos de las
+invitaciones (`IssueInvitation`, `ActivateAccount`, `RequestNewInvitation`) y la
+consulta `GetInvitationStatus`. En `teams` están los comandos `CreateTeam` y
+`AddTeamMember` (HU-02) y `CreateTeamAsAdmin` (HU-05), y las consultas `ListMyTeams` y
+`GetTeam` (HU-05). En `shared` están las consultas de salud (`GetLiveness` y
+`GetReadiness`).
 
 ### Contextos delimitados
 
@@ -91,15 +94,25 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
 | `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas en el servidor: dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; HU-03 y HU-04 después |
-| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio, casos de uso (`CreateTeam`, `AddTeamMember`), consulta de administradores y persistencia (HU-02); lo demás con HU-05, 06, 07… |
+| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio (con el nombre como objeto de valor `TeamName`), comandos (`CreateTeam` y `AddTeamMember` de HU-02, `CreateTeamAsAdmin` de HU-05), consultas (administradores, `ListMyTeams`, `GetTeam` y el rol de un integrante), persistencia y API HTTP (`/v1/teams`, HU-05); lo demás con HU-06, 07… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
 
 `shared/` no es un contexto: contiene lo transversal (configuración, base de
-datos, planificador, sondas de salud) con las mismas cuatro capas.
+datos, planificador, sondas de salud, quién llama y a qué equipo pertenece, y el
+formato de error común) con las mismas cuatro capas.
 
 El **equipo es el tenant**: todo repositorio y toda consulta de un contexto con
-datos de equipo deben exigir el `team_id` en su firma.
+datos de equipo deben exigir el `team_id` en su firma. La única consulta que filtra
+por usuario en lugar de por equipo es la que lista los equipos de quien pregunta
+(`ListMyTeams`).
+
+Toda ruta HTTP sobre un equipo lleva `{team_id}` en el camino y declara
+`Depends(current_team_member)` (en `shared/presentation/http/access.py`). Esa dependencia
+resuelve a quien llama con `current_user_id` (`401 not_authenticated` si no hay un
+usuario) y comprueba su membresía activa guardada en la base (`403 not_a_team_member` si no
+la tiene). Una regla sobre el rol (solo un `admin` puede…) es otra dependencia encima de
+esa. La autorización nunca vive en la web.
 
 ## Cada pieza por dentro
 
@@ -112,14 +125,14 @@ api/
 ├── migrations/                       Alembic; env.py lee la URL de la configuración
 │   └── versions/
 ├── src/agilina_api/
-│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams) e invite.py (`make invite`)
+│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams), authentication.py (el adaptador de tokens, cerrado hasta HU-03) e invite.py (`make invite`)
 │   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
-│   │   ├── application/              Consultas de salud y los puertos Clock, UnitOfWork, Mailer y EmailRenderer
+│   │   ├── application/              Consultas de salud, los puertos Clock, UnitOfWork, Mailer y EmailRenderer, y los de acceso (AuthenticatedUsers y TeamAccess)
 │   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL, correo SMTP y plantillas de correo (Jinja2)
-│   │   └── presentation/http/        Router de salud y dependencias declaradas
+│   │   └── presentation/http/        Router de salud, dependencias declaradas, acceso (current_user_id y current_team_member) y el formato de error común (ErrorResponse y el manejador único, con una tabla de errores por contexto)
 │   ├── identity/                     Contexto (HU-02): dominio (Invitation, AppUser), puertos y DTO de lectura, persistencia
-│   ├── teams/                        Contexto (HU-02 lo necesita; HU-05 en adelante lo amplía): dominio (Team con sus membresías) y persistencia
+│   ├── teams/                        Contexto (HU-02 lo creó; HU-05 en adelante lo amplía): dominio (Team con sus membresías y TeamName), comandos, consultas, persistencia y API HTTP
 │   └── ceremonies/
 │       └── presentation/http/        Router del contrato del agente
 ```
@@ -207,8 +220,10 @@ web/
         └── presentation/            Páginas y componentes
 ```
 
-Hoy solo existe `features/status` (la pantalla de estado del entorno). Las
-demás (`identity`, `teams`, `ceremonies`) llegan con sus historias. El detalle,
+Hoy existen `features/status` (la pantalla de estado del entorno) y
+`features/teams` (HU-05: el selector mínimo, el formulario para crear un equipo y el
+dashboard del equipo, que por ahora solo muestra su nombre). Las demás (`identity`,
+`ceremonies`) llegan con sus historias. El detalle,
 las convenciones y el porqué están en [web/README.md](../web/README.md) y en
 [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 
