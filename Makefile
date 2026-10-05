@@ -20,27 +20,29 @@ PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
         lint format typecheck arch test test-python test-integration test-web coverage verify \
-        mail-test lock hooks keycloak-admin clean
+        mail-test lock hooks keycloak-admin credentials clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 # ------------------------------------------------------------ Environment ---
-env: ## Create .env from .env.example, with generated local passwords
-	@test -f .env || { \
-		cp .env.example .env; \
-		db_password=$$(openssl rand -hex 16); \
-		kc_password=$$(openssl rand -hex 16); \
-		sed -i.bak -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$$db_password|" \
-		           -e "s|^KEYCLOAK_ADMIN_PASSWORD=.*|KEYCLOAK_ADMIN_PASSWORD=$$kc_password|" .env; \
-		rm -f .env.bak; \
-		echo "Created .env with generated local passwords."; \
-		echo "Fill in the LiveKit, Gemini and ElevenLabs keys before using voice."; \
-	}
+env: ## Create .env from .env.example, or complete it, with generated local passwords
+	@test -f .env || { cp .env.example .env; echo "Created .env."; \
+		echo "Fill in the LiveKit, Gemini and ElevenLabs keys before using voice."; }
+	@# Keys added to .env.example after your .env was created are appended with their defaults.
+	@for key in $$(grep -E '^[A-Z][A-Z0-9_]*=' .env.example | cut -d= -f1); do \
+		grep -q "^$$key=" .env || { grep "^$$key=" .env.example >> .env; echo "Added $$key to .env"; }; \
+	done
+	@# Local passwords that are still empty are generated.
+	@for key in POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD PGADMIN_ADMIN_PASSWORD; do \
+		grep -Eq "^$$key=.+" .env || { \
+			sed -i.bak -e "s|^$$key=.*|$$key=$$(openssl rand -hex 16)|" .env && rm -f .env.bak; \
+			echo "Generated $$key in .env"; }; \
+	done
 
 up: env ## THE command: build and start everything, wait, migrate
-	$(COMPOSE) up -d --build postgres keycloak mailpit api web
+	$(COMPOSE) up -d --build postgres pgadmin keycloak mailpit api web
 	./infra/wait-for-services.sh
 	$(MAKE) migrate
 	@echo ""
@@ -49,11 +51,12 @@ up: env ## THE command: build and start everything, wait, migrate
 	@echo "  Web       http://localhost:4200"
 	@echo "  Mailpit   http://localhost:8025   (every email the app sends lands here)"
 	@echo "  Keycloak  http://localhost:8080"
+	@echo "  pgAdmin   http://localhost:5051   (credentials: make credentials)"
 	@echo "Voice (optional): make stt, make agent. Logs: make logs s=api"
 
-infra: env ## Start only the infrastructure: Postgres, Keycloak and Mailpit
-	$(COMPOSE) up -d postgres keycloak mailpit
-	@echo "Postgres :5432 · Keycloak http://localhost:8080 · Mailpit http://localhost:8025"
+infra: env ## Start only the infrastructure: Postgres, pgAdmin, Keycloak and Mailpit
+	$(COMPOSE) up -d postgres pgadmin keycloak mailpit
+	@echo "Postgres :5432 · pgAdmin http://localhost:5051 · Keycloak http://localhost:8080 · Mailpit http://localhost:8025"
 
 down: env ## Stop the containers without deleting the data
 	$(COMPOSE) --profile voice --profile tools down
@@ -69,6 +72,14 @@ logs: env ## Follow the logs: make logs [s=api]
 keycloak-admin: env ## Show the Keycloak admin console and its credentials
 	@echo "http://localhost:8080/admin"
 	@grep -E '^KEYCLOAK_ADMIN(_PASSWORD)?=' .env
+
+credentials: env ## Show the local URLs and credentials: Postgres, pgAdmin and Keycloak
+	@echo "Postgres   localhost:$$(grep '^POSTGRES_PORT=' .env | cut -d= -f2)   (inside the network: postgres:5432)"
+	@grep -E '^POSTGRES_(DB|USER|PASSWORD)=' .env | sed 's/^/           /'
+	@echo "pgAdmin    http://localhost:$$(grep '^PGADMIN_PORT=' .env | cut -d= -f2)"
+	@grep -E '^PGADMIN_ADMIN_(EMAIL|PASSWORD)=' .env | sed 's/^/           /'
+	@echo "Keycloak   http://localhost:8080/admin"
+	@grep -E '^KEYCLOAK_ADMIN(_PASSWORD)?=' .env | sed 's/^/           /'
 
 # --------------------------------------------------------------- Database ---
 migrate: env ## Apply the pending database migrations
