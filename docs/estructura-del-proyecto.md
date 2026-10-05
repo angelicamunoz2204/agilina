@@ -191,19 +191,26 @@ ninguno de los tres desplegables. Un cambio incompatible sube
 ### `web/`
 
 ```
-web/src/app/
-├── app.config.ts                    Raíz de composición: enlaza puertos con adaptadores
-├── app.routes.ts                    Mapa de pantallas, con carga diferida
-├── core/i18n/                       Servicio de textos y catálogos es.json / en.json
-└── features/<contexto>/
-    ├── domain/                      Modelos puros (sin Angular ni rxjs)
-    ├── application/                 Puertos (clases abstractas) y facades con señales
-    ├── infrastructure/              Adaptadores HTTP
-    └── presentation/                Componentes y páginas
+web/
+├── public/i18n/                     Catálogos es.json / en.json (Transloco)
+├── runtime-config.template.json     config.json a partir de variables de entorno
+└── src/app/
+    ├── app.config.ts                Raíz de composición: enlaza puertos con adaptadores
+    ├── app.routes.ts                Mapa de pantallas, con carga diferida
+    ├── core/                        config, http, i18n, logging (y auth, cuando llegue)
+    ├── layout/                      Cabecera y marco de la aplicación
+    ├── shared/                      Componentes, pipes y utilidades sin estado
+    └── features/<contexto>/
+        ├── domain/                  Modelos puros (sin Angular ni rxjs)
+        ├── application/             Puertos (clases abstractas) y facades con signals
+        ├── infrastructure/          Adaptadores: HTTP, LiveKit, Keycloak
+        └── presentation/            Páginas y componentes
 ```
 
 Hoy solo existe `features/status` (la pantalla de estado del entorno). Las
-demás pantallas llegan con sus historias.
+demás (`identity`, `teams`, `ceremonies`) llegan con sus historias. El detalle,
+las convenciones y el porqué están en [web/README.md](../web/README.md) y en
+[AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 
 ### `infra/` y los contenedores
 
@@ -231,7 +238,8 @@ Se ejecutan con `make verify`, en la CI y (mypy e import-linter) antes de cada
 | Herramienta | Qué hace cumplir |
 | --- | --- |
 | `import-linter` (`make arch`) | Capas de la API, del worker y de la transcripción; la raíz de composición va encima de todo; los contextos de la API no se importan entre sí y `shared` y `shared_kernel` quedan debajo; el dominio de la API (y `shared_kernel`) no conoce FastAPI, SQLAlchemy, Pydantic ni `httpx`; el dominio del worker no conoce LiveKit ni `httpx`; el contrato compartido no depende de ningún desplegable |
-| ESLint (`make lint`) | En la web, `presentation` no importa `infrastructure` y `domain` no conoce Angular ni rxjs |
+| ESLint (`make lint`) | En la web: capas hacia adentro, ninguna funcionalidad importa a otra, `core` y `shared` no conocen las funcionalidades, `domain` no conoce Angular ni rxjs, `HttpClient`/LiveKit/Keycloak solo en adaptadores y nada de `console.*` fuera del `Logger` |
+| Prettier (`make format`) | Formato de la web; `make verify` y la CI lo comprueban |
 | `mypy --strict` (`make typecheck`) | Tipado estricto en los cuatro paquetes de Python |
 | `ruff` | Formato y reglas de estilo y seguridad |
 | Pruebas | Prueba de que toda clave i18n existe en español e inglés |
@@ -273,6 +281,7 @@ en el code review.
 - Cómo se organizan las pruebas (árbol espejo, *Data Builders*, cobertura del 100 %): [AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
 - Cómo se envía el correo (SMTP, Mailpit y el proveedor por configuración): [AD-23](adr/0023-enviar-correo-por-smtp-con-mailpit-y-proveedor-configurable.md).
+- Las herramientas y la estructura de la web: [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 - Cómo nace el primer Administrador sin registro público: [AD-22](adr/0022-emitir-por-cli-la-invitacion-del-primer-administrador.md).
 - Cómo se escribe el código dentro de esta estructura: [code-conventions.md](code-conventions.md).
 - El vocabulario del dominio: [glossary.md](glossary.md).

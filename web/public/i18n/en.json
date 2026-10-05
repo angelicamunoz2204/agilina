@@ -1,0 +1,17 @@
+{
+  "app": {
+    "tagline": "Virtual Scrum Master for the daily stand-up"
+  },
+  "status": {
+    "title": "Environment status",
+    "description": "This screen exists to check that the web application talks to the API. The product screens arrive with their own stories.",
+    "api": "API",
+    "checking": "Checking…",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "version": "Version",
+    "environment": "Environment",
+    "retry": "Retry",
+    "error_hint": "Start the API with make api and try again."
+  }
+}

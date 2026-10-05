@@ -1,0 +1,9 @@
+{
+  "apiUrl": "${AGILINA_API_PUBLIC_URL}",
+  "keycloak": {
+    "url": "${AGILINA_KEYCLOAK_URL}",
+    "realm": "${AGILINA_KEYCLOAK_REALM}",
+    "clientId": "${AGILINA_KEYCLOAK_WEB_CLIENT}"
+  },
+  "logLevel": "${AGILINA_LOG_LEVEL}"
+}

@@ -1,3 +1,5 @@
-# Específico de la aplicación web; lo general está en el .gitignore de la raíz.
+# Specific to the web application; the general rules are in the root .gitignore.
 /out-tsc/
 /.angular/
+# Rendered from the environment at startup (scripts/render-runtime-config.mjs).
+/runtime/

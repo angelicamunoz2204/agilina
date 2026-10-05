@@ -133,10 +133,11 @@ vocabulario del dominio en [docs/glossary.md](docs/glossary.md). Lo esencial:
 - **Python.** `ruff` decide formato y reglas, `mypy` en modo estricto el tipado
   e `import-linter` las reglas de arquitectura (capas y fronteras entre
   contextos); la configuración está en el `pyproject.toml` de la raíz.
-- **TypeScript y Angular.** `eslint` con `angular-eslint`. Componentes
-  `standalone`, `OnPush` y señales. Prefijo de selectores `agl`.
+- **TypeScript y Angular.** Prettier para el formato y `eslint` con
+  `angular-eslint` para el resto. Angular 22 zoneless, señales y prefijo de
+  selectores `agl`. La guía completa está en [web/README.md](web/README.md).
 - **Textos de usuario.** Nunca en el código: en `shared/src/agilina_shared/i18n.py`
-  para lo que Agilina dice, y en `web/src/app/core/i18n/*.json` para la interfaz.
+  para lo que Agilina dice, y en `web/public/i18n/*.json` para la interfaz.
   Hay una prueba que falla si una clave existe en un idioma y no en el otro.
 - **Dependencias.** Cuando cambias `pyproject.toml` o `web/package.json`, ejecuta
   `make lock` y commitea `uv.lock` y `web/package-lock.json`. Los locks fijan la

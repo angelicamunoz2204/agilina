@@ -123,6 +123,9 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Formato
+        run: npm run format:check
+
       - name: Análisis estático
         run: npm run lint
 

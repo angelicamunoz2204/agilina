@@ -16,6 +16,10 @@ COMPOSE   := docker compose -f infra/docker-compose.yml --env-file .env
 # guarantees the image matches the current Dockerfile and dependencies (cached, so cheap).
 TOOLS     := $(COMPOSE) --profile tools run --rm --no-deps --build tools
 WEB       := $(COMPOSE) run --rm --no-deps --build web
+# The whole web/ folder mounted as your user, for commands that rewrite files outside
+# src/ and public/ (Prettier). node_modules stays the image's.
+WEB_RW    := $(COMPOSE) run --rm --no-deps --build -u "$(HOST_UID):$(HOST_GID)" \
+             -v "$(CURDIR)/web:/app" -v /app/node_modules web
 PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
@@ -130,8 +134,9 @@ lint: env ## Static analysis of Python and the web
 	$(TOOLS) ruff check .
 	$(WEB) npm run lint
 
-format: env ## Format the Python code
+format: env ## Format the Python code and the web (Prettier)
 	$(TOOLS) sh -c "ruff format . && ruff check --fix ."
+	$(WEB_RW) npm run format
 
 typecheck: env ## Strict type checking of the Python packages
 	$(TOOLS) mypy $(PYPACKAGES)
@@ -163,7 +168,7 @@ coverage: env ## Unit + integration coverage of the API and the contract; fails 
 verify: env ## The same the pipeline runs, in containers
 	$(TOOLS) sh -c "ruff format --check . && ruff check . && mypy $(PYPACKAGES) && lint-imports"
 	$(MAKE) coverage
-	$(WEB) sh -c "npm run lint && npm run build"
+	$(WEB) sh -c "npm run format:check && npm run lint && npm run build"
 	$(MAKE) test-web
 	@echo ""
 	@echo "Verification green. The pull request should not fail on analysis or tests."

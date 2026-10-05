@@ -277,6 +277,7 @@ make test-keycloak      # pruebas contra el Keycloak real (levanta Keycloak y lo
 make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos)
 make invite team=… email=… name=…   # crea un equipo e invita a su primer administrador
 make lint           # ruff y ESLint
+make format         # ruff format y Prettier (la web)
 make typecheck      # mypy en modo estricto
 make arch           # reglas de arquitectura (capas y fronteras entre contextos)
 make verify         # exactamente lo que corre el pipeline, en contenedores

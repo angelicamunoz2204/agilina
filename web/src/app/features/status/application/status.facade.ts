@@ -1,31 +1,28 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
 
-import { ServiceStatus } from '../domain/service-status';
 import { HealthPort } from './health.port';
+import { type ServiceStatus } from '../domain/service-status';
 
-/** State of the status screen: what the presentation layer reads and triggers. */
-@Injectable({ providedIn: 'root' })
+/**
+ * State of the status screen: what the presentation reads and triggers. Provided
+ * by the page, so it lives and dies with it.
+ *
+ * A failed check becomes the `failed` state; the HTTP interceptor has already
+ * logged it, so it is not logged again here.
+ */
+@Injectable()
 export class StatusFacade {
   private readonly health = inject(HealthPort);
+  private readonly probe = rxResource({ stream: () => this.health.check() });
 
-  readonly status = signal<ServiceStatus | null>(null);
-  readonly checking = signal(false);
-  readonly failed = signal(false);
+  readonly serviceStatus = computed<ServiceStatus | null>(() =>
+    this.probe.hasValue() ? this.probe.value() : null,
+  );
+  readonly checking = this.probe.isLoading;
+  readonly failed = computed(() => this.probe.status() === 'error');
 
   refresh(): void {
-    this.checking.set(true);
-    this.failed.set(false);
-
-    this.health.check().subscribe({
-      next: (status) => {
-        this.status.set(status);
-        this.checking.set(false);
-      },
-      error: () => {
-        this.status.set(null);
-        this.failed.set(true);
-        this.checking.set(false);
-      },
-    });
+    this.probe.reload();
   }
 }
