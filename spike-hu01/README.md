@@ -103,5 +103,28 @@ El override `docker-compose.gpu.yml` cambia Whisper a la imagen CUDA, reserva la
    Para cambiar de modelo: editar `WHISPER_MODEL` en el `.env` de la instancia y
    `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --force-recreate whisper-warmup agent`.
 
-7. **Al terminar cada sesión, detener la instancia** en la consola de AWS: se cobra por hora mientras esté encendida.
+7. Bajar los CSV de métricas al Mac (el agente escribe una fila por turno en `metrics/<sala>.csv` de la instancia):
+
+   ```bash
+   mkdir -p metrics
+   scp -i ~/.ssh/<llave>.pem 'ubuntu@<ip>:spike-hu01/metrics/*.csv' metrics/
+   ```
+
+8. **Al terminar cada sesión, detener la instancia** en la consola de AWS: se cobra por hora mientras esté encendida.
    Los modelos descargados quedan en el volumen `hf-hub-cache` del disco de la instancia.
+
+## Métricas
+
+El agente escribe una fila por turno de usuario en `metrics/<sala>.csv` (carpeta fuera de git): contexto
+(`ENTORNO`, modelos, prompt, `USAR_LLM`), U1 con su desglose (espera del VAD y duración del STT), TTFB del LLM,
+U2, U3 aproximado, caracteres enviados a ElevenLabs (U6) y los textos. El detalle de cada columna está en
+`agent/metricas.py`.
+
+Resumen contra `UMBRALES.md` (mediana, máximo y cuántas cumplen):
+
+```bash
+docker run --rm -v "$PWD":/w -w /w python:3.12-slim python scripts/resumen-metricas.py metrics/*.csv
+```
+
+Opciones: `--participantes N` y `--dias N` para proyectar U6, y `--cuota N` (caracteres mensuales del plan de
+ElevenLabs) para el veredicto.

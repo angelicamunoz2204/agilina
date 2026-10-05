@@ -261,6 +261,37 @@
 - El agente lee `WHISPER_PROMPT` (opcional, vacío por defecto = sin prompt). Medido en la sala gpu-04 (ver paso 15):
   "Keycloak" correcto con prompt, sin costo de latencia medible.
 
+## Paso 17 · Instrumentación de métricas por turno (preparada, sin prueba en sala)
+- El agente escribe una fila por turno de usuario en `metrics/<sala>.csv` (`agent/metricas.py`; volumen
+  `./metrics:/metrics`). Columnas: contexto (sala, participante, hora UTC, `ENTORNO`, modelos, prompt, `USAR_LLM`),
+  duración de la voz y del audio enviado al STT, U1 con su desglose, TTFB del LLM, U2, U3 aproximado,
+  caracteres a ElevenLabs (respuesta + anuncio) y los textos. `scripts/resumen-metricas.py` resume contra
+  `UMBRALES.md` (mediana, máximo, cuántas cumplen; "cumple" = 90 %, U3 separado por `USAR_LLM`).
+- Métricas oficiales de livekit-agents 1.8.4 (verificadas en el código instalado):
+  - `ChatMessage.metrics` del usuario: `transcription_delay` = llegada de la transcripción final − fin de la voz
+    según el VAD (`stopped_speaking_at`). Es U1. Ya viene lleno dentro de `on_user_turn_completed`.
+  - `ChatMessage.metrics` de la respuesta: `tts_node_ttfb` (U2), `llm_node_ttft`, `started_speaking_at`
+    (primer cuadro de audio entregado a la pista de la sala) y `e2e_latency` = `started_speaking_at` − `stopped_speaking_at`
+    del usuario.
+  - **`e2e_latency` no se llena en modo plantilla:** `session.say()` solo recibe las métricas del usuario dentro de
+    `on_enter`. El agente calcula U3 aproximado con la misma fórmula.
+  - Con `StopResponse` el mensaje del usuario no se agrega a la conversación (no hay `conversation_item_added`).
+  - `metrics_collected` está deprecado en la sesión ("use session_usage_updated ... y ChatMessage.metrics"), pero no en
+    los componentes: el agente escucha `STTMetrics.duration` (petición a Whisper), `STTMetrics.audio_duration` y
+    `TTSMetrics.characters_count` (= `len(texto)`) directamente en los objetos STT y TTS.
+- Tramos calculados: espera del VAD = U1 − duración de la última petición a Whisper del turno.
+  Validado con eventos simulados (fila correcta, saludo fuera del turno, turnos descartados sin fila);
+  pendiente la prueba en sala `metricas-01` con 3 intervenciones.
+- **Lo que U3 no ve.** `started_speaking_at` es cuando el agente entrega el primer cuadro a su pista (LiveKit
+  documenta `playback_latency` ≈ 0 para la salida de sala, sin la entrega por red). Quedan fuera:
+  (1) de subida, el tramo micrófono → SFU → agente (el agente fecha el fin de la voz cuando le llega el audio);
+  (2) de bajada, agente → SFU de LiveKit Cloud (US East) → navegador en Colombia;
+  (3) el búfer de jitter del navegador y la salida de audio del equipo.
+  Validación propuesta en 2 o 3 muestras: grabar en el equipo del participante el micrófono y el audio del sistema
+  en una misma pista (QuickTime u OBS con un dispositivo de captura del sistema), medir en la forma de onda el
+  tiempo entre el fin de la voz y el inicio de la voz de Agilina, y compararlo con `u3_aprox_s` de la misma fila.
+  La diferencia es la parte de red y búfer que el agente no ve.
+
 ## Cierre · Estimaciones de costo (U5, U6)
 - U5 (estimado): ~20 min de instancia por ceremonia (15 de daily + ~5 de arranque) × USD 0,526/h ≈ USD 0,18
   (20/60 × 0,526 = 0,175).
