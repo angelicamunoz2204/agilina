@@ -1,9 +1,9 @@
-<section class="card" *transloco="let t; prefix: 'teams.dashboard'">
+<section class="mx-auto w-full max-w-5xl" *transloco="let t; prefix: 'teams.dashboard'">
   @if (team(); as team) {
-    <h1>{{ team.name }}</h1>
+    <h1 class="font-display text-3xl font-bold tracking-tight break-words">{{ team.name }}</h1>
   } @else if (loading()) {
-    <p>{{ t('loading') }}</p>
-  } @else if (failed()) {
-    <p class="error" role="alert">{{ t('failed') }}</p>
+    <p role="status" class="text-sm text-muted">{{ t('loading') }}</p>
+  } @else if (problemMessage(); as message) {
+    <p role="alert" class="text-sm text-danger">{{ t(message) }}</p>
   }
 </section>

@@ -1,11 +1,14 @@
-import { Component, inject } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import { teamNameError, teamNameValidator } from './team-name.validator';
+import { Button } from '@shared/ui/button';
+import { TextField } from '@shared/ui/text-field';
+
+import { problemMessageKey } from './problem-message';
 import { CreateTeamFacade } from '../application/create-team.facade';
-import { TEAM_NAME_MAX_LENGTH, type TeamNameProblem } from '../domain/team-name';
+import { TEAM_NAME_MAX_LENGTH, teamNameProblem } from '../domain/team-name';
 
 /**
  * Form to create a team: only its name. Mode and language take the defaults of every
@@ -13,33 +16,33 @@ import { TEAM_NAME_MAX_LENGTH, type TeamNameProblem } from '../domain/team-name'
  */
 @Component({
   selector: 'agl-create-team-page',
-  imports: [ReactiveFormsModule, RouterLink, TranslocoDirective],
+  imports: [FormsModule, RouterLink, TranslocoDirective, Button, TextField],
   providers: [CreateTeamFacade],
   templateUrl: './create-team-page.html',
-  styleUrl: './create-team-page.scss',
 })
 export class CreateTeamPage {
   private readonly facade = inject(CreateTeamFacade);
   private readonly router = inject(Router);
 
   protected readonly maxLength = TEAM_NAME_MAX_LENGTH;
-  protected readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [teamNameValidator] }),
-  });
+  protected readonly name = signal('');
+  /** Whether the user already typed in the field or left it: errors wait until then. */
+  protected readonly touched = signal(false);
+  protected readonly problem = computed(() => teamNameProblem(this.name()));
+  protected readonly shownProblem = computed(() => (this.touched() ? this.problem() : null));
   protected readonly saving = this.facade.saving;
-  protected readonly failed = this.facade.failed;
+  protected readonly problemMessage = computed(() => problemMessageKey(this.facade.problem()));
 
-  /** The problem to show, once the user has typed in the field or left it. */
-  protected nameProblem(): TeamNameProblem | null {
-    const name = this.form.controls.name;
-    return name.dirty || name.touched ? teamNameError(name) : null;
+  protected changeName(name: string): void {
+    this.name.set(name);
+    this.touched.set(true);
   }
 
   protected async submit(): Promise<void> {
-    if (this.form.invalid || this.saving()) {
+    if (this.problem() !== null || this.saving()) {
       return;
     }
-    const teamId = await this.facade.create(this.form.controls.name.value);
+    const teamId = await this.facade.create(this.name());
     if (teamId !== null) {
       await this.router.navigate(['/teams', teamId]);
     }

@@ -75,7 +75,7 @@ describe('TeamSelectorPage', () => {
       ]),
     );
 
-    expect(page.querySelector('h1')?.textContent).toBe('Tus equipos');
+    expect(page.querySelector('h1')?.textContent).toBe('Selecciona tu equipo');
     expect(links(page)).toEqual([
       { text: 'Atlas', href: '/teams/a' },
       { text: 'Boreal', href: '/teams/b' },
@@ -104,21 +104,21 @@ describe('TeamSelectorPage', () => {
 
     expect(links(page)).toEqual([]);
     expect(page.textContent).toContain('Todavía no perteneces a ningún equipo.');
-    const create = page.querySelector('a.button');
-    expect(create?.textContent.trim()).toBe('Crear equipo');
+    const create = page.querySelector('a[href="/teams/new"]');
+    expect(create?.textContent.trim()).toBe('Crear equipo nuevo');
     expect(create?.getAttribute('href')).toBe('/teams/new');
   });
 
   it('always offers to create a team', async () => {
     const page = await open(of([{ id: 'a', name: 'Atlas' }]));
 
-    expect(page.querySelector('a.button')?.getAttribute('href')).toBe('/teams/new');
+    expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
   });
 
   it('takes the user to the creation form', async () => {
     const page = await open(of([]));
 
-    page.querySelector<HTMLAnchorElement>('a.button')!.click();
+    page.querySelector<HTMLAnchorElement>('a[href="/teams/new"]')!.click();
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(Router).url).toBe('/teams/new');
@@ -148,6 +148,6 @@ describe('TeamSelectorPage', () => {
     expect(page.querySelector('[role="alert"]')?.textContent).toBe(
       'No se pudieron cargar tus equipos. Inténtalo de nuevo más tarde.',
     );
-    expect(page.querySelector('a.button')?.getAttribute('href')).toBe('/teams/new');
+    expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
   });
 });

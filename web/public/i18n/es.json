@@ -16,11 +16,14 @@
   },
   "teams": {
     "selector": {
-      "title": "Tus equipos",
+      "title": "Selecciona tu equipo",
       "loading": "Cargando tus equipos…",
       "failed": "No se pudieron cargar tus equipos. Inténtalo de nuevo más tarde.",
       "empty": "Todavía no perteneces a ningún equipo.",
-      "create": "Crear equipo"
+      "create": "Crear equipo nuevo",
+      "problems": {
+        "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo."
+      }
     },
     "create": {
       "title": "Crear equipo",
@@ -34,11 +37,19 @@
       "submit": "Crear equipo",
       "saving": "Creando…",
       "failed": "No se pudo crear el equipo. Inténtalo de nuevo.",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "problems": {
+        "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+        "invalid_name": "El nombre del equipo no es válido. Revísalo y vuelve a intentarlo."
+      }
     },
     "dashboard": {
       "loading": "Cargando el equipo…",
-      "failed": "No se pudo abrir este equipo."
+      "failed": "No se pudo abrir este equipo.",
+      "problems": {
+        "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+        "not_a_member": "Este equipo no existe o no perteneces a él."
+      }
     }
   },
   "identity": {

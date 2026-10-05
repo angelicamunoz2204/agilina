@@ -5,6 +5,7 @@ import { NEVER, of, throwError, type Observable } from 'rxjs';
 import { TeamSelectorFacade } from './team-selector.facade';
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
+import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: listMine() answers what the test chose. */
 class FakeTeamsPort extends TeamsPort {
@@ -78,7 +79,16 @@ describe('TeamSelectorFacade', () => {
     const facade = await settled();
 
     expect(facade.failed()).toBeTrue();
+    expect(facade.problem()).toBe('unavailable');
     expect(facade.teams()).toBeNull();
     expect(facade.loading()).toBeFalse();
+  });
+
+  it('says when the user is not signed in', async () => {
+    port.mine = throwError(() => new TeamFailure('not_authenticated'));
+
+    const facade = await settled();
+
+    expect(facade.problem()).toBe('not_authenticated');
   });
 });

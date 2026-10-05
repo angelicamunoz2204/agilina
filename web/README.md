@@ -19,7 +19,7 @@ guía está en [AD-26](../docs/adr/0026-organizar-y-equipar-la-aplicacion-web.md
 | Sala de audio | `livekit-client`. No se usan los componentes prearmados de LiveKit, que son solo para React |
 | Identidad | Keycloak (OIDC) con `keycloak-js`. La API emite el token de LiveKit |
 | Textos | [Transloco](https://jsverse.gitbook.io/transloco) (`@jsverse/transloco`), español e inglés |
-| Formularios | Reactive Forms tipados (`@angular/forms`) |
+| Formularios | `FormsModule` (`ngModel`) atado a signals; la validación es una regla pura de `domain` |
 | Análisis estático | ESLint con `angular-eslint`, `typescript-eslint` (reglas *type-checked*) e `import-x` |
 | Estilos | Tailwind CSS 4, con tokens `--agl-*` como tema ([AD-27](../docs/adr/0027-dar-estilo-a-la-web-con-tailwind-css.md)) |
 | Formato | Prettier, con el ordenador de clases de Tailwind |
@@ -87,7 +87,8 @@ web/
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
         │   └── auth/             Keycloak (llega con la historia de autenticación)
-        ├── layout/               Marco de la aplicación: cabecera, navegación (@layout/*)
+        ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
+        │                         centered-layout (las pantallas antes de entrar a un equipo)
         ├── shared/               Reutilizable y sin estado (@shared/*)
         │   ├── ui/               Componentes de presentación genéricos
         │   ├── pipes/
@@ -160,7 +161,6 @@ en inglés.
 | Otro adaptador | `livekit-room.adapter.ts` | `LiveKitRoomAdapter` |
 | Modelo de dominio | `turn.ts` | `Turn` |
 | Interceptor, *guard*, *pipe* | `auth.interceptor.ts`, `admin.guard.ts`, `local-date.pipe.ts` | `authInterceptor`, `adminGuard` (funciones), `LocalDatePipe` |
-| Validador de formulario | `team-name.validator.ts` | `teamNameValidator` (función) |
 | Proveedores de un módulo de `core` | `provide-logging.ts` | `provideLogging()` |
 | Prueba | junto al archivo, `*.spec.ts` | — |
 
@@ -211,24 +211,25 @@ en inglés.
 
 ## Formularios
 
-- **Reactive Forms tipados** (`ReactiveFormsModule`): un `FormGroup` con sus
-  `FormControl` creados con `nonNullable: true`, como campos `protected` de la
-  página. Se envía con `(ngSubmit)` sobre `[formGroup]`.
-- **La regla vive en `domain`** como función pura (por ejemplo,
-  `teamNameProblem` en `features/teams/domain/team-name.ts`), con su prueba sin
-  `TestBed`. El validador es una función de `presentation`
-  (`team-name.validator.ts`) que solo delega en esa regla: no repite la regla.
-- **La validación del cliente es comodidad; la autoridad es la API.** La API
-  aplica la misma regla y responde con un `code` (`invalid_team_name`). Hoy la
-  pantalla muestra un error genérico traducido ante cualquier fallo; traducir
-  cada `code` llega cuando una historia lo necesite.
-- El botón de enviar queda deshabilitado mientras el formulario sea inválido o
-  se esté guardando. Los mensajes de validación se muestran cuando el usuario ya
+Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new`):
+
+- **`FormsModule` con signals:** cada campo es un `signal` de la página, atado con
+  `[ngModel]="name()"` y `(ngModelChange)="name.set($event)"`. No se usan `FormGroup` ni
+  Reactive Forms. El formulario se envía con `(submit)="submit(); $event.preventDefault()"` y
+  lleva `novalidate`: la validación es la nuestra, no la del navegador.
+- **La regla vive en `domain`** como función pura (`teamNameProblem` en
+  `features/teams/domain/team-name.ts`, `checkPasswordInput` en
+  `features/identity/domain/password-input.ts`), con su prueba sin `TestBed`. La página la usa
+  en un `computed` (o la *facade* al enviar); no se repite la regla en otro lado.
+- **La validación del cliente es comodidad; la autoridad es la API.** La API aplica la misma
+  regla y responde con un `code` estable; la *facade* lo convierte en un problema que la
+  pantalla traduce, o en un error genérico traducido cuando no hace falta distinguirlo.
+- El botón de enviar (`aglButton`) queda deshabilitado mientras el formulario no se pueda
+  enviar o se esté guardando. Los mensajes de validación se muestran cuando el usuario ya
   escribió en el campo o salió de él.
-- Todo control tiene su `<label for>`, y el mensaje de error se asocia con
-  `aria-describedby` y `aria-invalid`.
-- El envío lo hace la *facade* (`saving`, `failed` y un método que devuelve una
-  `Promise`); la página solo decide adónde navegar con el resultado.
+- Todo control (`input[aglTextField]`) tiene su `<label for>`, y el mensaje de error se asocia
+  con `aria-describedby` y `aria-invalid`; un error del envío se anuncia con `role="alert"`.
+- El envío lo hace la *facade*; la página solo decide adónde navegar con el resultado.
 
 ## Comunicación con la API
 
@@ -351,11 +352,20 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 
 - Los colores salen de los tokens `--agl-*` de `styles.css`, que Tailwind lee como tema:
   `bg-surface`, `bg-background`, `text-foreground`, `text-muted`, `text-accent`,
-  `text-danger`, `border-border`. **No se escriben colores sueltos** (`#fff`, `bg-blue-500`):
-  un tema nuevo cambia los valores de las variables y nada más.
-- Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `button[aglButton]`
-  (con `variant="primary" | "secondary"`) y `input[aglTextField]`, directivas sobre el elemento
-  nativo. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
+  `text-accent`, `text-accent-foreground` (texto sobre el color de acento), `text-danger`,
+  `border-border`; con opacidad cuando hace falta un tono suave (`bg-accent/10`). **No se
+  escriben colores sueltos** (`#fff`, `bg-blue-500`): un tema nuevo cambia los valores de las
+  variables y nada más. Los valores son la paleta clara de los mockups (prototipo de Lovable).
+- Tipografía: Inter para el texto y Plus Jakarta Sans para los títulos (`font-display`),
+  autoalojadas con `@fontsource` (en `angular.json`): ninguna fuente se pide a un servidor
+  externo.
+- El marco de cada pantalla lo elige su ruta en `app.routes.ts`: `AppShell` (cabecera arriba)
+  o `CenteredLayout` (marca centrada sobre una sola tarjeta, para el selector de equipo y su
+  formulario).
+- Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `aglButton`
+  (con `variant="primary" | "secondary"`), que va sobre un `<button>` o, si navega, sobre un
+  `<a routerLink>` (un enlace sigue siendo enlace), e `input[aglTextField]`: directivas sobre
+  el elemento nativo. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
 - El orden de las clases lo decide Prettier (`make format`); no se discute en el review.
 - Nada de estilos en línea (`style="…"`). *(ESLint.)*
 - Un `.scss` de componente (`styleUrl`) es la excepción, solo para lo que las utilidades no

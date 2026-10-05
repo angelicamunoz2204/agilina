@@ -4,6 +4,7 @@ import { NEVER, Subject, type Observable } from 'rxjs';
 import { CreateTeamFacade } from './create-team.facade';
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
+import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: each create() waits until the test answers it. */
 class FakeTeamsPort extends TeamsPort {
@@ -64,10 +65,11 @@ describe('CreateTeamFacade', () => {
 
   it('resolves to null and marks the failure when the API refuses it', async () => {
     const created = facade.create('Atlas');
-    port.pending.error(new Error('422'));
+    port.pending.error(new TeamFailure('invalid_name'));
 
     expect(await created).toBeNull();
     expect(facade.failed()).toBeTrue();
+    expect(facade.problem()).toBe('invalid_name');
     expect(facade.saving()).toBeFalse();
   });
 

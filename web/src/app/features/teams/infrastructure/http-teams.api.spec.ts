@@ -6,6 +6,7 @@ import { provideTestRuntimeConfig, TEST_RUNTIME_CONFIG } from '@testing/runtime-
 
 import { HttpTeamsApi } from './http-teams.api';
 import { type Team } from '../domain/team';
+import { TeamFailure } from '../domain/team-failure';
 
 describe('HttpTeamsApi', () => {
   const teamsUrl = `${TEST_RUNTIME_CONFIG.apiUrl}/v1/teams`;
@@ -75,14 +76,38 @@ describe('HttpTeamsApi', () => {
     backend.expectOne(`${teamsUrl}/a%2Fb`).flush({ id: 'a/b', name: 'Atlas' });
   });
 
-  it('lets a refused request fail for the facade to handle', () => {
-    let failed = false;
-    api.get('someone-elses').subscribe({ error: () => (failed = true) });
+  it('turns the error codes of the API into team failures', () => {
+    const failures: unknown[] = [];
+    const keep = (error: unknown): void => {
+      failures.push(error);
+    };
 
+    api.get('someone-elses').subscribe({ error: keep });
     backend
       .expectOne(`${teamsUrl}/someone-elses`)
       .flush({ code: 'not_a_team_member' }, { status: 403, statusText: 'Forbidden' });
+    api.create(' ').subscribe({ error: keep });
+    backend
+      .expectOne(teamsUrl)
+      .flush({ code: 'invalid_team_name' }, { status: 422, statusText: 'Unprocessable' });
+    api.listMine().subscribe({ error: keep });
+    backend
+      .expectOne(teamsUrl)
+      .flush({ code: 'not_authenticated' }, { status: 401, statusText: 'Unauthorized' });
 
-    expect(failed).toBeTrue();
+    expect(failures).toEqual([
+      new TeamFailure('not_a_member'),
+      new TeamFailure('invalid_name'),
+      new TeamFailure('not_authenticated'),
+    ]);
+  });
+
+  it('treats an answer without a known code as the service being unavailable', () => {
+    let failure: unknown;
+    api.listMine().subscribe({ error: (error: unknown) => (failure = error) });
+
+    backend.expectOne(teamsUrl).flush('Bad gateway', { status: 502, statusText: 'Bad Gateway' });
+
+    expect(failure).toEqual(new TeamFailure('unavailable'));
   });
 });

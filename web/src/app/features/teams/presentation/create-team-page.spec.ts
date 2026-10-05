@@ -10,6 +10,7 @@ import { TeamDashboardPage } from './team-dashboard-page';
 import { TeamSelectorPage } from './team-selector-page';
 import { TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
+import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: create() waits until the test answers; get() returns what was created. */
 class FakeTeamsPort extends TeamsPort {
@@ -39,8 +40,8 @@ class FakeTeamsPort extends TeamsPort {
     this.pending.complete();
   }
 
-  refuse(): void {
-    this.pending.error(new Error('503'));
+  refuse(failure: Error = new Error('503')): void {
+    this.pending.error(failure);
   }
 }
 
@@ -197,8 +198,21 @@ describe('CreateTeamPage', () => {
     expect(input().value).toBe('Atlas');
   });
 
+  it('asks to sign in again when the API does not recognize the session', async () => {
+    await type('Atlas');
+
+    await save();
+    port.refuse(new TeamFailure('not_authenticated'));
+    await settled();
+
+    expect(TestBed.inject(Router).url).toBe('/teams/new');
+    expect(page.querySelector('[role="alert"]')?.textContent).toBe(
+      'Tu sesión no es válida o expiró. Inicia sesión de nuevo.',
+    );
+  });
+
   it('goes back to the team selector on cancel', async () => {
-    page.querySelector<HTMLAnchorElement>('.actions a')!.click();
+    page.querySelector<HTMLAnchorElement>('a[href="/teams"]')!.click();
     await settled();
 
     expect(TestBed.inject(Router).url).toBe('/teams');

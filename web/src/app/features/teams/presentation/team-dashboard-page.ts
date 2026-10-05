@@ -1,6 +1,7 @@
-import { Component, inject, input, type OnInit } from '@angular/core';
+import { Component, computed, inject, input, type OnInit } from '@angular/core';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { problemMessageKey } from './problem-message';
 import { TeamDashboardFacade } from '../application/team-dashboard.facade';
 
 /** Dashboard of a team. For now a placeholder that only shows the team's name. */
@@ -9,7 +10,6 @@ import { TeamDashboardFacade } from '../application/team-dashboard.facade';
   imports: [TranslocoDirective],
   providers: [TeamDashboardFacade],
   templateUrl: './team-dashboard-page.html',
-  styleUrl: './team-dashboard-page.scss',
 })
 export class TeamDashboardPage implements OnInit {
   /** The :teamId of the route, bound by the router (withComponentInputBinding). */
@@ -19,7 +19,7 @@ export class TeamDashboardPage implements OnInit {
 
   protected readonly team = this.facade.team;
   protected readonly loading = this.facade.loading;
-  protected readonly failed = this.facade.failed;
+  protected readonly problemMessage = computed(() => problemMessageKey(this.facade.problem()));
 
   ngOnInit(): void {
     this.facade.follow(this.teamId);

@@ -1,22 +1,70 @@
-<section class="card" *transloco="let t; prefix: 'teams.selector'">
-  <h1>{{ t('title') }}</h1>
+<section
+  class="rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
+  *transloco="let t; prefix: 'teams.selector'"
+>
+  <h1 class="font-display text-xl font-semibold">{{ t('title') }}</h1>
 
-  @if (teams(); as teams) {
-    <ul class="teams">
-      @for (team of teams; track team.id) {
-        <li>
-          <a [routerLink]="['/teams', team.id]">{{ team.name }}</a>
-        </li>
+  <div class="mt-6 space-y-4">
+    @if (teams(); as teams) {
+      <ul class="space-y-3">
+        @for (team of teams; track team.id) {
+          <li>
+            <a
+              class="flex w-full items-center gap-3 rounded-xl border border-border p-4 text-left transition-colors hover:border-accent/50 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              [routerLink]="['/teams', team.id]"
+            >
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"
+              >
+                <!-- Lucide "users" icon. -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="size-5"
+                  aria-hidden="true"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+              </span>
+              <span class="min-w-0 flex-1 font-medium break-words">{{ team.name }}</span>
+            </a>
+          </li>
+        }
+      </ul>
+      @if (teams.length === 0) {
+        <p class="text-sm text-muted">{{ t('empty') }}</p>
       }
-    </ul>
-    @if (teams.length === 0) {
-      <p class="hint">{{ t('empty') }}</p>
+    } @else if (loading()) {
+      <p role="status" class="text-sm text-muted">{{ t('loading') }}</p>
+    } @else if (problemMessage(); as message) {
+      <p role="alert" class="text-sm text-danger">{{ t(message) }}</p>
     }
-  } @else if (loading()) {
-    <p>{{ t('loading') }}</p>
-  } @else if (failed()) {
-    <p class="error" role="alert">{{ t('failed') }}</p>
-  }
 
-  <a class="button" routerLink="/teams/new">{{ t('create') }}</a>
+    <a aglButton variant="secondary" routerLink="/teams/new" class="w-full">
+      <!-- Lucide "plus" icon. -->
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="size-4"
+        aria-hidden="true"
+      >
+        <path d="M5 12h14" />
+        <path d="M12 5v14" />
+      </svg>
+      {{ t('create') }}
+    </a>
+  </div>
 </section>

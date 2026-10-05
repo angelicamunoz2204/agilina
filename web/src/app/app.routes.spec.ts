@@ -43,22 +43,25 @@ describe('routes', () => {
     harness = await RouterTestingHarness.create();
   });
 
+  /** The layout the route opens and the screen inside it. */
   async function screenAt(url: string): Promise<string | undefined> {
     await harness.navigateByUrl(url);
-    return harness.routeNativeElement?.tagName.toLowerCase();
+    const layout = harness.routeNativeElement;
+    const screen = layout?.querySelector('router-outlet + *');
+    return `${layout?.tagName.toLowerCase()} > ${screen?.tagName.toLowerCase()}`;
   }
 
   it('opens the team selector at /teams', async () => {
-    expect(await screenAt('/teams')).toBe('agl-team-selector-page');
+    expect(await screenAt('/teams')).toBe('agl-centered-layout > agl-team-selector-page');
   });
 
   it('opens the creation form at /teams/new, not a team called "new"', async () => {
-    expect(await screenAt('/teams/new')).toBe('agl-create-team-page');
+    expect(await screenAt('/teams/new')).toBe('agl-centered-layout > agl-create-team-page');
     expect(port.requested).toEqual([]);
   });
 
   it('opens the dashboard of the team at /teams/:teamId with that id', async () => {
-    expect(await screenAt('/teams/team-1')).toBe('agl-team-dashboard-page');
+    expect(await screenAt('/teams/team-1')).toBe('agl-app-shell > agl-team-dashboard-page');
     TestBed.tick();
 
     expect(port.requested).toEqual(['team-1']);

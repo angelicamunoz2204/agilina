@@ -3,6 +3,7 @@ import { rxResource } from '@angular/core/rxjs-interop';
 
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
+import { failureKindOf, type TeamFailureKind } from '../domain/team-failure';
 
 /**
  * State of the team selector: the teams of the signed-in user. Provided by the page,
@@ -22,4 +23,8 @@ export class TeamSelectorFacade {
   );
   readonly loading = this.mine.isLoading;
   readonly failed = computed(() => this.mine.status() === 'error');
+  /** What went wrong, when the list could not be loaded. */
+  readonly problem = computed<TeamFailureKind | null>(() =>
+    this.failed() ? failureKindOf(this.mine.error()) : null,
+  );
 }

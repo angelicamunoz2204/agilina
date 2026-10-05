@@ -16,11 +16,14 @@
   },
   "teams": {
     "selector": {
-      "title": "Your teams",
+      "title": "Select your team",
       "loading": "Loading your teams…",
       "failed": "Your teams could not be loaded. Try again later.",
       "empty": "You do not belong to any team yet.",
-      "create": "Create team"
+      "create": "Create a new team",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again."
+      }
     },
     "create": {
       "title": "Create team",
@@ -34,11 +37,19 @@
       "submit": "Create team",
       "saving": "Creating…",
       "failed": "The team could not be created. Try again.",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+        "invalid_name": "The team name is not valid. Check it and try again."
+      }
     },
     "dashboard": {
       "loading": "Loading the team…",
-      "failed": "This team could not be opened."
+      "failed": "This team could not be opened.",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+        "not_a_member": "This team does not exist or you do not belong to it."
+      }
     }
   },
   "identity": {

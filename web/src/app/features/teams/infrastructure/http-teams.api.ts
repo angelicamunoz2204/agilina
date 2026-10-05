@@ -1,11 +1,12 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, type Observable } from 'rxjs';
+import { catchError, map, type Observable, throwError } from 'rxjs';
 
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 
 import { type TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
+import { TeamFailure, type TeamFailureKind } from '../domain/team-failure';
 
 /** Item of GET /v1/teams, exactly as the API sends it. */
 interface MyTeamResponse {
@@ -33,6 +34,17 @@ interface TeamResponse {
   role: string;
 }
 
+/** Every error of the API has a stable `code`. */
+interface ErrorResponse {
+  code?: string;
+}
+
+const FAILURES: Readonly<Record<string, TeamFailureKind>> = {
+  not_authenticated: 'not_authenticated',
+  invalid_team_name: 'invalid_name',
+  not_a_team_member: 'not_a_member',
+};
+
 /** HTTP adapter of the teams port: the only exit of this feature towards the API. */
 @Injectable()
 export class HttpTeamsApi implements TeamsPort {
@@ -40,20 +52,24 @@ export class HttpTeamsApi implements TeamsPort {
   private readonly teamsUrl = `${inject(RUNTIME_CONFIG).apiUrl}/v1/teams`;
 
   listMine(): Observable<readonly Team[]> {
-    return this.http.get<MyTeamResponse[]>(this.teamsUrl).pipe(map((teams) => teams.map(toTeam)));
+    return this.http.get<MyTeamResponse[]>(this.teamsUrl).pipe(
+      map((teams) => teams.map(toTeam)),
+      catchError(failWithDomainError),
+    );
   }
 
   create(name: string): Observable<string> {
     const body: CreateTeamRequest = { name };
-    return this.http
-      .post<CreatedTeamResponse>(this.teamsUrl, body)
-      .pipe(map((created) => created.id));
+    return this.http.post<CreatedTeamResponse>(this.teamsUrl, body).pipe(
+      map((created) => created.id),
+      catchError(failWithDomainError),
+    );
   }
 
   get(teamId: string): Observable<Team> {
     return this.http
       .get<TeamResponse>(`${this.teamsUrl}/${encodeURIComponent(teamId)}`)
-      .pipe(map(toTeam));
+      .pipe(map(toTeam), catchError(failWithDomainError));
   }
 }
 
@@ -63,4 +79,23 @@ export class HttpTeamsApi implements TeamsPort {
  */
 function toTeam(response: MyTeamResponse | TeamResponse): Team {
   return { id: response.id, name: response.name };
+}
+
+/** The API's error codes stay in this file: the rest of the app only sees `TeamFailure`. */
+function failWithDomainError(error: unknown): Observable<never> {
+  return throwError(() => toFailure(error));
+}
+
+function toFailure(error: unknown): TeamFailure {
+  if (!(error instanceof HttpErrorResponse)) {
+    return new TeamFailure('unavailable');
+  }
+  const body = asErrorResponse(error.error);
+  return new TeamFailure(
+    (body.code !== undefined ? FAILURES[body.code] : undefined) ?? 'unavailable',
+  );
+}
+
+function asErrorResponse(body: unknown): ErrorResponse {
+  return typeof body === 'object' && body !== null ? body : {};
 }

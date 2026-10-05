@@ -8,6 +8,7 @@ import { Button } from './button';
   template: `
     <button aglButton type="button" class="w-full">Save</button>
     <button aglButton variant="secondary" type="button">Cancel</button>
+    <a aglButton href="/teams/new">Create</a>
   `,
 })
 class Host {}
@@ -29,8 +30,17 @@ describe('Button', () => {
   it('can be secondary', () => {
     const [, cancel] = buttons();
 
-    expect(cancel?.classList).toContain('bg-transparent');
+    expect(cancel?.classList).toContain('bg-surface');
     expect(cancel?.classList).not.toContain('bg-accent');
+  });
+
+  it('gives a link the look of a button and leaves it a link', () => {
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a');
+
+    expect(link?.classList).toContain('bg-accent');
+    expect(link?.getAttribute('href')).toBe('/teams/new');
   });
 
   it('stays a native button', () => {

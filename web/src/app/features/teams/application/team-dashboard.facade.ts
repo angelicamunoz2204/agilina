@@ -3,6 +3,7 @@ import { rxResource } from '@angular/core/rxjs-interop';
 
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
+import { failureKindOf, type TeamFailureKind } from '../domain/team-failure';
 
 /**
  * State of a team's dashboard: the team whose id the page receives. Provided by the
@@ -26,6 +27,10 @@ export class TeamDashboardFacade {
   );
   readonly loading = this.current.isLoading;
   readonly failed = computed(() => this.current.status() === 'error');
+  /** What went wrong, when the team could not be opened. */
+  readonly problem = computed<TeamFailureKind | null>(() =>
+    this.failed() ? failureKindOf(this.current.error()) : null,
+  );
 
   /** Loads the team of this id, and loads it again whenever the id changes. */
   follow(teamId: Signal<string>): void {
