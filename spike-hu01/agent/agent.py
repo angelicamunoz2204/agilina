@@ -6,6 +6,8 @@ from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopRes
 from livekit.agents.voice import room_io
 from livekit.plugins import elevenlabs, google, openai, silero
 
+from metricas import RegistroMetricas
+
 server = AgentServer()
 
 USAR_LLM = os.environ.get("USAR_LLM") == "1"
@@ -22,15 +24,21 @@ INSTRUCCIONES = (
 
 
 class Agilina(Agent):
-    def __init__(self, ceder_turno_tras) -> None:
+    def __init__(self, ceder_turno_tras, registro: RegistroMetricas) -> None:
         super().__init__(instructions=INSTRUCCIONES)
         self._ceder_turno_tras = ceder_turno_tras
+        self._registro = registro
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
+        texto = new_message.text_content or ""
+        if not USAR_LLM and len(texto.split()) < MIN_PALABRAS:
+            self._registro.descartar_turno()
+            raise StopResponse()  # Texto vacío o casi vacío: no se responde ni se cede el turno.
+        hablante = self.session.room_io.linked_participant
+        # new_message.metrics ya trae los tiempos del turno (transcription_delay, stopped_speaking_at, ...).
+        self._registro.iniciar_turno(hablante.identity if hablante else "", texto, new_message.metrics)
         if USAR_LLM:
             return  # Responde el LLM; el turno se cede al terminar esa respuesta.
-        if len((new_message.text_content or "").split()) < MIN_PALABRAS:
-            raise StopResponse()  # Texto vacío o casi vacío: no se responde ni se cede el turno.
         respuesta = self.session.say(RESPUESTA_FIJA)
         self._ceder_turno_tras(respuesta)
         raise StopResponse()  # Sin LLM: no generar respuesta adicional.
@@ -43,24 +51,43 @@ async def entrypoint(ctx: JobContext):
         if USAR_LLM
         else None
     )
+    whisper_prompt = os.environ.get("WHISPER_PROMPT", "")
+    registro = RegistroMetricas(
+        sala=ctx.room.name,
+        carpeta=os.environ.get("METRICAS_DIR", "/metrics"),
+        contexto={
+            "entorno": os.environ.get("ENTORNO", "desconocido"),
+            "whisper_model": os.environ.get("WHISPER_MODEL", "Systran/faster-whisper-small"),
+            "prompt_activo": "sí" if whisper_prompt else "no",
+            "eleven_model": os.environ.get("ELEVEN_MODEL", "eleven_v4_turbo"),
+            "usar_llm": "1" if USAR_LLM else "0",
+        },
+    )
+    stt = openai.STT(
+        base_url=os.environ["WHISPER_BASE_URL"],
+        api_key="no-se-usa",  # speaches no valida la llave
+        model=os.environ.get("WHISPER_MODEL", "Systran/faster-whisper-small"),
+        language="es",
+        # Vocabulario para Whisper (initial_prompt en speaches). Vacío = sin prompt: el plugin lo omite.
+        prompt=whisper_prompt,
+    )
+    tts = elevenlabs.TTS(
+        api_key=os.environ["ELEVEN_API_KEY"],
+        voice_id=os.environ["ELEVEN_VOICE_ID"],
+        model=os.environ.get("ELEVEN_MODEL", "eleven_v4_turbo"),
+    )
+    # Métricas de componente (duración de cada petición a Whisper, caracteres enviados a ElevenLabs).
+    # En la sesión el evento metrics_collected está deprecado; en los componentes no.
+    stt.on("metrics_collected", registro.al_medir_stt)
+    tts.on("metrics_collected", registro.al_medir_tts)
     session = AgentSession(
         vad=silero.VAD.load(),
-        stt=openai.STT(
-            base_url=os.environ["WHISPER_BASE_URL"],
-            api_key="no-se-usa",  # speaches no valida la llave
-            model=os.environ.get("WHISPER_MODEL", "Systran/faster-whisper-small"),
-            language="es",
-            # Vocabulario para Whisper (initial_prompt en speaches). Vacío = sin prompt: el plugin lo omite.
-            prompt=os.environ.get("WHISPER_PROMPT", ""),
-        ),
+        stt=stt,
         llm=llm,
-        tts=elevenlabs.TTS(
-            api_key=os.environ["ELEVEN_API_KEY"],
-            voice_id=os.environ["ELEVEN_VOICE_ID"],
-            model=os.environ.get("ELEVEN_MODEL", "eleven_v4_turbo"),
-        ),
+        tts=tts,
         turn_handling=TURNOS,
     )
+    session.on("conversation_item_added", lambda ev: registro.al_agregar_mensaje(ev.item))
     tareas: set[asyncio.Task] = set()
 
     def siguiente_participante() -> str | None:
@@ -77,7 +104,9 @@ async def entrypoint(ctx: JobContext):
         siguiente = siguiente_participante()
         if siguiente:
             session.room_io.set_participant(siguiente)
-            session.say(f"{siguiente}, tienes la palabra.")
+            session.say(f"{siguiente}, tienes la palabra.")  # al agregarse este mensaje se cierra la fila
+        else:
+            registro.cerrar_turno()
 
     def ceder_turno_tras(respuesta) -> None:
         tarea = asyncio.create_task(ceder_turno(respuesta))
@@ -94,7 +123,7 @@ async def entrypoint(ctx: JobContext):
     primero = await ctx.wait_for_participant()  # Así el saludo nombra a alguien y no a "equipo".
     await session.start(
         room=ctx.room,
-        agent=Agilina(ceder_turno_tras),
+        agent=Agilina(ceder_turno_tras, registro),
         room_options=room_io.RoomOptions(participant_identity=primero.identity),
     )
     session.say(f"Hola equipo, soy Agilina. {primero.identity}, tienes la palabra.")
