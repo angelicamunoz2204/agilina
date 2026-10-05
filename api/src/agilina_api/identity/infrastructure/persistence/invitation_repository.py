@@ -6,7 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agilina_api.identity.domain.errors import PendingInvitationAlreadyExistsError
+from agilina_api.identity.domain.errors import (
+    PendingInvitationAlreadyExistsError,
+    UnknownTeamError,
+)
 from agilina_api.identity.domain.invitation import Invitation, InvitationStatus
 from agilina_api.identity.domain.repositories import InvitationRepository
 from agilina_api.identity.domain.value_objects import Email, TokenHash
@@ -18,6 +21,7 @@ from agilina_api.identity.infrastructure.persistence.orm_models import Invitatio
 from agilina_api.shared.infrastructure.database.types import violated_constraint
 
 PENDING_UNIQUE = "invitation_pending_unique"
+TEAM_FOREIGN_KEY = "invitation_team_id_fkey"
 
 
 class SqlAlchemyInvitationRepository(InvitationRepository):
@@ -34,6 +38,8 @@ class SqlAlchemyInvitationRepository(InvitationRepository):
                     f"Team {invitation.team_id} already has a pending invitation "
                     f"for {invitation.email}"
                 ) from error
+            if violated_constraint(error) == TEAM_FOREIGN_KEY:
+                raise UnknownTeamError(f"Team {invitation.team_id} does not exist") from error
             raise
 
     async def save(self, invitation: Invitation) -> None:

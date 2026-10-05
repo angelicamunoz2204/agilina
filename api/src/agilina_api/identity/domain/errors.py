@@ -57,3 +57,7 @@ class PendingInvitationAlreadyExistsError(DomainError):
 
 class UserAlreadyExistsError(DomainError):
     """There is already an account with that email or that Keycloak identity (HU-02)."""
+
+
+class UnknownTeamError(DomainError):
+    """The team an invitation is for does not exist."""
