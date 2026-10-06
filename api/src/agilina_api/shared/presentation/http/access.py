@@ -9,6 +9,9 @@ A route about one team has ``{team_id}`` in its path and declares
 or the request ends in ``403 not_a_team_member``. That is how every route of a team keeps
 the other teams out (HU-05).
 
+A route only an admin of the team may use declares ``Depends(current_team_admin)`` instead:
+a member who is not an admin gets ``403 not_a_team_admin`` (HU-06).
+
 The adapters are declared here and provided by the composition root, so this layer never
 imports the infrastructure one.
 """
@@ -21,11 +24,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from agilina_api.shared.application.access import (
     AuthenticatedUsers,
+    NotATeamAdminError,
     NotATeamMemberError,
     NotAuthenticatedError,
     TeamAccess,
     TeamContext,
 )
+from agilina_shared.enums import TeamRole
 
 bearer = HTTPBearer(
     auto_error=False,
@@ -69,7 +74,24 @@ async def current_team_member(
     this one. The caller is resolved first, so a request without a valid token answers
     ``401`` before the membership is looked at.
     """
-    role = await access.role_of(team_id=team_id, user_id=user_id)
-    if role is None:
+    membership = await access.membership_of(team_id=team_id, user_id=user_id)
+    if membership is None:
         raise NotATeamMemberError("The user is not an active member of the team")
-    return TeamContext(team_id=team_id, user_id=user_id, role=role)
+    return TeamContext(
+        team_id=team_id,
+        user_id=user_id,
+        membership_id=membership.membership_id,
+        role=membership.role,
+    )
+
+
+async def current_team_admin(team: TeamContext = Depends(current_team_member)) -> TeamContext:
+    """The team of the route's ``{team_id}``, only when the caller is one of its admins.
+
+    Built on ``current_team_member``, so a request without a valid token still answers
+    ``401`` and a user outside the team ``403 not_a_team_member`` first. The role is the one
+    stored in the membership, never a claim of the token.
+    """
+    if team.role is not TeamRole.ADMIN:
+        raise NotATeamAdminError("Only an admin of the team may do this")
+    return team

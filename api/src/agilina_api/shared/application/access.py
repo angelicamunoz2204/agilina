@@ -42,12 +42,31 @@ class NotATeamMemberError(Exception):
     Not a business rule: the interface answers it with a ``403``."""
 
 
+class NotATeamAdminError(Exception):
+    """The user is an active member of the team but not one of its admins, and the request
+    is one only an admin may make (HU-06). Not a business rule: the interface answers it
+    with a ``403``."""
+
+
+@dataclass(frozen=True)
+class MembershipRef:
+    """A user's stored, active membership in one team: which one it is and its role."""
+
+    membership_id: UUID
+    role: TeamRole
+
+
 @dataclass(frozen=True)
 class TeamContext:
-    """The team a request is about and the stored role in it of the user who sent it."""
+    """The team a request is about and the stored membership in it of the user who sent it.
+
+    ``membership_id`` identifies that membership: what the team's records point to when
+    they say who did something (an invitation's ``created_by``, HU-06).
+    """
 
     team_id: UUID
     user_id: UUID
+    membership_id: UUID
     role: TeamRole
 
 
@@ -58,7 +77,7 @@ class TeamAccess(Protocol):
     tenant, so the ``team_id`` is part of the signature and cannot be forgotten.
     """
 
-    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
-        """The user's role in the team while their membership is active; ``None`` when
-        they were never a member, were removed, or the team does not exist."""
+    async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:
+        """The user's membership in the team while it is active; ``None`` when they were
+        never a member, were removed, or the team does not exist."""
         ...

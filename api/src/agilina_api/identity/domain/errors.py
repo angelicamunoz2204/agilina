@@ -61,3 +61,12 @@ class UserAlreadyExistsError(DomainError):
 
 class UnknownTeamError(DomainError):
     """The team an invitation is for does not exist."""
+
+
+class AlreadyTeamMemberError(DomainError):
+    """The person invited is already an active member of that team (HU-06)."""
+
+
+class AccountDisabledError(DomainError):
+    """The person invited has an account in Agilina, but it is disabled: they could not
+    enter the team, so nothing is done (HU-06)."""

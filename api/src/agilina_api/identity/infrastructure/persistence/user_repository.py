@@ -1,5 +1,7 @@
 """SQLAlchemy repository of the ``AppUser`` aggregate."""
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +31,10 @@ class SqlAlchemyUserRepository(UserRepository):
                     f"There is already an account for {user.email} or that Keycloak identity"
                 ) from error
             raise
+
+    async def get(self, user_id: UUID) -> AppUser | None:
+        row = await self._session.get(AppUserRow, user_id)
+        return user_to_domain(row) if row is not None else None
 
     async def get_by_email(self, email: Email) -> AppUser | None:
         statement = select(AppUserRow).where(AppUserRow.email == email.value)

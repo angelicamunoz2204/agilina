@@ -7,8 +7,13 @@ graph, so they cannot drift apart.
 from dataclasses import dataclass
 
 from agilina_api.bootstrap.authentication import ClosedAuthenticatedUsers
-from agilina_api.bootstrap.context_adapters import TeamsBackedContacts, team_membership_factory
+from agilina_api.bootstrap.context_adapters import (
+    IdentityBackedMemberContacts,
+    TeamsBackedContacts,
+    team_membership_factory,
+)
 from agilina_api.identity.application.commands.activate_account import ActivateAccountHandler
+from agilina_api.identity.application.commands.invite_to_team import InviteToTeamHandler
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitationHandler
 from agilina_api.identity.application.commands.request_new_invitation import (
     RequestNewInvitationHandler,
@@ -29,11 +34,14 @@ from agilina_api.shared.infrastructure.database.session import get_session_facto
 from agilina_api.shared.infrastructure.mail.renderer import JinjaEmailRenderer
 from agilina_api.shared.infrastructure.mail.smtp_mailer import SmtpMailer
 from agilina_api.shared.infrastructure.settings import Settings
+from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
 from agilina_api.teams.application.commands.create_team import CreateTeamHandler
 from agilina_api.teams.application.commands.create_team_as_admin import CreateTeamAsAdminHandler
+from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
 from agilina_api.teams.application.ports.outbound import TeamQueries
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
+from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit_of_work_factory
 
@@ -44,10 +52,14 @@ class Container:
     activate_account: ActivateAccountHandler
     request_new_invitation: RequestNewInvitationHandler
     issue_invitation: IssueInvitationHandler
+    invite_to_team: InviteToTeamHandler
     create_team: CreateTeamHandler
     create_team_as_admin: CreateTeamAsAdminHandler
     list_my_teams: ListMyTeamsHandler
     get_team: GetTeamHandler
+    list_team_members: ListTeamMembersHandler
+    change_member_role: ChangeMemberRoleHandler
+    remove_member: RemoveMemberHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
     team_access: TeamAccess
@@ -80,25 +92,44 @@ def build_container(settings: Settings) -> Container:
     identity_uow = identity_unit_of_work_factory(session_factory, team_membership_factory(clock))
     teams_uow = teams_unit_of_work_factory(session_factory)
     team_queries = SqlTeamQueries(session_factory)
-    activation_url = f"{settings.web_public_url.rstrip('/')}/activate"
+    user_contacts = SqlUserContacts(session_factory)
+    team_contacts = TeamsBackedContacts(team_queries, user_contacts)
+    web_url = settings.web_public_url.rstrip("/")
+    issue_invitation = IssueInvitationHandler(
+        identity_uow,
+        SecretsActivationTokenGenerator(),
+        renderer,
+        mailer,
+        clock,
+        f"{web_url}/activate",
+    )
 
     return Container(
         invitation_status=GetInvitationStatusHandler(SqlInvitationQueries(session_factory), clock),
         activate_account=ActivateAccountHandler(identity_uow, identity_provider, clock),
         request_new_invitation=RequestNewInvitationHandler(
+            identity_uow, team_contacts, renderer, mailer, clock
+        ),
+        issue_invitation=issue_invitation,
+        invite_to_team=InviteToTeamHandler(
             identity_uow,
-            TeamsBackedContacts(team_queries, SqlUserContacts(session_factory)),
+            team_contacts,
+            issue_invitation,
             renderer,
             mailer,
             clock,
-        ),
-        issue_invitation=IssueInvitationHandler(
-            identity_uow, SecretsActivationTokenGenerator(), renderer, mailer, clock, activation_url
+            # The notice to an existing account links to the team, never to an activation.
+            f"{web_url}/teams",
         ),
         create_team=CreateTeamHandler(teams_uow, clock),
         create_team_as_admin=CreateTeamAsAdminHandler(teams_uow, clock),
         list_my_teams=ListMyTeamsHandler(team_queries),
         get_team=GetTeamHandler(team_queries),
+        list_team_members=ListTeamMembersHandler(
+            team_queries, IdentityBackedMemberContacts(user_contacts)
+        ),
+        change_member_role=ChangeMemberRoleHandler(teams_uow, clock),
+        remove_member=RemoveMemberHandler(teams_uow, clock),
         team_queries=team_queries,
         # TODO(HU-03): the adapter that validates Keycloak access tokens.
         authenticated_users=ClosedAuthenticatedUsers(),

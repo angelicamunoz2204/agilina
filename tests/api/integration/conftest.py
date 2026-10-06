@@ -24,7 +24,7 @@ from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUn
 from agilina_api.shared.infrastructure.settings import get_settings
 from tests.api.integration.helpers import alembic_config, create_database, drop_database
 
-TABLES = "invitation, team_member, team, app_user"
+TABLES = "sprint, invitation, team_member, team, app_user"
 
 
 @pytest.fixture(scope="session")

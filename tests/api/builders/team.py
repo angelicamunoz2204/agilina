@@ -1,7 +1,7 @@
 """Builder of ``Team``."""
 
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol, Self
 from uuid import UUID
 
@@ -13,7 +13,8 @@ from tests.api.builders.identifiers import next_id
 
 @dataclass(frozen=True)
 class TeamBuilder:
-    """A team called Atlas, in support mode and English, created by the operator at ``NOW``."""
+    """A team called Atlas, in support mode and English, created by the operator at ``NOW``.
+    Its members join when it is created; a removed one leaves an hour later."""
 
     team_id: UUID = field(default_factory=next_id)
     name: str = TEAM_NAME
@@ -23,6 +24,7 @@ class TeamBuilder:
     created_at: datetime = NOW
     members: tuple[tuple[UUID, TeamRole], ...] = ()
     creating_admin: UUID | None = None
+    removed: tuple[UUID, ...] = ()
 
     def with_id(self, team_id: UUID) -> Self:
         return replace(self, team_id=team_id)
@@ -48,6 +50,12 @@ class TeamBuilder:
     def with_admin(self, user_id: UUID) -> Self:
         return self.with_member(user_id, TeamRole.ADMIN)
 
+    def with_removed_member(self, user_id: UUID, role: TeamRole = TeamRole.MEMBER) -> Self:
+        """``user_id`` joined with ``role`` and was then removed, through
+        ``Team.remove_member``: the team's only admin cannot be removed, here either."""
+        added = self.with_member(user_id, role)
+        return replace(added, removed=(*added.removed, user_id))
+
     def created_with_admin(self, user_id: UUID) -> Self:
         """Created by ``user_id`` through ``Team.create_with_admin``, who becomes its admin.
 
@@ -62,6 +70,8 @@ class TeamBuilder:
             team.add_member(
                 membership_id=next_id(), user_id=user_id, role=role, now=self.created_at
             )
+        for user_id in self.removed:
+            team.remove_member(user_id=user_id, now=self.created_at + timedelta(hours=1))
         team.pull_events()
         return team
 

@@ -21,6 +21,7 @@ class AppUserBuilder:
     email: str = EMAIL
     full_name: str = FULL_NAME
     registered_at: datetime = NOW
+    active: bool = True
 
     def with_id(self, user_id: UUID) -> Self:
         return replace(self, user_id=user_id)
@@ -41,7 +42,21 @@ class AppUserBuilder:
     def registered_at_instant(self, instant: datetime) -> Self:
         return replace(self, registered_at=instant)
 
+    def disabled(self) -> Self:
+        """An account that can no longer sign in. No behavior disables an account yet, so
+        it is rebuilt as stored, like ``InvitationBuilder.restored_as``."""
+        return replace(self, active=False)
+
     def build(self) -> AppUser:
+        if not self.active:
+            return AppUser(
+                user_id=self.user_id,
+                keycloak_subject=self.keycloak_subject or f"subject-{self.user_id}",
+                email=Email(self.email),
+                full_name=self.full_name,
+                is_active=False,
+                created_at=self.registered_at,
+            )
         user = AppUser.register(
             user_id=self.user_id,
             keycloak_subject=self.keycloak_subject or f"subject-{self.user_id}",

@@ -6,11 +6,7 @@ from datetime import timedelta
 import pytest
 
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitationHandler
-from agilina_api.identity.domain.errors import (
-    InvalidEmailError,
-    InvalidFullNameError,
-    PendingInvitationAlreadyExistsError,
-)
+from agilina_api.identity.domain.errors import InvalidEmailError, InvalidFullNameError
 from agilina_api.identity.domain.invitation import InvitationStatus
 from agilina_api.shared.application.ports import MailDeliveryError
 from agilina_shared.enums import Language, TeamRole
@@ -93,16 +89,18 @@ async def test_if_the_email_cannot_be_sent_nothing_is_committed():
     assert uow.commits == 0
 
 
-async def test_a_second_invitation_while_the_first_still_works_is_refused():
+async def test_a_second_invitation_while_the_first_still_works_revokes_the_first():
     uow, mailer = FakeIdentityUnitOfWork(), FakeMailer()
     handler = _handler(uow, mailer)
     invitation = _invitation()  # the same team both times
-    await handler.handle(invitation.build())
+    first = await handler.handle(invitation.build())
 
-    with pytest.raises(PendingInvitationAlreadyExistsError):
-        await handler.handle(invitation.with_email("julian@example.test").build())
+    second = await handler.handle(invitation.with_email("julian@example.test").build())
 
-    assert len(mailer.sent) == 1 and uow.commits == 1
+    assert uow.invitations.by_id[first.invitation_id].status is InvitationStatus.REVOKED
+    assert uow.invitations.by_id[second.invitation_id].status is InvitationStatus.PENDING
+    assert (first.revoked_previous, second.revoked_previous) == (False, True)
+    assert len(mailer.sent) == 2 and uow.commits == 2
 
 
 async def test_after_the_first_one_expired_a_new_invitation_is_issued_and_the_old_one_is_closed():

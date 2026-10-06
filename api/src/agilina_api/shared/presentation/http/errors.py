@@ -12,7 +12,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from agilina_api.shared.application.access import NotATeamMemberError, NotAuthenticatedError
+from agilina_api.shared.application.access import (
+    NotATeamAdminError,
+    NotATeamMemberError,
+    NotAuthenticatedError,
+)
 from agilina_api.shared.application.ports import MailDeliveryError
 
 
@@ -47,6 +51,7 @@ SHARED_ERRORS: tuple[ErrorMapping, ...] = (
     # The same answer whether the team is someone else's, the user was removed from it or
     # it does not exist: a 404 for the last one would let anybody enumerate teams.
     ErrorMapping(NotATeamMemberError, 403, "not_a_team_member"),
+    ErrorMapping(NotATeamAdminError, 403, "not_a_team_admin"),
     ErrorMapping(MailDeliveryError, 502, "mail_unavailable"),
 )
 

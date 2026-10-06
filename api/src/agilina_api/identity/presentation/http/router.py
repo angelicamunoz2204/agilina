@@ -1,7 +1,12 @@
-"""Invitations API (HU-02): check a link, activate the account, ask for a new link.
+"""Invitations API.
 
-Public on purpose: the person has no account yet, and the unguessable token in the body is
-what authorizes them. Nothing here is cached (it carries tokens and passwords).
+``router`` (HU-02): check a link, activate the account, ask for a new link. Public on
+purpose: the person has no account yet, and the unguessable token in the body is what
+authorizes them. Nothing here is cached (it carries tokens and passwords).
+
+``team_invitations_router`` (HU-06): an admin invites a person to their team. It lives in
+identity, which owns invitations and accounts, under the team's path; only the team's
+admins reach it (``current_team_admin``).
 """
 
 from fastapi import APIRouter, Depends, Response, status
@@ -10,6 +15,10 @@ from fastapi.responses import JSONResponse
 from agilina_api.identity.application.commands.activate_account import (
     ActivateAccount,
     ActivateAccountHandler,
+)
+from agilina_api.identity.application.commands.invite_to_team import (
+    InviteToTeam,
+    InviteToTeamHandler,
 )
 from agilina_api.identity.application.commands.request_new_invitation import (
     RequestNewInvitation,
@@ -23,6 +32,7 @@ from agilina_api.identity.domain.invitation import InvitationStatus
 from agilina_api.identity.presentation.http.dependencies import (
     get_activate_account_handler,
     get_invitation_status_handler,
+    get_invite_to_team_handler,
     get_request_new_invitation_handler,
 )
 from agilina_api.identity.presentation.http.presenters import present_activated, present_status
@@ -30,9 +40,13 @@ from agilina_api.identity.presentation.http.schemas import (
     ActivatedAccountResponse,
     ActivateRequest,
     InvitationStatusResponse,
+    InviteToTeamRequest,
+    InviteToTeamResponse,
     RequestedResponse,
     TokenRequest,
 )
+from agilina_api.shared.application.access import TeamContext
+from agilina_api.shared.presentation.http.access import current_team_admin
 from agilina_api.shared.presentation.http.errors import ErrorResponse, error_response
 
 
@@ -114,3 +128,76 @@ async def request_new_invitation(
 ) -> RequestedResponse:
     await handler.handle(RequestNewInvitation(token=request.token))
     return RequestedResponse()
+
+
+team_invitations_router = APIRouter(prefix="/v1/teams", tags=["teams"])
+
+INVITE_TO_TEAM_DESCRIPTION = """
+Invites a person to the team with a role (`member` by default). What happens depends on
+the email:
+
+- **no account in Agilina:** an invitation is stored and its activation link (single use,
+  valid for seven days) is e-mailed; activating it puts the person in the team with the
+  chosen role (`invitation_sent`);
+- **an existing account:** the person joins the team right away with the chosen role and
+  gets a notice without an activation link (`member_added`);
+- **already an active member:** refused with `409 already_a_team_member`; nothing is
+  stored or sent.
+
+A pending invitation of that email to the team stops working: the new one replaces it.
+The email is sent before anything is stored, so if the mail server refuses it the answer
+is `502 mail_unavailable` and nothing changes. Only an admin of the team may invite.
+"""
+
+
+@team_invitations_router.post(
+    "/{team_id}/invitations",
+    response_model=InviteToTeamResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Invite a person to the team",
+    description=INVITE_TO_TEAM_DESCRIPTION,
+    responses={
+        201: {"description": "Invited: an invitation was sent or the account joined the team"},
+        401: {
+            "model": ErrorResponse,
+            "description": "No access token, or one that does not identify a user "
+            "(`not_authenticated`)",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "The user is not an active member of the team "
+            "(`not_a_team_member`), or is a member but not one of its admins "
+            "(`not_a_team_admin`)",
+        },
+        404: {"model": ErrorResponse, "description": "The team does not exist (`team_not_found`)"},
+        409: {
+            "model": ErrorResponse,
+            "description": "The person is already an active member (`already_a_team_member`), "
+            "their account is disabled (`account_disabled`), or another invitation to them "
+            "was being issued at the same moment (`pending_invitation_exists`)",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "The email is malformed (`invalid_email`) or the name blank "
+            "(`invalid_full_name`). A malformed body (a missing or unknown field, an unknown "
+            "role) answers with FastAPI's validation format instead",
+        },
+        502: {"model": ErrorResponse, "description": "The email could not be sent"},
+    },
+)
+async def invite_to_team(
+    request: InviteToTeamRequest,
+    team: TeamContext = Depends(current_team_admin),
+    handler: InviteToTeamHandler = Depends(get_invite_to_team_handler),
+) -> InviteToTeamResponse:
+    outcome = await handler.handle(
+        InviteToTeam(
+            team_id=team.team_id,
+            inviter_user_id=team.user_id,
+            inviter_membership_id=team.membership_id,
+            email=request.email,
+            full_name=request.full_name,
+            role=request.role,
+        )
+    )
+    return InviteToTeamResponse(outcome=outcome)

@@ -1,8 +1,8 @@
 """Storing builder-made objects in the real PostgreSQL, committed, as a test's starting data."""
 
-from uuid import UUID
+from datetime import date
+from uuid import UUID, uuid4
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agilina_api.identity.domain.invitation import Invitation
@@ -12,7 +12,9 @@ from agilina_api.identity.infrastructure.persistence.invitation_repository impor
 )
 from agilina_api.identity.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+from agilina_api.teams.domain.sprint import SprintStatus
 from agilina_api.teams.domain.team import Team
+from agilina_api.teams.infrastructure.persistence.orm_models import SprintRow
 from agilina_api.teams.infrastructure.persistence.team_repository import SqlAlchemyTeamRepository
 from tests.api.builders import AppUserBuilder, InvitationBuilder, TeamBuilder
 
@@ -20,7 +22,8 @@ SessionFactory = async_sessionmaker[AsyncSession]
 
 
 async def stored_team(session_factory: SessionFactory, builder: TeamBuilder | None = None) -> Team:
-    """A committed team: invitations and memberships reference it."""
+    """A committed team: invitations and memberships reference it. A removed member comes
+    from ``TeamBuilder.with_removed_member``."""
     async with SqlAlchemyUnitOfWork(session_factory) as uow:
         team = await (builder or TeamBuilder()).saved_in(SqlAlchemyTeamRepository(uow.session))
         await uow.commit()
@@ -49,15 +52,21 @@ async def stored_invitation(
     return invitation
 
 
-async def removed_from_team(session_factory: SessionFactory, team_id: UUID, user_id: UUID) -> None:
-    """Marks a stored membership as removed, committed. The domain cannot remove a member
-    yet (HU-06), so the state is restored straight in the table."""
+async def stored_sprint(
+    session_factory: SessionFactory, team_id: UUID, status: SprintStatus = SprintStatus.ACTIVE
+) -> UUID:
+    """A committed sprint of the team, with ``status``. There is no ``Sprint`` aggregate
+    until HU-07, so the row is written straight in the table."""
+    sprint_id = uuid4()
     async with session_factory() as session:
-        await session.execute(
-            text(
-                "UPDATE team_member SET status = 'removed', removed_at = now() "
-                "WHERE team_id = :team_id AND user_id = :user_id"
-            ),
-            {"team_id": team_id, "user_id": user_id},
+        session.add(
+            SprintRow(
+                id=sprint_id,
+                team_id=team_id,
+                start_date=date(2026, 10, 5),
+                end_date=date(2026, 10, 16),
+                status=status,
+            )
         )
         await session.commit()
+    return sprint_id

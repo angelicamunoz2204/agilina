@@ -5,10 +5,18 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agilina_api.teams.application.dtos import TeamSummary, TeamView, UserTeamView
+from agilina_api.shared.application.access import MembershipRef
+from agilina_api.teams.application.dtos import (
+    MemberRecord,
+    TeamMemberRecords,
+    TeamSummary,
+    TeamView,
+    UserTeamView,
+)
 from agilina_api.teams.application.ports.outbound import TeamQueries
 from agilina_api.teams.domain.team import MembershipStatus
 from agilina_api.teams.infrastructure.persistence.orm_models import TeamMemberRow, TeamRow
+from agilina_api.teams.infrastructure.persistence.sprint_queries import team_has_active_sprint
 from agilina_shared.enums import TeamRole
 
 
@@ -68,13 +76,35 @@ class SqlTeamQueries(TeamQueries):
             return None
         return TeamView(team_id=row.id, name=row.name, mode=row.mode, language=row.language)
 
-    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
+    async def list_members(self, team_id: UUID) -> TeamMemberRecords:
+        statement = (
+            select(TeamMemberRow.user_id, TeamMemberRow.role, TeamMemberRow.joined_at)
+            .where(
+                TeamMemberRow.team_id == team_id,
+                TeamMemberRow.status == MembershipStatus.ACTIVE,
+            )
+            .order_by(TeamMemberRow.joined_at, TeamMemberRow.id)
+        )
+        async with self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+            has_active_sprint = await team_has_active_sprint(session, team_id)
+        return TeamMemberRecords(
+            members=tuple(
+                MemberRecord(user_id=row.user_id, role=row.role, joined_at=row.joined_at)
+                for row in rows
+            ),
+            has_active_sprint=has_active_sprint,
+        )
+
+    async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:
         # At most one row, found through the unique index on ``(team_id, user_id)``.
-        statement = select(TeamMemberRow.role).where(
+        statement = select(TeamMemberRow.id, TeamMemberRow.role).where(
             TeamMemberRow.team_id == team_id,
             TeamMemberRow.user_id == user_id,
             TeamMemberRow.status == MembershipStatus.ACTIVE,
         )
         async with self._session_factory() as session:
-            role: TeamRole | None = (await session.execute(statement)).scalar_one_or_none()
-        return role
+            row = (await session.execute(statement)).one_or_none()
+        if row is None:
+            return None
+        return MembershipRef(membership_id=row.id, role=row.role)

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from uuid import UUID
 
 from agilina_api.identity.domain.invitation import InvitationStatus
@@ -27,6 +28,8 @@ class IssuedInvitation:
 
     invitation_id: UUID
     expires_at: datetime
+    revoked_previous: bool = False
+    """Whether the person had a pending invitation whose link still worked, now revoked."""
 
 
 @dataclass(frozen=True)
@@ -54,3 +57,12 @@ class TeamContacts:
     team_name: str
     language: Language
     admins: tuple[Contact, ...]
+
+
+class TeamInvitationOutcome(StrEnum):
+    """What inviting a person to a team did (HU-06)."""
+
+    INVITATION_SENT = "invitation_sent"
+    """They had no account: they got an invitation with its activation link."""
+    MEMBER_ADDED = "member_added"
+    """They already had an account: they joined the team and got a notice, without a link."""

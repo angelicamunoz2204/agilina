@@ -16,6 +16,21 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.create_team_as_admin is not None
     assert container.list_my_teams is not None
     assert container.get_team is not None
+    assert container.invite_to_team is not None
+    assert container.list_team_members is not None
+    assert container.change_member_role is not None
+    assert container.remove_member is not None
+
+
+def test_the_invitation_links_open_the_web_from_its_public_url():
+    """The activation link goes to ``/activate`` and the notice to an existing account to
+    the team, both under ``AGILINA_WEB_PUBLIC_URL`` (HU-02 and HU-06)."""
+    settings = get_settings().model_copy(update={"web_public_url": "https://agilina.example/"})
+
+    container = build_container(settings)
+
+    assert container.issue_invitation._activation_url == "https://agilina.example/activate"  # noqa: SLF001
+    assert container.invite_to_team._teams_url == "https://agilina.example/teams"  # noqa: SLF001
 
 
 def test_until_login_exists_no_token_is_trusted():

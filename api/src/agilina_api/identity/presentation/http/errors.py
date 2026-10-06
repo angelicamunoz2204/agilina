@@ -15,9 +15,15 @@ from agilina_api.identity.application.errors import (
     PasswordPolicyError,
 )
 from agilina_api.identity.domain.errors import (
+    AccountDisabledError,
+    AlreadyTeamMemberError,
+    InvalidEmailError,
+    InvalidFullNameError,
     InvitationAlreadyUsedError,
     InvitationExpiredError,
     InvitationRevokedError,
+    PendingInvitationAlreadyExistsError,
+    UnknownTeamError,
 )
 from agilina_api.shared.presentation.http.errors import ErrorMapping
 
@@ -37,4 +43,12 @@ IDENTITY_ERRORS: tuple[ErrorMapping, ...] = (
     ErrorMapping(NoAdminsToNotifyError, 409, "no_admins_to_notify"),
     ErrorMapping(PasswordPolicyError, 422, "password_policy", reasons=_password_policy_reasons),
     ErrorMapping(IdentityProviderUnavailableError, 503, "identity_provider_unavailable"),
+    ErrorMapping(InvalidEmailError, 422, "invalid_email"),
+    ErrorMapping(InvalidFullNameError, 422, "invalid_full_name"),
+    ErrorMapping(AlreadyTeamMemberError, 409, "already_a_team_member"),
+    ErrorMapping(AccountDisabledError, 409, "account_disabled"),
+    # Only two invitations to the same person at the same instant get here: the second
+    # one finds the index already taken by the first.
+    ErrorMapping(PendingInvitationAlreadyExistsError, 409, "pending_invitation_exists"),
+    ErrorMapping(UnknownTeamError, 404, "team_not_found"),
 )

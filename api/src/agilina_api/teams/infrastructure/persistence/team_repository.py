@@ -31,7 +31,19 @@ class SqlAlchemyTeamRepository(TeamRepository):
         await self._session.flush()
 
     async def get(self, team_id: UUID) -> Team | None:
-        row = await self._session.get(TeamRow, team_id)
+        """Load the team with its memberships and **lock its row** until the transaction
+        ends.
+
+        The lock serializes every change to the team's members (a role change, a removal,
+        an activation that adds a member): two admins demoting each other at the same time
+        would otherwise each see the other still admin and leave the team without one. The
+        second waits for the first and then reads the memberships it committed.
+        """
+        row = (
+            await self._session.execute(
+                select(TeamRow).where(TeamRow.id == team_id).with_for_update()
+            )
+        ).scalar_one_or_none()
         if row is None:
             return None
         members = (

@@ -5,6 +5,7 @@ the infrastructure one.
 """
 
 from agilina_api.identity.application.commands.activate_account import ActivateAccountHandler
+from agilina_api.identity.application.commands.invite_to_team import InviteToTeamHandler
 from agilina_api.identity.application.commands.request_new_invitation import (
     RequestNewInvitationHandler,
 )
@@ -22,4 +23,8 @@ def get_activate_account_handler() -> ActivateAccountHandler:
 
 
 def get_request_new_invitation_handler() -> RequestNewInvitationHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_invite_to_team_handler() -> InviteToTeamHandler:
     raise NotImplementedError("Wired by the composition root")

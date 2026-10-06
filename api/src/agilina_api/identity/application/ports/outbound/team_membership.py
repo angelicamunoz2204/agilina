@@ -11,4 +11,8 @@ class TeamMembership(Protocol):
     composition root implements with the teams use case. It works inside the caller's
     transaction: it never commits."""
 
-    async def add_member(self, *, team_id: UUID, user_id: UUID, role: TeamRole) -> None: ...
+    async def add_member(self, *, team_id: UUID, user_id: UUID, role: TeamRole) -> None:
+        """Put the user into the team with ``role``; someone who had been removed comes
+        back. Raises ``AlreadyTeamMemberError`` when they are an active member and
+        ``UnknownTeamError`` when the team does not exist."""
+        ...

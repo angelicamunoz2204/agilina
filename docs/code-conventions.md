@@ -57,16 +57,17 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 - Un repositorio **no filtra por estado calculado**: un estado que depende del tiempo
   (una invitación vencida) se *calcula* en el agregado (`state_at`); el repositorio solo
   guarda lo que el agregado ya decidió. Por eso `find_pending` devuelve lo *almacenado*
-  como pendiente, que puede estar vencido: quien invita de nuevo debe llamar a
-  `expire_if_due`, guardar y recién entonces insertar la nueva.
+  como pendiente, que puede estar vencido: quien invita de nuevo debe cerrarla
+  (`expire_if_due` si venció, `revoke` si su enlace aún sirve; lo hace
+  `release_pending_invitation`), guardar y recién entonces insertar la nueva.
 - **Una excepción a «el `team_id` va en toda firma»:** buscar una invitación por el hash de
   su token. El token (impredecible) es la credencial que identifica la invitación y, con
   ella, el equipo; es el único punto de entrada donde el tenant no se conoce de antemano.
   Todo lo demás exige el `team_id`.
-- Cuando dos peticiones pueden disputarse un agregado (activar el mismo enlace dos veces),
-  el repositorio lo bloquea con `SELECT … FOR UPDATE` al cargarlo: la segunda espera y
-  encuentra el enlace ya usado. Hay una prueba de integración que falla si se quita el
-  bloqueo.
+- Cuando dos peticiones pueden disputarse un agregado (activar el mismo enlace dos veces,
+  dos Administradores que se degradan a la vez), el repositorio lo bloquea con
+  `SELECT … FOR UPDATE` al cargarlo: la segunda espera y encuentra el enlace ya usado, o al
+  otro ya degradado. Hay una prueba de integración que falla si se quita el bloqueo.
 - Los modelos ORM de un contexto **no declaran claves foráneas hacia otro contexto**: las
   define la migración y las hace cumplir la base de datos. Así un contexto no conoce las
   tablas de otro.

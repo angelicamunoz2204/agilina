@@ -1,0 +1,78 @@
+"""The one question about sprints HU-06 asks, against a real PostgreSQL: does the team have
+a sprint in progress?"""
+
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+from agilina_api.teams.domain.sprint import SprintStatus
+from agilina_api.teams.infrastructure.persistence.sprint_queries import (
+    SqlActiveSprints,
+    team_has_active_sprint,
+)
+from tests.api.builders import next_id
+from tests.api.integration.support import stored_sprint, stored_team
+
+pytestmark = pytest.mark.integration
+
+
+async def _has_active_sprint(session_factory, team_id) -> bool:
+    async with session_factory() as session:
+        return await team_has_active_sprint(session, team_id)
+
+
+async def test_a_team_without_sprints_has_none_in_progress(session_factory):
+    team = await stored_team(session_factory)
+
+    assert await _has_active_sprint(session_factory, team.id) is False
+
+
+@pytest.mark.parametrize("status", [SprintStatus.PLANNED, SprintStatus.CLOSED])
+async def test_a_planned_or_closed_sprint_is_not_in_progress(session_factory, status):
+    team = await stored_team(session_factory)
+    await stored_sprint(session_factory, team.id, status)
+
+    assert await _has_active_sprint(session_factory, team.id) is False
+
+
+async def test_an_active_sprint_is_in_progress(session_factory):
+    team = await stored_team(session_factory)
+    await stored_sprint(session_factory, team.id, SprintStatus.CLOSED)
+    await stored_sprint(session_factory, team.id, SprintStatus.ACTIVE)
+
+    assert await _has_active_sprint(session_factory, team.id) is True
+
+
+async def test_the_active_sprint_of_another_team_does_not_count(session_factory):
+    team, other = await stored_team(session_factory), await stored_team(session_factory)
+    await stored_sprint(session_factory, other.id, SprintStatus.ACTIVE)
+
+    assert await _has_active_sprint(session_factory, team.id) is False
+    assert await _has_active_sprint(session_factory, next_id()) is False
+
+
+async def test_the_unit_of_work_asks_it_inside_its_transaction(session_factory):
+    team = await stored_team(session_factory)
+    await stored_sprint(session_factory, team.id, SprintStatus.ACTIVE)
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        sprints = SqlActiveSprints(uow.session)
+        assert await sprints.has_active_sprint(team.id) is True
+        assert await sprints.has_active_sprint(next_id()) is False
+
+
+async def test_a_team_cannot_have_two_sprints_in_progress(session_factory):
+    team = await stored_team(session_factory)
+    await stored_sprint(session_factory, team.id, SprintStatus.ACTIVE)
+
+    with pytest.raises(IntegrityError, match="sprint_one_active_per_team"):
+        await stored_sprint(session_factory, team.id, SprintStatus.ACTIVE)
+
+
+async def test_two_teams_can_each_have_their_sprint_in_progress(session_factory):
+    team, other = await stored_team(session_factory), await stored_team(session_factory)
+
+    await stored_sprint(session_factory, team.id, SprintStatus.ACTIVE)
+    await stored_sprint(session_factory, other.id, SprintStatus.ACTIVE)
+
+    assert await _has_active_sprint(session_factory, other.id) is True

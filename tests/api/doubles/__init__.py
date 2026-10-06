@@ -13,15 +13,23 @@ from tests.api.doubles.identity import (
     InMemoryUserRepository,
 )
 from tests.api.doubles.mail import FakeMailer, FakeRenderer
-from tests.api.doubles.teams import FakeTeamQueries, FakeTeamsUnitOfWork, InMemoryTeamRepository
+from tests.api.doubles.teams import (
+    FakeActiveSprints,
+    FakeMemberContacts,
+    FakeTeamQueries,
+    FakeTeamsUnitOfWork,
+    InMemoryTeamRepository,
+)
 
 __all__ = [
+    "FakeActiveSprints",
     "FakeAuthenticatedUsers",
     "FakeClock",
     "FakeIdentityProvider",
     "FakeIdentityUnitOfWork",
     "FakeInvitationQueries",
     "FakeMailer",
+    "FakeMemberContacts",
     "FakeRenderer",
     "FakeTeamAccess",
     "FakeTeamContactsDirectory",

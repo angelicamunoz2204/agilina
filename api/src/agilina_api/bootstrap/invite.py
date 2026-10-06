@@ -5,7 +5,9 @@
 
 There is no public registration, so the first admin of a team cannot invite themselves:
 whoever operates the platform does it from here, with access to its database. The person
-gets the usual invitation email and activates the account like anyone else.
+gets the usual invitation email and activates the account like anyone else. Inviting
+someone who still has a pending invitation to the team revokes it (HU-06): only the new
+link works, and the command says so.
 """
 
 import argparse
@@ -53,6 +55,8 @@ async def invite(
         )
     )
     print(f"Invitation {issued.invitation_id} sent to {email} as {role.value}")
+    if issued.revoked_previous:
+        print("The previous invitation to that email was revoked: its link no longer works.")
     print(f"The link expires on {issued.expires_at.date().isoformat()} (UTC) and works once.")
 
 

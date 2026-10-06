@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(ceremonies_router.router)
     app.include_router(identity_router.router)
     app.include_router(teams_router.router)
+    app.include_router(identity_router.team_invitations_router)
     register_error_handlers(app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS))
 
     # Wiring: presentation declares what it needs, this is where it is provided.
@@ -105,6 +106,9 @@ def create_app() -> FastAPI:
     app.dependency_overrides[identity_dependencies.get_request_new_invitation_handler] = (
         lambda: container.request_new_invitation
     )
+    app.dependency_overrides[identity_dependencies.get_invite_to_team_handler] = (
+        lambda: container.invite_to_team
+    )
     app.dependency_overrides[teams_dependencies.get_create_team_as_admin_handler] = (
         lambda: container.create_team_as_admin
     )
@@ -112,6 +116,15 @@ def create_app() -> FastAPI:
         lambda: container.list_my_teams
     )
     app.dependency_overrides[teams_dependencies.get_get_team_handler] = lambda: container.get_team
+    app.dependency_overrides[teams_dependencies.get_list_team_members_handler] = (
+        lambda: container.list_team_members
+    )
+    app.dependency_overrides[teams_dependencies.get_change_member_role_handler] = (
+        lambda: container.change_member_role
+    )
+    app.dependency_overrides[teams_dependencies.get_remove_member_handler] = (
+        lambda: container.remove_member
+    )
     app.dependency_overrides[get_authenticated_users] = lambda: container.authenticated_users
     app.dependency_overrides[get_team_access] = lambda: container.team_access
     app.dependency_overrides[get_liveness_query] = lambda: liveness
