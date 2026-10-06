@@ -10,8 +10,8 @@ import { type Team } from '../domain/team';
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
   readonly teams: Record<string, Team> = {
-    atlas: { id: 'atlas', name: 'Atlas' },
-    boreal: { id: 'boreal', name: 'Boreal' },
+    atlas: { id: 'atlas', name: 'Atlas', role: 'admin' },
+    boreal: { id: 'boreal', name: 'Boreal', role: 'admin' },
   };
 
   listMine(): Observable<readonly Team[]> {
@@ -58,7 +58,7 @@ describe('TeamDashboardFacade', () => {
     await stable();
 
     expect(port.requested).toEqual(['atlas']);
-    expect(facade.team()).toEqual({ id: 'atlas', name: 'Atlas' });
+    expect(facade.team()).toEqual({ id: 'atlas', name: 'Atlas', role: 'admin' });
     expect(facade.loading()).toBeFalse();
   });
 
@@ -71,7 +71,7 @@ describe('TeamDashboardFacade', () => {
     await stable();
 
     expect(port.requested).toEqual(['atlas', 'boreal']);
-    expect(facade.team()).toEqual({ id: 'boreal', name: 'Boreal' });
+    expect(facade.team()).toEqual({ id: 'boreal', name: 'Boreal', role: 'admin' });
   });
 
   it('turns a refused team into the failed state', async () => {

@@ -30,7 +30,7 @@ describe('HttpTeamsApi', () => {
     backend.verify();
   });
 
-  it('lists the teams of the user and keeps only their id and name', () => {
+  it('lists the teams of the user and keeps their id, name and role', () => {
     let received: readonly Team[] | undefined;
     api.listMine().subscribe((teams) => (received = teams));
 
@@ -42,8 +42,8 @@ describe('HttpTeamsApi', () => {
     ]);
 
     expect(received).toEqual([
-      { id: 'a', name: 'Atlas' },
-      { id: 'b', name: 'Boreal' },
+      { id: 'a', name: 'Atlas', role: 'admin' },
+      { id: 'b', name: 'Boreal', role: 'member' },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe('HttpTeamsApi', () => {
     expect(request.request.method).toBe('GET');
     request.flush({ id: 'team-1', name: 'Atlas', mode: 'support', language: 'en', role: 'admin' });
 
-    expect(received).toEqual({ id: 'team-1', name: 'Atlas' });
+    expect(received).toEqual({ id: 'team-1', name: 'Atlas', role: 'admin' });
   });
 
   it('escapes the team id in the path', () => {

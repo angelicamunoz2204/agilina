@@ -1,6 +1,6 @@
 import { computed, Directive, input } from '@angular/core';
 
-export type ButtonVariant = 'primary' | 'secondary';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 const BASE =
   'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border ' +
@@ -11,6 +11,8 @@ const BASE =
 const VARIANTS: Readonly<Record<ButtonVariant, string>> = {
   primary: 'border-accent bg-accent text-accent-foreground shadow-sm hover:bg-accent/90',
   secondary: 'border-border bg-surface text-foreground shadow-sm hover:bg-accent/5',
+  // For what cannot be undone, such as taking someone out of a team.
+  danger: 'border-danger bg-danger text-accent-foreground shadow-sm hover:bg-danger/90',
 };
 
 /**

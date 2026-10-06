@@ -8,6 +8,7 @@ import { Button } from './button';
   template: `
     <button aglButton type="button" class="w-full">Save</button>
     <button aglButton variant="secondary" type="button">Cancel</button>
+    <button aglButton variant="danger" type="button">Remove</button>
     <a aglButton href="/teams/new">Create</a>
   `,
 })
@@ -34,6 +35,13 @@ describe('Button', () => {
     expect(cancel?.classList).not.toContain('bg-accent');
   });
 
+  it('can be danger, for what cannot be undone', () => {
+    const [, , remove] = buttons();
+
+    expect(remove?.classList).toContain('bg-danger');
+    expect(remove?.classList).not.toContain('bg-accent');
+  });
+
   it('gives a link the look of a button and leaves it a link', () => {
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
@@ -44,6 +52,6 @@ describe('Button', () => {
   });
 
   it('stays a native button', () => {
-    expect(buttons().map((button) => button.type)).toEqual(['button', 'button']);
+    expect(buttons().map((button) => button.type)).toEqual(['button', 'button', 'button']);
   });
 });

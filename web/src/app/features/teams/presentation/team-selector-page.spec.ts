@@ -70,8 +70,8 @@ describe('TeamSelectorPage', () => {
   it('shows the name of each team of the user with a link to its dashboard', async () => {
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'admin' },
       ]),
     );
 
@@ -84,11 +84,11 @@ describe('TeamSelectorPage', () => {
   });
 
   it('enters the dashboard of the team the user clicks', async () => {
-    port.known = [{ id: 'b', name: 'Boreal' }];
+    port.known = [{ id: 'b', name: 'Boreal', role: 'admin' }];
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'admin' },
       ]),
     );
 
@@ -110,7 +110,7 @@ describe('TeamSelectorPage', () => {
   });
 
   it('always offers to create a team', async () => {
-    const page = await open(of([{ id: 'a', name: 'Atlas' }]));
+    const page = await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
 
     expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
   });
@@ -126,7 +126,7 @@ describe('TeamSelectorPage', () => {
   });
 
   it('does not show the role of the user in each team', async () => {
-    const page = await open(of([{ id: 'a', name: 'Atlas' }]));
+    const page = await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
 
     expect(page.textContent).not.toMatch(/admin|member|miembro/i);
   });

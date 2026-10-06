@@ -35,7 +35,7 @@ class FakeTeamsPort extends TeamsPort {
 
   /** The API creates the team with this id. */
   accept(id: string): void {
-    this.created.push({ id, name: this.names.at(-1)!.trim() });
+    this.created.push({ id, name: this.names.at(-1)!.trim(), role: 'admin' });
     this.pending.next(id);
     this.pending.complete();
   }

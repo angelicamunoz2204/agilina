@@ -13,8 +13,9 @@ import { type Team } from '../domain/team';
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
   readonly known: readonly Team[] = [
-    { id: 'atlas', name: 'Atlas' },
-    { id: 'boreal', name: 'Boreal' },
+    { id: 'atlas', name: 'Atlas', role: 'admin' },
+    { id: 'boreal', name: 'Boreal', role: 'admin' },
+    { id: 'cielo', name: 'Cielo', role: 'member' },
   ];
 
   listMine(): Observable<readonly Team[]> {
@@ -91,5 +92,22 @@ describe('TeamDashboardPage', () => {
 
     expect(page.querySelector('[role="alert"]')?.textContent).toBe('No se pudo abrir este equipo.');
     expect(page.querySelector('h1')).toBeNull();
+  });
+
+  it('shows an admin the way to the settings of the team', async () => {
+    const page = await open('/teams/atlas');
+
+    const link = Array.from(page.querySelectorAll('a')).find(
+      (candidate) => candidate.textContent.trim() === 'Configuración',
+    );
+    expect(link?.getAttribute('href')).toBe('/teams/atlas/settings');
+  });
+
+  it('does not show a member the way to the settings: the API would refuse them', async () => {
+    const page = await open('/teams/cielo');
+
+    expect(page.querySelector('h1')?.textContent).toBe('Cielo');
+    expect(page.querySelector('a[href="/teams/cielo/settings"]')).toBeNull();
+    expect(page.textContent).not.toContain('Configuración');
   });
 });

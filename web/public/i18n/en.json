@@ -46,9 +46,104 @@
     "dashboard": {
       "loading": "Loading the team…",
       "failed": "This team could not be opened.",
+      "settings": "Settings",
       "problems": {
         "not_authenticated": "Your session is not valid or has expired. Sign in again.",
         "not_a_member": "This team does not exist or you do not belong to it."
+      }
+    },
+    "settings": {
+      "title": "Team",
+      "subtitle": "The people who take part in the team's ceremonies, and their role.",
+      "back": "Back to the team",
+      "members": "Members",
+      "loading": "Loading the members…",
+      "failed": "The members could not be loaded. Try again later.",
+      "saving": "Saving…",
+      "role_of": "Role of {{ name }}",
+      "roles": {
+        "admin": "Administrator",
+        "member": "Member"
+      },
+      "blocked": {
+        "role_change": {
+          "sprint_in_progress": "The role cannot change while the team has a sprint in progress.",
+          "last_admin": "This is the only Administrator: the team cannot be left without one."
+        },
+        "removal": {
+          "last_admin": "This is the only Administrator: they cannot be removed from the team."
+        }
+      },
+      "forbidden": {
+        "title": "You do not have access to this screen",
+        "text": "Only the team's Administrators can manage its members."
+      },
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again."
+      },
+      "role_change": {
+        "failed": "The role could not be changed. Try again.",
+        "problems": {
+          "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+          "forbidden": "You are no longer an Administrator of this team.",
+          "not_found": "This person is no longer in the team.",
+          "last_admin": "The role cannot change: the team cannot be left without an Administrator.",
+          "sprint_in_progress": "The role cannot change while the team has a sprint in progress."
+        }
+      },
+      "invite": {
+        "open": "Invite member",
+        "title": "Invite member",
+        "subtitle": "We will send them an email. If they already have an Agilina account, they join the team right away.",
+        "full_name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "role_hint": "You can change it later, as long as there is no sprint in progress.",
+        "errors": {
+          "full_name": {
+            "blank": "Enter the person's name.",
+            "too_long": "The name cannot be longer than {{ max }} characters."
+          },
+          "email": {
+            "blank": "Enter the person's email.",
+            "invalid": "Enter a valid email, such as name@example.com.",
+            "too_long": "The email cannot be longer than {{ max }} characters."
+          }
+        },
+        "submit": "Send invitation",
+        "saving": "Sending…",
+        "cancel": "Cancel",
+        "failed": "The invitation could not be sent. Try again.",
+        "problems": {
+          "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+          "forbidden": "You are no longer an Administrator of this team.",
+          "already_member": "This person is already a member of the team.",
+          "account_disabled": "This person's account is disabled, so they cannot be added to the team.",
+          "invalid_email": "The email is not valid. Check it and try again.",
+          "invalid_name": "Enter the person's name.",
+          "mail_unavailable": "The email could not be sent. Try again in a few minutes."
+        },
+        "outcomes": {
+          "invitation_sent": "We emailed the invitation. The activation link is valid for 7 days.",
+          "member_added": "This person already had an Agilina account: they joined the team and we let them know by email."
+        }
+      },
+      "remove": {
+        "open": "Remove",
+        "open_label": "Remove {{ name }} from the team",
+        "title": "Remove {{ name }} from the team?",
+        "warning": "{{ name }} will no longer belong to the team or receive its calls.",
+        "account_kept": "Their Agilina account is not deleted: they can stay in their other teams.",
+        "confirm": "Remove from the team",
+        "saving": "Removing…",
+        "cancel": "Cancel",
+        "failed": "This person could not be removed. Try again.",
+        "problems": {
+          "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+          "forbidden": "You are no longer an Administrator of this team.",
+          "not_found": "This person is no longer in the team.",
+          "last_admin": "They cannot be removed: the team cannot be left without an Administrator."
+        }
       }
     }
   },

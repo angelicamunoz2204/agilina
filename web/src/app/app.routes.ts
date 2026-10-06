@@ -10,7 +10,9 @@ import { CenteredLayout } from '@layout/centered-layout/centered-layout';
  * status, which proves that the application talks to the API; /activate is the account
  * activation (HU-02).
  *
- * No route carries an access rule: the API decides who sees a team.
+ * No route carries an access rule: the API decides who sees a team. That includes the team
+ * settings, which only an admin may open: a guard would hide the API's 403, and the screen
+ * shows "no access" with it.
  */
 export const routes: Routes = [
   {
@@ -56,6 +58,13 @@ export const routes: Routes = [
           import('@features/teams/presentation/team-dashboard-page').then(
             (m) => m.TeamDashboardPage,
           ),
+        title: 'Agilina',
+      },
+      {
+        // Settings → Team (HU-06): the members of the team, for its admins.
+        path: 'teams/:teamId/settings',
+        loadComponent: () =>
+          import('@features/teams/presentation/team-settings-page').then((m) => m.TeamSettingsPage),
         title: 'Agilina',
       },
     ],

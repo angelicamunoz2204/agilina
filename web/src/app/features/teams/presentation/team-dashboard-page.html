@@ -1,6 +1,30 @@
 <section class="mx-auto w-full max-w-5xl" *transloco="let t; prefix: 'teams.dashboard'">
   @if (team(); as team) {
-    <h1 class="font-display text-3xl font-bold tracking-tight break-words">{{ team.name }}</h1>
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <h1 class="font-display text-3xl font-bold tracking-tight break-words">{{ team.name }}</h1>
+      @if (team.role === 'admin') {
+        <a aglButton variant="secondary" [routerLink]="['/teams', team.id, 'settings']">
+          <!-- Lucide "settings" icon. -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-4"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
+            />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          {{ t('settings') }}
+        </a>
+      }
+    </div>
   } @else if (loading()) {
     <p role="status" class="text-sm text-muted">{{ t('loading') }}</p>
   } @else if (problemMessage(); as message) {

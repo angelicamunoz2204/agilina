@@ -7,6 +7,7 @@ import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 import { type TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
 import { TeamFailure, type TeamFailureKind } from '../domain/team-failure';
+import { type TeamRole } from '../domain/team-member';
 
 /** Item of GET /v1/teams, exactly as the API sends it. */
 interface MyTeamResponse {
@@ -75,10 +76,15 @@ export class HttpTeamsApi implements TeamsPort {
 
 /**
  * The API contract stays in this file; the rest of the app sees the domain model.
- * The role, mode and language are not shown yet, so they do not reach the domain.
+ * The mode and language are not shown yet, so they do not reach the domain.
  */
 function toTeam(response: MyTeamResponse | TeamResponse): Team {
-  return { id: response.id, name: response.name };
+  return { id: response.id, name: response.name, role: toRole(response.role) };
+}
+
+/** A role this screen does not know offers the least: it reads as `member`. */
+function toRole(role: string): TeamRole {
+  return role === 'admin' ? 'admin' : 'member';
 }
 
 /** The API's error codes stay in this file: the rest of the app only sees `TeamFailure`. */
