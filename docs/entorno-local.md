@@ -94,7 +94,9 @@ make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=mem
 ```
 
 Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
-Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activate#t=<token>`) abre la pantalla
+Mailpit lo ves en <http://localhost:8025>. Si la persona ya tenía una invitación pendiente a
+ese equipo, la nueva la revoca: el enlace anterior deja de servir y el comando lo avisa
+(HU-06). El enlace (`…/activate#t=<token>`) abre la pantalla
 de activación de la web (<http://localhost:4200/activate>): comprueba el enlace, pide la
 contraseña con su confirmación y, al activar, lleva a Keycloak con el correo ya escrito. La
 web lee el token del fragmento, lo quita de la barra de direcciones y llama a la API:
@@ -222,6 +224,99 @@ no sirve, porque Agilina necesita también su `app_user` y su membresía. El cam
 `make invite` → Mailpit → activación crea las dos cosas, se repite cuando haga falta y no
 deja ningún secreto en el repositorio.
 
+## Gestionar integrantes (HU-06)
+
+Solo un **Administrador** del equipo de la ruta puede ver y cambiar a sus integrantes. La
+API lo comprueba en cada llamada contra la membresía guardada, no contra lo que muestre la
+web:
+
+| Operación | Qué hace |
+| --- | --- |
+| `GET /v1/teams/{team_id}/members` | Los integrantes activos con `user_id`, `full_name`, `email`, `role` (interno: `admin` o `member`) y `label` (el código de la etiqueta que traduce la web), ordenados por nombre sin distinguir mayúsculas, y los `roles` que se pueden asignar. Cada integrante trae `role_change_blocked_by` y `removal_blocked_by`: el motivo por el que hoy no se puede cambiar su rol o sacarlo, o `null` |
+| `POST /v1/teams/{team_id}/invitations` | Con `{"full_name", "email", "role"}`. Si el correo no tiene cuenta, guarda una invitación y envía el enlace de activación (`201 {"outcome": "invitation_sent"}`); si ya tiene cuenta, la persona entra al equipo en ese momento y recibe un aviso sin enlace (`201 {"outcome": "member_added"}`). Si había una invitación pendiente de ese correo al equipo, queda revocada |
+| `PATCH /v1/teams/{team_id}/members/{user_id}` | Con `{"role"}`: cambia el rol de un integrante activo, que puede ser el mismo admin que lo pide; `204`. Dar el rol que ya tiene no cambia nada |
+| `DELETE /v1/teams/{team_id}/members/{user_id}` | Termina la membresía: la persona deja de recibir convocatorias del equipo; `204`. Su cuenta de Keycloak y su `app_user` quedan intactos (puede estar en otros equipos) y se la puede volver a invitar |
+
+Las cuatro exigen `Authorization: Bearer <token>`. Quien invita es siempre el usuario del
+token, y la invitación guarda su membresía como autora (`created_by`). Los errores
+responden `{"code": …}`:
+
+| Código | Cuándo |
+| --- | --- |
+| `401 not_authenticated` | Sin token o con uno que no identifica a un usuario de Agilina |
+| `403 not_a_team_member` | El equipo es ajeno, te removieron de él o no existe (la misma respuesta en los tres casos) |
+| `403 not_a_team_admin` | Eres integrante del equipo, pero no Administrador: vale para las cuatro operaciones, también si llamas a la API sin pasar por la pantalla |
+| `404 member_not_found` | `PATCH` o `DELETE` de alguien que no es integrante activo del equipo |
+| `409 last_admin` | Degradar o sacar al único Administrador, también si te lo pides a ti mismo: el equipo no puede quedar sin uno. No cambia nada |
+| `409 sprint_in_progress` | `PATCH` mientras el equipo tiene un sprint activo. Sacar a alguien sí se permite con sprint activo |
+| `409 already_a_team_member` | Invitar a quien ya es integrante activo. No se guarda ni se envía nada |
+| `409 account_disabled` | Invitar un correo cuya cuenta de Agilina está desactivada. No se guarda ni se envía nada |
+| `409 pending_invitation_exists` | Dos invitaciones al mismo correo en el mismo instante: la segunda choca con la primera |
+| `410 invitation_revoked` | Al activar (`POST /v1/invitations/activate`) con el enlace de una invitación que otra más nueva reemplazó |
+| `422 invalid_email`, `422 invalid_full_name` | Al invitar, un correo mal formado o un nombre vacío |
+| `502 mail_unavailable` | El servidor de correo rechazó el envío. Como el correo sale antes de guardar, no queda ni la invitación ni la membresía |
+
+Un cuerpo con un campo desconocido (por ejemplo `team_id` o `created_by`) o con un rol que
+no existe responde `422` con el formato de validación de FastAPI, sin `code`.
+
+### Valores por defecto y reglas
+
+| Dato | Valor | Notas |
+| --- | --- | --- |
+| Rol al invitar (`role`) | `member` | Si no lo envías. La activación asigna el rol que viajó en la invitación |
+| Etiqueta (`label`) | El mismo código del rol | Hoy `admin` o `member`; cuando exista la etiqueta según el modo del equipo (HU-04) se calculará con esa regla |
+| Vigencia del enlace | 7 días, un solo uso | Es la invitación de HU-02, sin cambios |
+| Sprint activo | Bloquea el cambio de rol | La tabla `sprint` es mínima (equipo, fechas y estado); la amplía HU-07. Todavía no hay API para crear sprints |
+
+Las reglas se aplican en la API aunque la pantalla también las muestre: el listado avisa
+el motivo para que la web deshabilite el control, pero un `PATCH` o un `DELETE` directo
+recibe el mismo `409`. Dos Administradores que se degradan a la vez no dejan el equipo
+sin ninguno: el cambio bloquea la fila del equipo hasta terminar, y el segundo recibe
+`409 last_admin`.
+
+### Cómo probarlo
+
+**Hoy, sin login.** Igual que con los equipos (HU-05), en el entorno levantado estas cuatro
+rutas responden `401`, porque la API todavía no valida tokens de Keycloak (HU-03). Por eso
+la historia se demuestra así:
+
+- **Pruebas automatizadas** (`make test-integration`). Corren la API real contra
+  PostgreSQL, con `FakeAuthenticatedUsers` en lugar del login y el correo simulado:
+  - `tests/api/integration/teams/presentation/http/test_team_members_flow.py`: el listado
+    con nombre y correo, el cambio de rol con y sin sprint activo, la eliminación sin tocar
+    `app_user`, el último Administrador y el `403` de un Miembro en cada una de las cuatro
+    rutas.
+  - `tests/api/integration/identity/presentation/http/test_team_invitations_flow.py`:
+    invitar un correo nuevo (el enlace `…/activate#t=<token>` y la activación con el rol
+    elegido), una cuenta existente, un integrante actual, reinvitar (el enlace anterior
+    responde `410 invitation_revoked`) y el fallo del correo.
+- **El correo, en Mailpit** (<http://localhost:8025>). `make invite` envía la invitación con
+  la misma plantilla. Si repites `make invite team_id=<uuid> …` con el mismo correo, el
+  comando avisa que revocó la anterior y el primer enlace deja de servir. El aviso
+  `member_added` se revisa como se explica en [Plantillas de correo](#plantillas-de-correo).
+- **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra las cuatro
+  operaciones con sus códigos de error. Con cualquier token, hoy la respuesta es `401`.
+- **La pantalla Configuración → Equipo** (<http://localhost:4200/teams/<id>/settings>).
+  Como la API responde `401`, hoy la pantalla solo muestra el aviso de que la sesión no es
+  válida. Lo que ve un Administrador (la lista, el control de rol deshabilitado con su
+  motivo, los diálogos de invitar y de eliminar) y la vista «sin acceso» ante un `403` se
+  comprueban con las pruebas de la web (`make test-web`), que montan la página real con
+  un puerto falso y los textos en español.
+
+**Cuando exista el login (HU-03).** Con el entorno levantado y una Administradora activada
+como en los pasos 1 a 3 de «Cómo probarlo» de *Crear equipos*:
+
+1. En el dashboard del equipo aparece **Configuración**, que lleva a
+   `/teams/<id>/settings`; desde ahí se hace lo mismo que en los pasos siguientes. Por la
+   API: con su token, `POST /v1/teams/<id>/invitations` con el nombre y el correo de otra
+   persona. En Mailpit llega la invitación; al activarla, la persona aparece en
+   `GET /v1/teams/<id>/members` con el rol elegido.
+2. Invita de nuevo a esa misma persona: la respuesta es `409 already_a_team_member`.
+3. Cámbiale el rol con `PATCH` y luego sácala con `DELETE`: deja de aparecer en el listado,
+   pero su cuenta sigue existiendo y sirve en sus otros equipos, si los tiene.
+4. Con el token de un Miembro, cualquiera de las cuatro rutas responde
+   `403 not_a_team_admin`, y abrir `/teams/<id>/settings` por URL muestra «sin acceso».
+
 ## Entrar a Keycloak
 
 La consola de administración está en <http://localhost:8080/admin> (con el
@@ -292,6 +387,21 @@ Los correos no llevan texto escrito en el código: se arman con plantillas en
 | `templates/<nombre>.txt` | La versión de texto plano, que muestran los clientes sin HTML |
 | `texts.py` | Todos los textos, en español y en inglés |
 | `theme.py` | Los colores y las tipografías |
+
+Estos son los correos que hay hoy, cada uno en español y en inglés (sale en el idioma del
+equipo):
+
+| Plantilla | Cuándo sale | Qué lleva |
+| --- | --- | --- |
+| `test` | `make mail-test` | Con qué servidor y remitente se envió |
+| `invitation` | Al invitar a alguien sin cuenta (`make invite` o *Invitar miembro*) | El enlace de activación `…/activate#t=<token>`, que vence en 7 días |
+| `member_added` | Al invitar a alguien que **ya tiene cuenta** (HU-06) | Un aviso de que entró al equipo y un enlace a `…/teams/<id>`; sin enlace de activación |
+| `new_invitation_request` | Cuando alguien con un enlace vencido pide uno nuevo | A los administradores del equipo, el motivo |
+
+Para ver el aviso `member_added` en Mailpit (<http://localhost:8025>) hace falta invitar,
+desde `POST /v1/teams/{team_id}/invitations`, el correo de alguien que ya activó su
+cuenta. En local esa ruta responde 401 hasta que exista el inicio de sesión (HU-03); el
+envío lo comprueban las pruebas automáticas con el renderizador real y un envío simulado.
 
 Para ver un cambio de diseño: edita la plantilla, ejecuta `make mail-test to=...` y
 abre Mailpit (la API recarga sola, y el comando renderiza la plantilla en cada

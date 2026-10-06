@@ -44,8 +44,20 @@ from tests.api.builders import InvitationBuilder, TeamBuilder, next_id
 invitation = InvitationBuilder().for_team(team_id).as_admin().build()
 used       = InvitationBuilder().accepted_by(next_id()).build()
 overdue    = InvitationBuilder().past_its_deadline().build()
+replaced   = InvitationBuilder().revoked().build()
+left       = TeamBuilder().with_admin(ana).with_removed_member(bruno).build()
 await InvitationBuilder().for_team(team.id).saved_in(uow.invitations)
 ```
+
+| Builder | Qué arma |
+| --- | --- |
+| `TeamBuilder` | Un equipo; `with_member`, `with_admin` y `with_removed_member` (entra y luego sale por `Team.remove_member`, así que el único admin no se puede remover tampoco aquí) |
+| `InvitationBuilder` | Una invitación pendiente; `accepted_by`, `past_its_deadline`, `expired` y `revoked` (reemplazada por otra, con `Invitation.revoke`) |
+| `AppUserBuilder` | Una cuenta de Agilina; `disabled` (una cuenta desactivada: ningún comportamiento la desactiva todavía, así que se restaura tal como se guarda) |
+| `IssueInvitationBuilder`, `ActivateAccountBuilder`, `RequestNewInvitationBuilder` | Los comandos de invitación y activación (HU-02) |
+| `InviteToTeamBuilder` | Un admin invita a alguien a su equipo (HU-06); `by_admin(user_id, membership_id)` fija quién invita y la membresía que queda como autora |
+| `ChangeMemberRoleBuilder`, `RemoveMemberBuilder` | Un admin cambia el rol de un integrante o lo saca del equipo (HU-06) |
+| `ContactBuilder`, `TeamContactsBuilder`, `EmailMessageBuilder` | Datos de lectura y mensajes de correo |
 
 Reglas:
 
@@ -54,15 +66,50 @@ Reglas:
   partida no se altera.
 - `build()` usa las **reglas del dominio** (`Invitation.issue`, `Team.create`): si el
   dato es inválido, falla igual que en producción.
-- Un estado se alcanza **por comportamiento** (`accepted_by` llama a `accept`), nunca
-  escribiendo atributos privados. Lo que el dominio todavía no sabe hacer (una invitación
-  *revocada*) se restaura con `restored_as(...)`.
+- Un estado se alcanza **por comportamiento** (`accepted_by` llama a `accept`, `revoked` a
+  `revoke`, `with_removed_member` a `Team.remove_member`), nunca escribiendo atributos
+  privados. Un estado guardado al que ningún comportamiento llega se restaura con
+  `restored_as(...)`.
 - `saved_in(repositorio)` sirve para el doble en memoria y para el repositorio SQL.
 - En integración, `tests/api/integration/support.py` guarda con *commit* un equipo, un
   usuario o una invitación como datos de partida. La base impide dos invitaciones con el
   mismo token o dos usuarios con el mismo correo: `with_unique_token()` y
-  `with_unique_email()` evitan el choque.
+  `with_unique_email()` evitan el choque. Un integrante removido se guarda con
+  `stored_team(session_factory, TeamBuilder()….with_removed_member(user_id))`, no con un
+  `UPDATE` directo. `stored_sprint(session_factory, team_id, status)` es la excepción: el
+  sprint todavía no tiene agregado (llega con HU-07), así que escribe la fila tal cual.
 - Si te falta un builder, **agrégalo en `builders/`**, no en el archivo de la prueba.
+
+## Los dobles
+
+En `tests/api/doubles/`, uno por puerto, en memoria. Los que más se usan:
+
+| Doble | Puerto | Qué permite |
+| --- | --- | --- |
+| `FakeClock` | `Clock` | Fija la hora y la avanza |
+| `FakeMailer`, `FakeRenderer` | `Mailer`, `EmailRenderer` | Ver lo enviado (`sent`), hacer fallar el envío (`fail = True`) y leer la plantilla y sus parámetros en el cuerpo |
+| `FakeTokenGenerator` | `ActivationTokenGenerator` | Entrega los tokens que le das, en orden |
+| `FakeIdentityProvider` | `IdentityProvider` (Keycloak) | Crea o borra cuentas, rechaza una contraseña o se cae |
+| `FakeAuthenticatedUsers` | `AuthenticatedUsers` | Hace de inicio de sesión mientras no exista HU-03: cada token es un usuario |
+| `FakeTeamAccess`, `FakeTeamQueries` | `TeamAccess`, `TeamQueries` | La membresía y el rol de cada usuario, y lo que leen las consultas |
+| `FakeActiveSprints` | `ActiveSprints` | Los equipos que tienen un sprint en curso |
+| `FakeMemberContacts` | `MemberContactsDirectory` | El nombre y el correo de cada integrante; los demás no tienen cuenta |
+
+### Flujos de punta a punta
+
+Una historia se prueba completa por HTTP contra PostgreSQL real, sin inicio de sesión, con
+el patrón de `tests/api/integration/teams/presentation/http/test_teams_flow.py`:
+`create_app()` con `dependency_overrides` hacia los *handlers* reales, `FakeAuthenticatedUsers`
+en lugar del login, `SqlTeamQueries` como `TeamAccess` (la membresía se comprueba contra la
+tabla) y solo el correo, los tokens y el reloj doblados.
+
+Para los casos de uso que cruzan identity y teams sin pasar por HTTP,
+`tests/api/integration/world.py` arma `World`: base real, repositorios reales y los mismos
+dobles. Tiene la invitación y la activación de HU-02 y, de HU-06, `invite_to_team`,
+`list_members`, `change_role` y `remove`; `admin_invites(team_id, admin_id, …)` invita
+como lo hace la ruta, con la membresía del admin como autora. Escribe los correos con
+`FakeRenderer` (plantilla y parámetros); `World(session_factory, JinjaEmailRenderer())` usa
+las plantillas reales cuando la prueba necesita leer lo que recibe la persona.
 
 ## Reglas de cada prueba
 
