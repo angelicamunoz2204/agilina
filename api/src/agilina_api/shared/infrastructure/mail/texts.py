@@ -82,6 +82,32 @@ TEMPLATES: dict[str, dict[Language, dict[str, str]]] = {
             "ignore": "If you were not expecting this invitation, ignore this message: nothing happens unless the link is activated.",
         },
     },
+    "member_added": {
+        Language.ES: {
+            "subject": "Ahora formas parte de {{ team_name }} en Agilina",
+            "preheader": "Ya puedes entrar al equipo {{ team_name }} con tu cuenta de siempre.",
+            "title": "Ahora formas parte de {{ team_name }}",
+            "greeting": "Hola {{ name }},",
+            "intro": "Te agregaron al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "intro_by": "{{ inviter_name }} te agregó al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "no_activation": "Como ya tienes una cuenta, no hace falta activar nada: entra con tu correo y tu contraseña de siempre.",
+            "cta": "Abrir el equipo",
+            "fallback": "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+            "unexpected": "Si no esperabas este mensaje, habla con quien administra el equipo.",
+        },
+        Language.EN: {
+            "subject": "You are now part of {{ team_name }} on Agilina",
+            "preheader": "You can now open the {{ team_name }} team with your usual account.",
+            "title": "You are now part of {{ team_name }}",
+            "greeting": "Hi {{ name }},",
+            "intro": "You were added to the {{ team_name }} team on Agilina, the virtual Scrum Master of your daily.",
+            "intro_by": "{{ inviter_name }} added you to the {{ team_name }} team on Agilina, the virtual Scrum Master of your daily.",
+            "no_activation": "Since you already have an account, there is nothing to activate: sign in with your usual email and password.",
+            "cta": "Open the team",
+            "fallback": "If the button does not work, copy and paste this link into your browser:",
+            "unexpected": "If you were not expecting this message, talk to whoever manages the team.",
+        },
+    },
     "new_invitation_request": {
         Language.ES: {
             "subject": "{{ requester_name }} necesita una invitación nueva a {{ team_name }}",

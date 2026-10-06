@@ -185,3 +185,75 @@ def test_the_request_for_a_new_invitation_explains_the_reason_in_each_language()
     assert "Hola Diego," in render(Language.ES, "expired").text_body
     assert "julian@example.test" in render(Language.ES, "expired").html_body
     assert render(Language.EN, "expired").subject == "Julián needs a new invitation to Atlas"
+
+
+# -------------------------------------------------- member added notice (HU-06) --
+MEMBER_ADDED = {
+    "name": "Julián Torres",
+    "team_name": "Atlas",
+    "inviter_name": "Diego",
+    "team_url": "https://app.example.test/teams/0000-atlas",
+}
+
+
+def _member_added(language: Language = Language.ES, **overrides: object):
+    return JinjaEmailRenderer().render("member_added", language, **{**MEMBER_ADDED, **overrides})
+
+
+def test_the_member_added_notice_names_the_person_and_the_team_in_each_language():
+    spanish, english = _member_added(Language.ES), _member_added(Language.EN)
+
+    assert spanish.subject == "Ahora formas parte de Atlas en Agilina"
+    assert english.subject == "You are now part of Atlas on Agilina"
+    assert "Hola Julián Torres," in spanish.text_body and "Hi Julián Torres," in english.text_body
+    assert '<html lang="es">' in spanish.html_body and '<html lang="en">' in english.html_body
+
+
+def test_the_member_added_notice_links_to_the_team_and_never_to_an_activation():
+    for email in (_member_added(Language.ES), _member_added(Language.EN)):
+        assert 'href="' + MEMBER_ADDED["team_url"] + '"' in email.html_body
+        assert MEMBER_ADDED["team_url"] in email.text_body
+        for version in (email.html_body, email.text_body):
+            assert "/activate" not in version and "#t=" not in version
+    assert "Abrir el equipo" in _member_added(Language.ES).html_body
+    assert "Open the team" in _member_added(Language.EN).html_body
+
+
+def test_the_member_added_notice_says_who_added_them_when_it_is_known():
+    assert "Diego te agregó al equipo Atlas" in _member_added().text_body
+    anonymous = _member_added(inviter_name="")
+    assert "Te agregaron al equipo Atlas" in anonymous.text_body
+    assert "te agregó" not in anonymous.text_body
+    assert "Diego added you to the Atlas team" in _member_added(Language.EN).text_body
+
+
+def test_the_member_added_notice_says_there_is_nothing_to_activate():
+    assert "no hace falta activar nada" in _member_added(Language.ES).text_body
+    assert "there is nothing to activate" in _member_added(Language.EN).html_body
+
+
+def test_a_name_or_team_cannot_inject_markup_into_the_member_added_notice():
+    html = _member_added(name="<i>Julián</i>", team_name="<b>Atlas</b>").html_body
+
+    assert "<i>Julián" not in html and "<b>Atlas" not in html
+    assert "&lt;i&gt;Julián" in html and "&lt;b&gt;Atlas" in html
+
+
+def test_the_member_added_notice_does_not_depend_on_remote_resources():
+    html = _member_added().html_body.lower()
+
+    assert "<img" not in html and "<link" not in html and "@import" not in html
+
+
+def test_the_member_added_notice_needs_the_team_link():
+    params = {key: value for key, value in MEMBER_ADDED.items() if key != "team_url"}
+
+    with pytest.raises(UndefinedError):
+        JinjaEmailRenderer().render("member_added", Language.ES, **params)
+
+
+def test_the_invitation_still_carries_its_activation_link():
+    """Regression: HU-06 reuses the HU-02 invitation, whose link opens /activate."""
+    email = _invitation(Language.EN)
+
+    assert "/activate#t=" in email.text_body and "/activate#t=" in email.html_body

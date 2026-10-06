@@ -1,0 +1,14 @@
+{{ t.title }}
+
+{{ t.greeting }}
+
+{% if inviter_name %}{{ t.intro_by }}{% else %}{{ t.intro }}{% endif %} {{ t.no_activation }}
+
+{{ t.cta }}:
+{{ team_url }}
+
+{{ t.unexpected }}
+
+--
+Agilina · {{ layout.tagline }}
+{{ layout.footer }}
