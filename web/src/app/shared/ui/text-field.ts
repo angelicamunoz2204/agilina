@@ -8,9 +8,9 @@ import { Directive } from '@angular/core';
   selector: 'input[aglTextField]',
   host: {
     class:
-      'block min-h-11 w-full rounded-md border border-border bg-background px-3 py-2 ' +
-      'text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 ' +
-      'focus-visible:outline-accent',
+      'block min-h-11 w-full rounded-md border border-border bg-transparent px-3 py-2 ' +
+      'text-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 ' +
+      'focus-visible:outline-accent aria-invalid:border-danger',
   },
 })
 export class TextField {}

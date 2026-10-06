@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
 from agilina_api.teams.domain.team import MembershipStatus
@@ -99,3 +100,32 @@ async def test_saving_a_team_that_was_never_stored_is_an_error(session_factory):
     async with SqlAlchemyUnitOfWork(session_factory) as uow:
         with pytest.raises(LookupError, match="does not exist"):
             await SqlAlchemyTeamRepository(uow.session).save(TeamBuilder().build())
+
+
+async def test_a_team_created_by_a_user_is_stored_with_its_admin(session_factory):
+    user = await stored_user(session_factory)
+    team = await stored_team(session_factory, TeamBuilder().created_with_admin(user.id))
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        loaded = await SqlAlchemyTeamRepository(uow.session).get(team.id)
+
+    assert loaded is not None and loaded.created_by == user.id
+    membership = loaded.membership_of(user.id)
+    assert membership is not None and membership.role is TeamRole.ADMIN and membership.is_active
+
+
+async def test_if_a_membership_fails_the_team_is_not_stored(session_factory, engine):
+    """The team row is flushed before its members: a member that cannot be stored (a user
+    that does not exist breaks the foreign key) must take the team down with it."""
+    user = await stored_user(session_factory)
+    team = TeamBuilder().created_with_admin(user.id).with_member(next_id()).build()
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        with pytest.raises(IntegrityError):
+            await SqlAlchemyTeamRepository(uow.session).add(team)
+
+    async with engine.connect() as connection:
+        assert (await connection.execute(text("SELECT count(*) FROM team"))).scalar_one() == 0
+        assert (
+            await connection.execute(text("SELECT count(*) FROM team_member"))
+        ).scalar_one() == 0

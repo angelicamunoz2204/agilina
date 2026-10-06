@@ -100,3 +100,57 @@ def test_the_admin_count_only_counts_active_admins():
     _join(team, TeamRole.ADMIN)
 
     assert team.admin_count == 2
+
+
+# ------------------------------------------------- created by a user (HU-05) --
+def test_a_team_created_by_a_user_makes_them_its_admin():
+    user_id = next_id()
+
+    team = TeamBuilder().created_with_admin(user_id).build()
+
+    membership = team.membership_of(user_id)
+    assert membership is not None
+    assert membership.role is TeamRole.ADMIN and membership.is_active
+    assert membership.joined_at == NOW
+    assert team.admin_count == 1 and len(team.memberships) == 1
+
+
+def test_a_team_created_by_a_user_records_who_created_it():
+    user_id = next_id()
+
+    assert TeamBuilder().created_with_admin(user_id).build().created_by == user_id
+
+
+def test_a_team_created_by_a_user_starts_in_support_mode_and_english():
+    team = TeamBuilder().created_with_admin(next_id()).build()
+
+    assert team.mode is OperationMode.SUPPORT
+    assert team.language is Language.EN
+
+
+def test_creating_a_team_with_its_admin_records_member_joined():
+    team_id, user_id = next_id(), next_id()
+
+    team = Team.create_with_admin(
+        team_id=team_id, name="Atlas", user_id=user_id, membership_id=next_id(), now=NOW
+    )
+
+    assert team.pull_events() == [
+        MemberJoinedTeam(occurred_at=NOW, team_id=team_id, user_id=user_id, role=TeamRole.ADMIN)
+    ]
+
+
+def test_a_team_created_by_a_user_follows_the_name_rule():
+    user_id = next_id()
+
+    assert TeamBuilder().named("  Atlas  ").created_with_admin(user_id).build().name == "Atlas"
+    with pytest.raises(InvalidTeamNameError):
+        TeamBuilder().named("   ").created_with_admin(user_id).build()
+    with pytest.raises(InvalidTeamNameError):
+        TeamBuilder().named("x" * 81).created_with_admin(user_id).build()
+
+
+def test_the_operator_team_also_rejects_names_longer_than_80():
+    assert TeamBuilder().named("x" * 80).build().name == "x" * 80
+    with pytest.raises(InvalidTeamNameError):
+        TeamBuilder().named("x" * 81).build()

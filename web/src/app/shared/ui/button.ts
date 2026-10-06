@@ -3,22 +3,24 @@ import { computed, Directive, input } from '@angular/core';
 export type ButtonVariant = 'primary' | 'secondary';
 
 const BASE =
-  'min-h-11 cursor-pointer rounded-md border px-4 py-2 font-semibold ' +
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ' +
+  'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border ' +
+  'px-4 py-2 text-sm font-medium transition-colors ' +
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ' +
   'disabled:cursor-progress disabled:opacity-60';
 
 const VARIANTS: Readonly<Record<ButtonVariant, string>> = {
-  primary: 'border-accent bg-accent text-background',
-  secondary: 'border-border bg-transparent font-normal text-foreground',
+  primary: 'border-accent bg-accent text-accent-foreground shadow-sm hover:bg-accent/90',
+  secondary: 'border-border bg-surface text-foreground shadow-sm hover:bg-accent/5',
 };
 
 /**
  * The look of a button. Put it on a native `<button>`, so that keyboard and screen readers
- * keep working: `<button aglButton variant="secondary" type="button">`. Width and spacing
- * belong to whoever places the button (`class="w-full mt-4"`).
+ * keep working: `<button aglButton variant="secondary" type="button">`. A link that should
+ * look like a button stays a link (`<a aglButton routerLink="/teams/new">`): navigating is
+ * not acting. Width and spacing belong to whoever places it (`class="w-full mt-4"`).
  */
 @Directive({
-  selector: 'button[aglButton]',
+  selector: 'button[aglButton], a[aglButton]',
   host: { '[class]': 'classes()' },
 })
 export class Button {

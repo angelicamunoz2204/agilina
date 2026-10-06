@@ -1,11 +1,10 @@
-"""Turn the identity errors into HTTP responses.
+"""The identity errors and the HTTP response each one becomes.
 
-The domain knows nothing about status codes: this table is the only place that says that
-an expired link is a ``410`` or a refused password a ``422``.
+The composition root registers this table in the single handler of
+``shared.presentation.http.errors``.
 """
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from typing import cast
 
 from agilina_api.identity.application.errors import (
     AccountAlreadyExistsError,
@@ -20,43 +19,22 @@ from agilina_api.identity.domain.errors import (
     InvitationExpiredError,
     InvitationRevokedError,
 )
-from agilina_api.identity.presentation.http.schemas import ErrorResponse
-from agilina_api.shared.application.ports import MailDeliveryError
+from agilina_api.shared.presentation.http.errors import ErrorMapping
 
-ERRORS: tuple[tuple[type[Exception], int, str], ...] = (
-    (InvitationNotFoundError, 404, "invitation_not_found"),
-    (InvitationAlreadyUsedError, 410, "invitation_used"),
-    (InvitationExpiredError, 410, "invitation_expired"),
-    (InvitationRevokedError, 410, "invitation_revoked"),
-    (AccountAlreadyExistsError, 409, "account_already_exists"),
-    (InvitationStillValidError, 409, "invitation_still_valid"),
-    (NoAdminsToNotifyError, 409, "no_admins_to_notify"),
-    (PasswordPolicyError, 422, "password_policy"),
-    (MailDeliveryError, 502, "mail_unavailable"),
-    (IdentityProviderUnavailableError, 503, "identity_provider_unavailable"),
+
+def _password_policy_reasons(error: Exception) -> list[str]:
+    # The mapping below registers it only for PasswordPolicyError.
+    return list(cast(PasswordPolicyError, error).reasons)
+
+
+IDENTITY_ERRORS: tuple[ErrorMapping, ...] = (
+    ErrorMapping(InvitationNotFoundError, 404, "invitation_not_found"),
+    ErrorMapping(InvitationAlreadyUsedError, 410, "invitation_used"),
+    ErrorMapping(InvitationExpiredError, 410, "invitation_expired"),
+    ErrorMapping(InvitationRevokedError, 410, "invitation_revoked"),
+    ErrorMapping(AccountAlreadyExistsError, 409, "account_already_exists"),
+    ErrorMapping(InvitationStillValidError, 409, "invitation_still_valid"),
+    ErrorMapping(NoAdminsToNotifyError, 409, "no_admins_to_notify"),
+    ErrorMapping(PasswordPolicyError, 422, "password_policy", reasons=_password_policy_reasons),
+    ErrorMapping(IdentityProviderUnavailableError, 503, "identity_provider_unavailable"),
 )
-
-
-def error_response(
-    status: int, code: str, detail: str, reasons: list[str] | None = None
-) -> JSONResponse:
-    body = ErrorResponse(code=code, detail=detail, reasons=reasons)
-    return JSONResponse(
-        status_code=status,
-        content=body.model_dump(exclude_none=True),
-        headers={"Cache-Control": "no-store"},
-    )
-
-
-def register_error_handlers(app: FastAPI) -> None:
-    for error_type, status, code in ERRORS:
-
-        async def handle(
-            request: Request, error: Exception, status: int = status, code: str = code
-        ) -> JSONResponse:
-            reasons = list(error.reasons) if isinstance(error, PasswordPolicyError) else None
-            # The detail is generic on purpose: the messages of the errors name people and
-            # invitations, and the response must not.
-            return error_response(status, code, code.replace("_", " "), reasons)
-
-        app.add_exception_handler(error_type, handle)

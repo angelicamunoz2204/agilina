@@ -2,10 +2,10 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agilina_api.teams.application.dtos import TeamSummary
+from agilina_api.teams.application.dtos import TeamSummary, TeamView, UserTeamView
 from agilina_api.teams.application.ports.outbound import TeamQueries
 from agilina_api.teams.domain.team import MembershipStatus
 from agilina_api.teams.infrastructure.persistence.orm_models import TeamMemberRow, TeamRow
@@ -42,3 +42,39 @@ class SqlTeamQueries(TeamQueries):
                 language=team.language,
                 admin_user_ids=tuple(admins),
             )
+
+    async def list_for_user(self, user_id: UUID) -> tuple[UserTeamView, ...]:
+        # Served by the ``team_member_user_idx`` index on ``team_member.user_id``.
+        statement = (
+            select(TeamRow.id, TeamRow.name, TeamMemberRow.role)
+            .join(TeamMemberRow, TeamMemberRow.team_id == TeamRow.id)
+            .where(
+                TeamMemberRow.user_id == user_id,
+                TeamMemberRow.status == MembershipStatus.ACTIVE,
+            )
+            .order_by(func.lower(TeamRow.name), TeamRow.id)
+        )
+        async with self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+        return tuple(UserTeamView(team_id=row.id, name=row.name, role=row.role) for row in rows)
+
+    async def get_team(self, team_id: UUID) -> TeamView | None:
+        statement = select(TeamRow.id, TeamRow.name, TeamRow.mode, TeamRow.language).where(
+            TeamRow.id == team_id
+        )
+        async with self._session_factory() as session:
+            row = (await session.execute(statement)).one_or_none()
+        if row is None:
+            return None
+        return TeamView(team_id=row.id, name=row.name, mode=row.mode, language=row.language)
+
+    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
+        # At most one row, found through the unique index on ``(team_id, user_id)``.
+        statement = select(TeamMemberRow.role).where(
+            TeamMemberRow.team_id == team_id,
+            TeamMemberRow.user_id == user_id,
+            TeamMemberRow.status == MembershipStatus.ACTIVE,
+        )
+        async with self._session_factory() as session:
+            role: TeamRole | None = (await session.execute(statement)).scalar_one_or_none()
+        return role

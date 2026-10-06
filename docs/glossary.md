@@ -17,6 +17,8 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | `member` | Miembro | Rol de quien participa en la daily |
 | Visible label | Etiqueta visible | Cómo se rotula un rol en pantalla (Administrador, Scrum Master o Miembro). Se **deriva** de rol + modo; no se guarda |
 | Platform operator | Operador de la plataforma | Quien administra la instalación (no es un integrante); emite la invitación del primer Administrador |
+| `TeamSelector` | Selector de equipo | Pantalla con los equipos a los que pertenece el usuario, para entrar a uno o crear uno nuevo |
+| `TeamDashboard` | Dashboard del equipo | Pantalla de entrada a un equipo, a la que se llega desde el selector o al crearlo |
 
 ## Acceso
 

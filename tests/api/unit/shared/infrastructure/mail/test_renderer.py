@@ -114,7 +114,7 @@ INVITATION = {
     "name": "Julián Torres",
     "team_name": "Atlas",
     "inviter_name": "Diego",
-    "activation_url": "https://app.example.test/activar#t=" + "T" * 43,
+    "activation_url": "https://app.example.test/activate#t=" + "T" * 43,
     "expires_on": "2026-10-11",
 }
 

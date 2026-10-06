@@ -1,0 +1,50 @@
+<section
+  class="rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
+  *transloco="let t; prefix: 'teams.create'"
+>
+  <h1 class="font-display text-xl font-semibold">{{ t('title') }}</h1>
+
+  <form class="mt-6 flex flex-col" (submit)="submit(); $event.preventDefault()" novalidate>
+    <label for="team-name" class="mb-1.5 text-sm font-medium">{{ t('name_label') }}</label>
+    <input
+      aglTextField
+      id="team-name"
+      name="name"
+      type="text"
+      autocomplete="off"
+      aria-describedby="team-name-hint team-name-problem"
+      [attr.aria-invalid]="shownProblem() !== null"
+      [ngModel]="name()"
+      (ngModelChange)="changeName($event)"
+      (blur)="touched.set(true)"
+    />
+    <p id="team-name-hint" class="mt-1.5 text-xs text-muted">
+      {{ t('name_hint', { max: maxLength }) }}
+    </p>
+    <p id="team-name-problem" class="mt-1 text-xs text-danger empty:hidden" aria-live="polite">
+      @switch (shownProblem()) {
+        @case ('blank') {
+          {{ t('errors.blank') }}
+        }
+        @case ('too_long') {
+          {{ t('errors.too_long', { max: maxLength }) }}
+        }
+      }
+    </p>
+
+    <p class="mt-4 rounded-lg bg-accent/5 px-3 py-2 text-sm text-muted">
+      {{ t('defaults_hint') }}
+    </p>
+
+    @if (problemMessage(); as message) {
+      <p role="alert" class="mt-4 text-sm text-danger">{{ t(message) }}</p>
+    }
+
+    <button aglButton type="submit" class="mt-6 w-full" [disabled]="problem() !== null || saving()">
+      {{ saving() ? t('saving') : t('submit') }}
+    </button>
+    <a aglButton variant="secondary" routerLink="/teams" class="mt-3 w-full">
+      {{ t('cancel') }}
+    </a>
+  </form>
+</section>

@@ -1,5 +1,8 @@
 """Storing builder-made objects in the real PostgreSQL, committed, as a test's starting data."""
 
+from uuid import UUID
+
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agilina_api.identity.domain.invitation import Invitation
@@ -44,3 +47,17 @@ async def stored_invitation(
         invitation = await builder.saved_in(SqlAlchemyInvitationRepository(uow.session))
         await uow.commit()
     return invitation
+
+
+async def removed_from_team(session_factory: SessionFactory, team_id: UUID, user_id: UUID) -> None:
+    """Marks a stored membership as removed, committed. The domain cannot remove a member
+    yet (HU-06), so the state is restored straight in the table."""
+    async with session_factory() as session:
+        await session.execute(
+            text(
+                "UPDATE team_member SET status = 'removed', removed_at = now() "
+                "WHERE team_id = :team_id AND user_id = :user_id"
+            ),
+            {"team_id": team_id, "user_id": user_id},
+        )
+        await session.commit()

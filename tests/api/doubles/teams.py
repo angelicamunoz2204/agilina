@@ -4,7 +4,9 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
+from agilina_api.teams.application.dtos import TeamSummary, TeamView, UserTeamView
 from agilina_api.teams.domain.team import Team
+from agilina_shared.enums import TeamRole
 
 
 class InMemoryTeamRepository:
@@ -44,3 +46,32 @@ class FakeTeamsUnitOfWork:
 
     async def rollback(self) -> None:
         self.committed = False
+
+
+class FakeTeamQueries:
+    """Answers with what the test gives it: summaries and views by team, teams by user
+    and roles by team and user."""
+
+    def __init__(
+        self,
+        summaries: dict[UUID, TeamSummary] | None = None,
+        teams_by_user: dict[UUID, tuple[UserTeamView, ...]] | None = None,
+        views: dict[UUID, TeamView] | None = None,
+        roles: dict[tuple[UUID, UUID], TeamRole] | None = None,
+    ) -> None:
+        self.summaries = summaries or {}
+        self.teams_by_user = teams_by_user or {}
+        self.views = views or {}
+        self.roles = roles or {}
+
+    async def get_summary(self, team_id: UUID) -> TeamSummary | None:
+        return self.summaries.get(team_id)
+
+    async def list_for_user(self, user_id: UUID) -> tuple[UserTeamView, ...]:
+        return self.teams_by_user.get(user_id, ())
+
+    async def get_team(self, team_id: UUID) -> TeamView | None:
+        return self.views.get(team_id)
+
+    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
+        return self.roles.get((team_id, user_id))

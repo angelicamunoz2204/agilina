@@ -1,12 +1,10 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
-import { Header } from '@layout/header/header';
-
-/** Root component: the layout around the routed screen. */
+/** Root component. The frame around each screen is a layout chosen by its route. */
 @Component({
   selector: 'agl-root',
-  imports: [RouterOutlet, Header],
+  imports: [RouterOutlet],
   templateUrl: './app.html',
 })
 export class App {}

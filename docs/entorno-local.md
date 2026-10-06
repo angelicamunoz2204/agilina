@@ -94,8 +94,8 @@ make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=mem
 ```
 
 Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
-Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activar#t=<token>`) abre la pantalla
-de activación de la web (<http://localhost:4200/activar>): comprueba el enlace, pide la
+Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activate#t=<token>`) abre la pantalla
+de activación de la web (<http://localhost:4200/activate>): comprueba el enlace, pide la
 contraseña con su confirmación y, al activar, lleva a Keycloak con el correo ya escrito. La
 web lee el token del fragmento, lo quita de la barra de direcciones y llama a la API:
 
@@ -127,6 +127,101 @@ make keycloak-reset    # borra los datos de Keycloak (no los de Postgres) y reim
 
 `make test-keycloak` ejecuta las pruebas contra ese Keycloak real.
 
+## Crear equipos (HU-05)
+
+Cualquier usuario autenticado puede crear un equipo, y queda como su Administrador. La API:
+
+| Operación | Qué hace |
+| --- | --- |
+| `POST /v1/teams` | Con `{"name": …}`: crea el equipo y la membresía de quien lo pide como `admin`, en una sola transacción (si algo falla, no queda nada guardado); `201` con `{"id": …}` y `Location: /v1/teams/<id>` |
+| `GET /v1/teams` | Los equipos donde el usuario es integrante activo, con `id`, `name` y su `role` en cada uno, ordenados por nombre sin distinguir mayúsculas; `[]` si no tiene ninguno |
+| `GET /v1/teams/{team_id}` | `name`, `mode` y `language` del equipo y el `role` de quien pregunta; solo para sus integrantes activos |
+
+Las tres exigen `Authorization: Bearer <token>`, y quien crea el equipo es siempre el
+usuario del token, nunca uno que venga en el cuerpo. Los errores responden
+`{"code": …}`, como el resto de la API:
+
+| Código | Cuándo |
+| --- | --- |
+| `401 not_authenticated` | Sin token o con uno que no identifica a un usuario de Agilina. Lleva `WWW-Authenticate: Bearer` y se responde antes de mirar el equipo |
+| `403 not_a_team_member` | `GET /v1/teams/{team_id}` de un equipo ajeno, de uno del que te removieron o de uno que no existe: es la misma respuesta en los tres casos, para no revelar qué equipos existen |
+| `422 invalid_team_name` | El nombre queda vacío o pasa de 80 caracteres después de recortarlo |
+
+Un cuerpo mal formado (sin `name`, o con un campo desconocido como `created_by`) y un
+`team_id` que no es un UUID también responden `422`, pero con el formato de validación de
+FastAPI, sin `code`.
+
+La web tiene tres pantallas: `/teams` (el selector: la lista de tus equipos y «Crear
+equipo»), `/teams/new` (el formulario) y `/teams/:teamId` (el dashboard del equipo, que por
+ahora solo muestra su nombre; el real llega con HU-12).
+
+### Valores por defecto de un equipo nuevo
+
+Un equipo que crea una persona con `POST /v1/teams` nace así:
+
+| Dato | Valor | Notas |
+| --- | --- | --- |
+| Modo (`mode`) | `support` | Soporte: un Scrum Master humano aprueba lo que hace Agilina |
+| Idioma (`language`) | `en` | Se guarda el código (`en` o `es`); «English» es solo la etiqueta de la interfaz |
+| Rol de quien lo crea | `admin` | Además queda registrado como su autor (`created_by`) |
+| Nombre (`name`) | Obligatorio | Se recorta; si queda vacío no vale; máximo 80 caracteres, que la base también exige (`CHECK team_name_max_length`). Dos equipos pueden llamarse igual |
+
+Estos valores también aparecen en la descripción de la operación en
+<http://localhost:8000/docs>, y el formulario de la web avisa que el equipo se crea en modo
+soporte e idioma inglés.
+
+El equipo que crea el **operador** con `make invite team=…` es distinto: también nace en
+`support`, pero su idioma es el de `lang=` o, si no lo das, el de `AGILINA_DEFAULT_LANGUAGE`
+(`es` en `.env.example`). No tiene autor ni integrantes: la primera persona entra cuando
+activa su invitación, con el rol de esa invitación (AD-22).
+
+### Cómo probarlo
+
+**Hoy, sin login.** La API todavía no valida los tokens de Keycloak, porque eso llega con
+HU-03. Mientras tanto, el adaptador de `api/.../bootstrap/authentication.py` no confía en
+ningún token. En el entorno levantado, toda ruta de equipos responde `401`, y la web en
+`/teams` muestra «No se pudieron cargar tus equipos». Es deliberado: sin validar un token,
+no se puede aceptar ninguno.
+
+- **Pruebas automatizadas.** Cambian ese adaptador por un doble que conoce sus tokens y
+  ejercitan el flujo completo:
+  - `make test-integration` corre la API real contra PostgreSQL (`tests/api/integration/teams/`).
+    Comprueba que el equipo se crea en `support`/`en` con su creador como `admin`, que un
+    usuario recibe todos sus equipos, que un nombre vacío se rechaza sin guardar nada, que
+    pedir un equipo ajeno da `403` y que sin token da `401`.
+  - `make test-web` prueba los componentes con el Router real y un puerto falso: guardar
+    queda deshabilitado con un nombre inválido, al crear se entra al dashboard y el
+    selector lista los equipos o queda vacío con el botón.
+- **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra el contrato, los
+  valores por defecto y el esquema de seguridad `HTTPBearer`. Con cualquier token, hoy la
+  respuesta es `401`.
+
+**Cuando exista el login (HU-03).** Este es el camino desde cero, con el entorno levantado:
+
+1. `make invite team="Atlas" email=ana@example.com name="Ana Ruiz"` crea el equipo del
+   operador y la invitación de su primera Administradora.
+2. En Mailpit (<http://localhost:8025>) abre el correo y copia el token del enlace
+   (lo que va después de `#t=`).
+3. En Swagger, llama a `POST /v1/invitations/activate` con `token`, `password` y
+   `confirmation`. La contraseña la eliges tú, con un mínimo de 12 caracteres. Esto crea a
+   la vez la cuenta de Keycloak y el usuario de Agilina (`app_user`), y la deja como `admin`
+   de «Atlas».
+4. Inicia sesión en la web y entra a `/teams`: aparece «Atlas». Con «Crear equipo» llegas a
+   `/teams/new`, y al guardar entras al dashboard del equipo nuevo. De vuelta en `/teams`,
+   ves los dos.
+5. Para ver el aislamiento, invita y activa a otra persona en otro equipo: si pide
+   `GET /v1/teams/<id de Atlas>` con su token, recibe `403 not_a_team_member`.
+
+Los pasos 1 a 3 ya funcionan hoy (son de HU-02). Solo el 4 y el 5 esperan el login.
+
+### El usuario de desarrollo
+
+El realm versionado no trae ninguna persona, y no se le agrega: AD-22 descarta sembrar una
+cuenta con credenciales en el repositorio. Además, una cuenta que existe solo en Keycloak
+no sirve, porque Agilina necesita también su `app_user` y su membresía. El camino
+`make invite` → Mailpit → activación crea las dos cosas, se repite cuando haga falta y no
+deja ningún secreto en el repositorio.
+
 ## Entrar a Keycloak
 
 La consola de administración está en <http://localhost:8080/admin> (con el
@@ -155,8 +250,10 @@ grep '^KEYCLOAK_ADMIN_PASSWORD=' .env | cut -d= -f2
 
 Entras al realm `master`, que es el de administración; el de Agilina es
 `agilina` y se elige en el menú de arriba a la izquierda. Este usuario administra
-Keycloak, no es una persona de Agilina: el realm `agilina` solo tiene la cuenta
-de servicio del worker, y las personas llegan con las invitaciones (HU-02).
+Keycloak, no es una persona de Agilina. El realm `agilina` no tiene ninguna persona:
+solo los clientes `agilina-web`, `agilina-worker` y `agilina-api`, y las cuentas de
+servicio de los dos últimos (la del worker y la que usa la API para crear cuentas). Las
+personas llegan con las invitaciones (HU-02; ver «El usuario de desarrollo»).
 
 La contraseña solo se aplica cuando Keycloak se crea por primera vez, con su
 volumen de datos vacío. Si cambias `KEYCLOAK_ADMIN_PASSWORD` después, Keycloak

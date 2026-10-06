@@ -37,12 +37,3 @@ class ActivatedAccountResponse(BaseModel):
 
 class RequestedResponse(BaseModel):
     status: str = "requested"
-
-
-class ErrorResponse(BaseModel):
-    """Every failure answers with a stable ``code`` the web turns into a message in the
-    person's language; ``detail`` is for developers."""
-
-    code: str
-    detail: str
-    reasons: list[str] | None = None

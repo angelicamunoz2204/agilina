@@ -1,17 +1,19 @@
-/* Global styles: Tailwind and the design tokens (docs/adr/0027). The definitive visual
-   design arrives with the interface stories; for now this keeps the app readable. */
+/* Global styles: Tailwind and the design tokens (docs/adr/0027). The fonts are self-hosted
+   from @fontsource (angular.json), so no request leaves our own server. */
 @import 'tailwindcss';
 
 /* The tokens are the source of truth: a theme (light, dark) is a different set of values
-   for these variables, and nothing else has to change. */
+   for these variables, and nothing else has to change. The values are the light palette of
+   the mockups (Lovable prototype). */
 :root {
-  --agl-background: #0f1419;
-  --agl-surface: #1a2029;
-  --agl-border: #2a323d;
-  --agl-text: #e6eaf0;
-  --agl-text-muted: #9aa5b1;
-  --agl-accent: #4a9d7f;
-  --agl-error: #d9534f;
+  --agl-background: oklch(98.5% 0.005 265);
+  --agl-surface: oklch(100% 0 0);
+  --agl-border: oklch(90.5% 0.012 265);
+  --agl-text: oklch(21% 0.035 265);
+  --agl-text-muted: oklch(52% 0.03 265);
+  --agl-accent: oklch(52% 0.19 268);
+  --agl-accent-text: oklch(99% 0.005 265);
+  --agl-error: oklch(58% 0.21 25);
 }
 
 /* Tailwind reads the tokens as its theme, so `bg-surface`, `text-muted` or `border-border`
@@ -24,12 +26,17 @@
   --color-foreground: var(--agl-text);
   --color-muted: var(--agl-text-muted);
   --color-accent: var(--agl-accent);
+  --color-accent-foreground: var(--agl-accent-text);
   --color-danger: var(--agl-error);
+
+  /* Inter for text, Plus Jakarta Sans for titles (`font-display`). */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   html,
   body {
-    @apply min-h-full bg-background text-foreground;
+    @apply min-h-full bg-background font-sans text-foreground antialiased;
   }
 }

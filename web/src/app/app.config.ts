@@ -12,6 +12,8 @@ import { HttpInvitationApi } from '@features/identity/infrastructure/http-invita
 import { KeycloakLoginAdapter } from '@features/identity/infrastructure/keycloak-login.adapter';
 import { HealthPort } from '@features/status/application/health.port';
 import { HttpHealthApi } from '@features/status/infrastructure/http-health.api';
+import { TeamsPort } from '@features/teams/application/teams.port';
+import { HttpTeamsApi } from '@features/teams/infrastructure/http-teams.api';
 
 import { routes } from './app.routes';
 
@@ -32,6 +34,7 @@ export function createAppConfig(runtimeConfig: RuntimeConfig): ApplicationConfig
       { provide: HealthPort, useClass: HttpHealthApi },
       { provide: InvitationPort, useClass: HttpInvitationApi },
       { provide: LoginRedirectPort, useClass: KeycloakLoginAdapter },
+      { provide: TeamsPort, useClass: HttpTeamsApi },
     ],
   };
 }

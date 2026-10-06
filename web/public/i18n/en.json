@@ -14,6 +14,44 @@
     "retry": "Retry",
     "error_hint": "Start the API with make api and try again."
   },
+  "teams": {
+    "selector": {
+      "title": "Select your team",
+      "loading": "Loading your teams…",
+      "failed": "Your teams could not be loaded. Try again later.",
+      "empty": "You do not belong to any team yet.",
+      "create": "Create a new team",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again."
+      }
+    },
+    "create": {
+      "title": "Create team",
+      "name_label": "Team name",
+      "name_hint": "Up to {{ max }} characters.",
+      "errors": {
+        "blank": "Enter the team's name.",
+        "too_long": "The name cannot be longer than {{ max }} characters."
+      },
+      "defaults_hint": "The team will be created in support mode with English as its language. You will be its Administrator.",
+      "submit": "Create team",
+      "saving": "Creating…",
+      "failed": "The team could not be created. Try again.",
+      "cancel": "Cancel",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+        "invalid_name": "The team name is not valid. Check it and try again."
+      }
+    },
+    "dashboard": {
+      "loading": "Loading the team…",
+      "failed": "This team could not be opened.",
+      "problems": {
+        "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+        "not_a_member": "This team does not exist or you do not belong to it."
+      }
+    }
+  },
   "identity": {
     "activate": {
       "title": "Activate your account",
