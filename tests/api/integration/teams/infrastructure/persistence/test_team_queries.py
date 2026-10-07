@@ -7,11 +7,10 @@ import pytest
 
 from agilina_api.shared.application.access import MembershipRef
 from agilina_api.teams.application.dtos import MemberRecord, TeamView, UserTeamView
-from agilina_api.teams.domain.sprint import SprintStatus
 from agilina_api.teams.domain.team import Team
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_shared.enums import Language, OperationMode, TeamRole
-from tests.api.builders import NOW, TeamBuilder, next_id
+from tests.api.builders import NOW, SprintBuilder, TeamBuilder, next_id
 from tests.api.integration.support import stored_sprint, stored_team, stored_user
 
 pytestmark = pytest.mark.integration
@@ -167,8 +166,8 @@ async def test_list_members_says_whether_the_team_has_a_sprint_in_progress(sessi
     ana = await stored_user(session_factory)
     with_sprint = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
     with_closed = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
-    await stored_sprint(session_factory, with_sprint.id, SprintStatus.ACTIVE)
-    await stored_sprint(session_factory, with_closed.id, SprintStatus.CLOSED)
+    await stored_sprint(session_factory, SprintBuilder().for_team(with_sprint))
+    await stored_sprint(session_factory, SprintBuilder().for_team(with_closed).closed())
     queries = SqlTeamQueries(session_factory)
 
     assert (await queries.list_members(with_sprint.id)).has_active_sprint is True

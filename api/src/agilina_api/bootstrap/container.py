@@ -49,11 +49,15 @@ from agilina_api.shared.infrastructure.settings import Settings
 from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
 from agilina_api.teams.application.commands.create_team import CreateTeamHandler
 from agilina_api.teams.application.commands.create_team_as_admin import CreateTeamAsAdminHandler
+from agilina_api.teams.application.commands.reconfigure_sprint import ReconfigureSprintHandler
 from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
+from agilina_api.teams.application.commands.start_sprint import StartSprintHandler
 from agilina_api.teams.application.ports.outbound import TeamQueries
+from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
+from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit_of_work_factory
 
@@ -74,6 +78,9 @@ class Container:
     list_team_members: ListTeamMembersHandler
     change_member_role: ChangeMemberRoleHandler
     remove_member: RemoveMemberHandler
+    start_sprint: StartSprintHandler
+    reconfigure_sprint: ReconfigureSprintHandler
+    get_active_sprint: GetActiveSprintHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
     team_access: TeamAccess
@@ -166,6 +173,9 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         ),
         change_member_role=ChangeMemberRoleHandler(teams_uow, clock),
         remove_member=RemoveMemberHandler(teams_uow, clock),
+        start_sprint=StartSprintHandler(teams_uow),
+        reconfigure_sprint=ReconfigureSprintHandler(teams_uow),
+        get_active_sprint=GetActiveSprintHandler(SqlSprintQueries(session_factory), clock),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),
         # The teams query answers the shared port as it is: the membership is checked

@@ -1,1 +1,1 @@
-"""Teams persistence: ORM models, mappers and the repository."""
+"""Teams persistence: ORM models, mappers, the repositories and the read queries."""

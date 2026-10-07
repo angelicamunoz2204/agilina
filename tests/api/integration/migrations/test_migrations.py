@@ -1,5 +1,5 @@
-"""The migrations produce the schema the reference DDL defines (with AD-22 and the minimal
-sprint of HU-06), and the ORM models agree with it."""
+"""The migrations produce the schema the reference DDL defines (with AD-22, the sprint of
+HU-06 and the daily's time and participants of HU-07), and the ORM models agree with it."""
 
 import uuid
 from datetime import date
@@ -36,7 +36,15 @@ async def test_every_table_the_story_needs_exists(engine: AsyncEngine):
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
 
-    assert {"app_user", "team", "team_member", "invitation", "sprint", "alembic_version"} <= tables
+    assert {
+        "app_user",
+        "team",
+        "team_member",
+        "invitation",
+        "sprint",
+        "sprint_participant",
+        "alembic_version",
+    } <= tables
 
 
 async def test_citext_and_the_enums_exist(engine: AsyncEngine):
@@ -69,7 +77,9 @@ async def test_created_by_accepts_null_for_the_platform_operator_ad_22(
     assert (await _columns(engine, table))["created_by"] is True
 
 
-@pytest.mark.parametrize("table", ["app_user", "team", "team_member", "invitation", "sprint"])
+@pytest.mark.parametrize(
+    "table", ["app_user", "team", "team_member", "invitation", "sprint", "sprint_participant"]
+)
 async def test_every_orm_column_exists_in_the_database_with_the_same_nullability(
     engine: AsyncEngine, table: str
 ):
@@ -125,9 +135,11 @@ async def _a_team(engine: AsyncEngine) -> str:
         )
 
 
+# The daily's time is required (HU-07); its value does not matter to these tests.
 _SPRINT = text(
-    "INSERT INTO sprint (team_id, start_date, end_date, status) "
-    "VALUES (:team, :start, :end, CAST(:status AS sprint_status))"
+    "INSERT INTO sprint (team_id, start_date, end_date, status, daily_time_utc, daily_time_zone) "
+    "VALUES (:team, :start, :end, CAST(:status AS sprint_status), "
+    "'2026-10-05T14:00:00Z', 'America/Bogota')"
 )
 
 
@@ -135,7 +147,10 @@ async def test_a_new_sprint_is_planned_and_cannot_end_before_it_starts(engine: A
     team = await _a_team(engine)
     async with engine.begin() as connection:
         await connection.execute(
-            text("INSERT INTO sprint (team_id, start_date, end_date) VALUES (:t, :d, :d)"),
+            text(
+                "INSERT INTO sprint (team_id, start_date, end_date, daily_time_utc, "
+                "daily_time_zone) VALUES (:t, :d, :d, '2026-10-05T14:00:00Z', 'America/Bogota')"
+            ),
             {"t": team, "d": date(2026, 10, 5)},
         )
         status = (await connection.execute(text("SELECT status::text FROM sprint"))).scalar_one()
@@ -192,8 +207,9 @@ async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "INSERT INTO sprint (team_id, start_date, end_date, updated_at) "
-                "VALUES (:t, :d, :d, '2000-01-01')"
+                "INSERT INTO sprint (team_id, start_date, end_date, updated_at, daily_time_utc, "
+                "daily_time_zone) "
+                "VALUES (:t, :d, :d, '2000-01-01', '2026-10-05T14:00:00Z', 'America/Bogota')"
             ),
             {"t": team, "d": date(2026, 10, 5)},
         )
@@ -203,6 +219,152 @@ async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
         ).scalar_one()
 
     assert updated is True
+
+
+# ------------------------------------------------------------ HU-07: the daily --
+async def test_no_column_stores_a_local_date_time_or_a_time_of_day(engine: AsyncEngine):
+    """DoD of HU-07 (AD-20, AD-31): instants are ``timestamptz``; a date with no time of day is
+    a ``date``. No column holds a wall-clock time or a time without its offset."""
+    async with engine.connect() as connection:
+        local = (
+            await connection.execute(
+                text(
+                    "SELECT table_name || '.' || column_name FROM information_schema.columns "
+                    "WHERE table_schema = 'public' AND data_type IN ("
+                    "'timestamp without time zone', 'time without time zone', "
+                    "'time with time zone')"
+                )
+            )
+        ).scalars()
+        daily = (
+            await connection.execute(
+                text(
+                    "SELECT data_type FROM information_schema.columns "
+                    "WHERE table_name = 'sprint' AND column_name = 'daily_time_utc'"
+                )
+            )
+        ).scalar_one()
+
+    assert list(local) == []
+    assert daily == "timestamp with time zone"
+
+
+async def test_a_sprint_needs_the_daily_time_and_a_time_zone_that_is_not_blank(
+    engine: AsyncEngine,
+):
+    team = await _a_team(engine)
+    insert = text(
+        "INSERT INTO sprint (team_id, start_date, end_date, daily_time_utc, daily_time_zone) "
+        "VALUES (:team, :d, :d, :at, :zone)"
+    )
+    day = date(2026, 10, 5)
+
+    with pytest.raises(IntegrityError, match="sprint_daily_time_zone_not_blank"):
+        async with engine.begin() as connection:
+            await connection.execute(
+                insert, {"team": team, "d": day, "at": "2026-10-05T14:00:00Z", "zone": "  "}
+            )
+    for missing in ("at", "zone"):
+        values = {"team": team, "d": day, "at": "2026-10-05T14:00:00Z", "zone": "America/Bogota"}
+        with pytest.raises(IntegrityError, match="not-null"):
+            async with engine.begin() as connection:
+                await connection.execute(insert, {**values, missing: None})
+
+
+async def _a_member(engine: AsyncEngine, team: str, email: str) -> str:
+    async with engine.begin() as connection:
+        user = (
+            await connection.execute(
+                text(
+                    "INSERT INTO app_user (keycloak_subject, email, full_name) "
+                    "VALUES (:sub, :email, 'Someone') RETURNING id"
+                ),
+                {"sub": email, "email": email},
+            )
+        ).scalar_one()
+        await connection.execute(
+            text("INSERT INTO team_member (team_id, user_id) VALUES (:team, :user)"),
+            {"team": team, "user": user},
+        )
+    return str(user)
+
+
+async def _an_active_sprint(engine: AsyncEngine, team: str) -> str:
+    async with engine.begin() as connection:
+        return str(
+            (
+                await connection.execute(
+                    text(f"{_SPRINT.text} RETURNING id"),
+                    {
+                        "team": team,
+                        "start": date(2026, 10, 5),
+                        "end": date(2026, 10, 16),
+                        "status": "active",
+                    },
+                )
+            ).scalar_one()
+        )
+
+
+_PARTICIPANT = text(
+    "INSERT INTO sprint_participant (sprint_id, team_id, user_id, turn_order) "
+    "VALUES (:sprint, :team, :user, :turn)"
+)
+
+
+async def test_a_participant_has_one_turn_from_one_and_no_two_share_it(engine: AsyncEngine):
+    team = await _a_team(engine)
+    ana = await _a_member(engine, team, "ana@example.test")
+    bruno = await _a_member(engine, team, "bruno@example.test")
+    sprint = await _an_active_sprint(engine, team)
+    async with engine.begin() as connection:
+        await connection.execute(
+            _PARTICIPANT, {"sprint": sprint, "team": team, "user": ana, "turn": 1}
+        )
+
+    refused = [
+        ({"user": bruno, "turn": 0}, "sprint_participant_turn_order_positive"),
+        ({"user": bruno, "turn": 1}, "sprint_participant_turn_order_unique"),
+        ({"user": ana, "turn": 2}, "sprint_participant_pkey"),
+    ]
+    for values, constraint in refused:
+        with pytest.raises(IntegrityError, match=constraint):
+            async with engine.begin() as connection:
+                await connection.execute(_PARTICIPANT, {"sprint": sprint, "team": team, **values})
+
+
+async def test_a_participant_is_a_member_of_the_very_team_of_the_sprint(engine: AsyncEngine):
+    atlas, boreal = await _a_team(engine), await _a_team(engine)
+    member_of_boreal = await _a_member(engine, boreal, "bea@example.test")
+    sprint_of_atlas = await _an_active_sprint(engine, atlas)
+
+    with pytest.raises(IntegrityError, match="sprint_participant_member_fk"):
+        async with engine.begin() as connection:
+            await connection.execute(
+                _PARTICIPANT,
+                {"sprint": sprint_of_atlas, "team": atlas, "user": member_of_boreal, "turn": 1},
+            )
+    with pytest.raises(IntegrityError, match="sprint_participant_sprint_fk"):
+        async with engine.begin() as connection:
+            await connection.execute(
+                _PARTICIPANT,
+                {"sprint": sprint_of_atlas, "team": boreal, "user": member_of_boreal, "turn": 1},
+            )
+
+
+async def test_deleting_a_sprint_or_its_team_deletes_its_participants(engine: AsyncEngine):
+    count = text("SELECT count(*) FROM sprint_participant")
+    deletes = ("DELETE FROM sprint WHERE id = :sprint", "DELETE FROM team WHERE id = :team")
+    for number, delete in enumerate(deletes):
+        team = await _a_team(engine)
+        ana = await _a_member(engine, team, f"ana-{number}@example.test")
+        sprint = await _an_active_sprint(engine, team)
+        async with engine.begin() as connection:
+            await connection.execute(
+                _PARTICIPANT, {"sprint": sprint, "team": team, "user": ana, "turn": 1}
+            )
+            await connection.execute(text(delete), {"sprint": sprint, "team": team})
+            assert (await connection.execute(count)).scalar_one() == 0
 
 
 def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
@@ -222,7 +384,17 @@ def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
                 for r in connection.execute(text("SELECT typname FROM pg_type WHERE typtype='e'"))
             }
         engine.dispose()
-        assert not {"app_user", "team", "team_member", "invitation", "sprint"} & tables
+        assert (
+            not {
+                "app_user",
+                "team",
+                "team_member",
+                "invitation",
+                "sprint",
+                "sprint_participant",
+            }
+            & tables
+        )
         assert not {"team_role", "invitation_status", "sprint_status"} & enums
 
         command.upgrade(alembic_config("tenant", url), "head")

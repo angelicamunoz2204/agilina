@@ -72,7 +72,7 @@ async def test_the_only_admin_cannot_be_removed_and_nothing_is_saved(scenario):
 
 async def test_a_sprint_in_progress_does_not_prevent_a_removal(scenario):
     team = await scenario.a_team()
-    scenario.uow.sprints = FakeActiveSprints({team.id})
+    scenario.uow.active_sprints = FakeActiveSprints({team.id})
 
     await scenario.handler.handle(
         RemoveMemberBuilder().for_team(team.id).of_user(scenario.bruno).build()

@@ -2,11 +2,19 @@
 
 from uuid import UUID
 
-from agilina_api.teams.application.dtos import TeamMembersList, TeamView, UserTeamView
+from agilina_api.teams.application.dtos import (
+    ActiveSprintView,
+    TeamMembersList,
+    TeamView,
+    UserTeamView,
+)
 from agilina_api.teams.presentation.http.schemas import (
+    ActiveSprintResponse,
     CreatedTeamResponse,
+    DailyParticipantResponse,
     MyTeamResponse,
     RoleOptionResponse,
+    SprintDayResponse,
     TeamMemberResponse,
     TeamMembersResponse,
     TeamResponse,
@@ -45,4 +53,21 @@ def present_members(members: TeamMembersList) -> TeamMembersResponse:
             )
             for member in members.members
         ],
+    )
+
+
+def present_active_sprint(view: ActiveSprintView) -> ActiveSprintResponse:
+    sprint = view.sprint
+    return ActiveSprintResponse(
+        id=sprint.sprint_id,
+        start_date=sprint.start_date,
+        end_date=sprint.end_date,
+        daily_time=sprint.daily_time,
+        time_zone=sprint.time_zone,
+        next_daily_at=view.next_daily_at,
+        participants=[
+            DailyParticipantResponse(user_id=user_id, turn_order=position)
+            for position, user_id in enumerate(sprint.participants, start=1)
+        ],
+        day=SprintDayResponse(number=view.day.number, total=view.day.total, phase=view.day.phase),
     )

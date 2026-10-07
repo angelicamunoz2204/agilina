@@ -5,7 +5,7 @@ consume la API (la web, el worker) y para quien revisa un cambio. La especificac
 y ejecutable está en `/docs` (OpenAPI); este archivo es el resumen que se lee de corrido.
 
 > **Se mantiene junto al código.** Un endpoint nuevo, o una respuesta nueva de uno existente,
-> se documenta aquí en el mismo cambio. Una prueba (`tests/api/unit/test_api_catalog.py`) falla
+> se documenta aquí en el mismo cambio. Una prueba (`tests/api/unit/bootstrap/test_api_catalog.py`) falla
 > si una ruta no está aquí, si una ruta de aquí ya no existe, o si un código de error no está en
 > el catálogo.
 
@@ -80,6 +80,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 404 | `member_not_found` | La persona no es miembro activo del equipo: nunca lo fue o ya la retiraron | — |
 | 409 | `last_admin` | El cambio dejaría al equipo sin admin: a su único admin no se le baja el rol ni se le retira, tampoco por su propia mano | — |
 | 409 | `sprint_in_progress` | El equipo tiene un sprint en curso: los roles no cambian mientras dure | — |
+| 404 | `no_active_sprint` | El equipo no tiene un sprint activo que editar | — |
 | 422 | `invalid_email` | El correo no es una dirección válida | — |
 | 422 | `invalid_full_name` | El nombre de la persona está en blanco | — |
 | 409 | `already_a_team_member` | La persona ya es miembro activo del equipo | — |
@@ -292,6 +293,79 @@ servidor de correo lo rechaza no cambia nada.
 | 422 | error `validation_error` | Falta `full_name` o `email`, el rol no existe, un texto es demasiado largo o hay un campo desconocido |
 | 422 | error `invalid_email` / `invalid_full_name` | El correo no es válido o el nombre está en blanco |
 | 502 | error `mail_unavailable` | No se pudo enviar el correo; nada se guarda |
+
+## Sprint
+
+El sprint activo del equipo (HU-07): su periodo, la hora de la daily y quiénes participan en
+ella, en orden de turno. Requieren tenant y sesión. Leerlo lo puede cualquier integrante; crearlo y
+editarlo, solo sus admins.
+
+El cuerpo de crear y de editar es el mismo: `{start_date, end_date, daily_time, time_zone,
+participants}` (un campo desconocido se rechaza).
+
+- `start_date` y `end_date` son fechas de calendario (`AAAA-MM-DD`), sin hora y ambas incluidas.
+  Pueden caer cualquier día de la semana y cuentan todos los días del periodo.
+- `daily_time` es la hora de pared de la daily como un instante con su desfase (la web envía la
+  del día de inicio en UTC, `Z`), y `time_zone` es la zona IANA del navegador de quien guarda
+  ([AD-31](adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)). Se guarda el
+  instante en UTC junto con la zona; la hora de pared y el calendario del sprint («hoy») son los de
+  esa zona. Guardar reemplaza la zona por la de quien guarda.
+- `participants` son los `user_id` de los integrantes que participan en la daily, en orden de
+  turno: el primero habla primero.
+
+La respuesta de las tres rutas es el sprint activo: `{id, start_date, end_date, daily_time,
+time_zone, next_daily_at, participants: [{user_id, turn_order}], day: {number, total, phase}}`.
+`daily_time` es el instante de anclaje en UTC; `next_daily_at`, la próxima daily en UTC, calculada
+por la API con el horario de verano incluido (`null` cuando ya empezó la última del sprint), y es
+la que la web muestra en la zona del navegador. `turn_order` va desde 1. `day` es el día N de M en
+el momento de la petición: `total` (M) son los días del periodo; `phase` es `not_started` (N = 0),
+`in_progress` (N de 1 a M) o `finished` (N = M). La fase se calcula, no se guarda: un sprint
+activo puede no haber empezado o haber terminado ya.
+
+Un sprint guardado queda `active` aunque empiece en el futuro, y mientras lo esté no cambian los
+roles del equipo (`409 sprint_in_progress` en `PATCH …/members/{user_id}`). Cerrarlo es la HU-10.
+
+### `POST /v1/teams/{team_id}/sprints`
+
+Configura el sprint del equipo, que queda activo. Solo para los admins del equipo.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 201 | El sprint activo; cabecera `Location: /v1/teams/{team_id}/sprints/active` | Sprint guardado y activo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
+| 404 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
+| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
+
+### `GET /v1/teams/{team_id}/sprints/active`
+
+El sprint activo del equipo con su día N de M y su próxima daily, para cualquier integrante (el
+dashboard lo usa). Sin sprint activo responde `200` con `null`: es un estado normal, no un error.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | El sprint activo, o `null` si el equipo no tiene uno | El usuario es miembro activo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 422 | error `validation_error` | `team_id` no es un UUID |
+
+### `PUT /v1/teams/{team_id}/sprints/active`
+
+Reemplaza toda la configuración del sprint activo: periodo, hora de la daily con la zona de quien
+guarda y participantes con su orden. El sprint sigue activo. Solo para los admins del equipo.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | El sprint activo, con los cambios | Sprint editado |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
+| 404 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
+| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
 
 ## Ceremonias (contrato del worker)
 

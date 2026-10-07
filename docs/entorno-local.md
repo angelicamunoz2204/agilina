@@ -363,11 +363,12 @@ no existe responde `422 validation_error`, con el mismo formato que los demás e
 | Rol al invitar (`role`) | `member` | Si no lo envías. La activación asigna el rol que viajó en la invitación |
 | Etiqueta (`label`) | El mismo código del rol | Hoy `admin` o `member`; cuando exista la etiqueta según el modo del equipo (HU-04) se calculará con esa regla |
 | Vigencia del enlace | 7 días, un solo uso | Es la invitación de HU-02, sin cambios |
-| Sprint activo | Bloquea el cambio de rol | La tabla `sprint` es mínima (equipo, fechas y estado) y vive en la migración inicial del tenant; la amplía HU-07. Todavía no hay API para crear sprints |
+| Sprint activo | Bloquea el cambio de rol | La tabla `sprint` vive en la migración inicial del tenant (HU-06 la creó y HU-07 le agrega la hora de la daily y sus participantes). El sprint se crea con `POST /v1/teams/{team_id}/sprints` y queda activo (ver [api.md](api.md#sprint)) |
 
-Como la tabla `sprint` se agregó a la migración inicial del tenant (las migraciones se reescriben
-mientras el desarrollo sea local), un entorno creado antes de HU-06 no la tiene: hay que
-reconstruirlo con `make clean` y `make up`, que borra las bases y los usuarios de Keycloak locales.
+Como la tabla `sprint` se agregó a la migración inicial del tenant y HU-07 la reescribió (las
+migraciones se reescriben mientras el desarrollo sea local), un entorno creado antes de HU-07 no
+tiene las columnas de la daily ni la tabla `sprint_participant`: hay que reconstruirlo con
+`make clean` y `make up`, que borra las bases y los usuarios de Keycloak locales.
 
 Las reglas se aplican en la API aunque la pantalla también las muestre: el listado avisa
 el motivo para que la web deshabilite el control, pero un `PATCH` o un `DELETE` directo
@@ -399,8 +400,9 @@ los pasos 1 a 3 de «Cómo probarlo» de *Crear equipos*, que inicia sesión en 
 6. Con la sesión de un Miembro, abrir `/acme/teams/<id>/settings` por URL muestra «sin acceso»,
    y cualquiera de las cuatro rutas responde `403 not_a_team_admin`.
 
-El cambio de rol con un sprint activo todavía no se puede ver en la pantalla, porque no hay
-API para crear sprints (HU-07); lo cubren las pruebas automatizadas. Swagger
+El cambio de rol con un sprint activo todavía no se puede ver en la pantalla, porque la pantalla
+del sprint llega con HU-07 (Configuración → Sprint); mientras tanto se crea un sprint con
+`POST /v1/teams/{team_id}/sprints` desde Swagger, y lo cubren las pruebas automatizadas. Swagger
 (<http://localhost:8000/docs>) muestra las cuatro operaciones en la sección *teams* con
 sus códigos de error; sin un token válido responden `401 not_authenticated`.
 

@@ -4,10 +4,11 @@ from typing import Protocol
 
 from agilina_api.shared.application.ports import UnitOfWork
 from agilina_api.teams.application.ports.outbound.active_sprints import ActiveSprints
-from agilina_api.teams.domain.repositories import TeamRepository
+from agilina_api.teams.domain.repositories import SprintRepository, TeamRepository
 
 
 class TeamsUnitOfWork(UnitOfWork, Protocol):
     teams: TeamRepository
-    sprints: ActiveSprints
+    sprints: SprintRepository
+    active_sprints: ActiveSprints
     """Read inside the same transaction, after the team is loaded (and locked)."""

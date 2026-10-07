@@ -6,7 +6,10 @@ the infrastructure one.
 
 from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
 from agilina_api.teams.application.commands.create_team_as_admin import CreateTeamAsAdminHandler
+from agilina_api.teams.application.commands.reconfigure_sprint import ReconfigureSprintHandler
 from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
+from agilina_api.teams.application.commands.start_sprint import StartSprintHandler
+from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
@@ -33,4 +36,16 @@ def get_change_member_role_handler() -> ChangeMemberRoleHandler:
 
 
 def get_remove_member_handler() -> RemoveMemberHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_start_sprint_handler() -> StartSprintHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_reconfigure_sprint_handler() -> ReconfigureSprintHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_get_active_sprint_handler() -> GetActiveSprintHandler:
     raise NotImplementedError("Wired by the composition root")

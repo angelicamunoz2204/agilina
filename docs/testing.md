@@ -63,6 +63,8 @@ await InvitationBuilder().for_team(team.id).saved_in(uow.invitations)
 | `IssueInvitationBuilder`, `ActivateAccountBuilder`, `RequestNewInvitationBuilder` | Los comandos de invitación y activación (HU-02) |
 | `InviteToTeamBuilder` | Un admin invita a alguien a su equipo (HU-06); `by_admin(user_id, membership_id)` fija quién invita y la membresía que queda como autora |
 | `ChangeMemberRoleBuilder`, `RemoveMemberBuilder` | Un admin cambia el rol de un integrante o lo saca del equipo (HU-06) |
+| `SprintBuilder` | Un sprint activo del 2026-10-05 al 2026-10-16 con la daily a las 09:00 de America/Bogota (HU-07); `for_team(equipo)` llama a la daily a sus integrantes activos, `with_period`, `with_daily_time`, `with_participants` (en orden de turno) y `closed()` / `planned()` (se restauran tal como se guardan: cerrar un sprint llega con HU-10) |
+| `StartSprintBuilder`, `ReconfigureSprintBuilder` | Un admin configura el sprint o edita el activo (HU-07), con los mismos valores por defecto que `SprintBuilder` |
 | `ContactBuilder`, `TeamContactsBuilder`, `EmailMessageBuilder` | Datos de lectura y mensajes de correo |
 
 Reglas:
@@ -89,8 +91,9 @@ Reglas:
   mismo token o dos usuarios con el mismo correo: `with_unique_token()` y
   `with_unique_email()` evitan el choque. Un integrante removido se guarda con
   `stored_team(session_factory, TeamBuilder()….with_removed_member(user_id))`, no con un
-  `UPDATE` directo. `stored_sprint(session_factory, team_id, status)` es la excepción: el
-  sprint todavía no tiene agregado (llega con HU-07), así que escribe la fila tal cual.
+  `UPDATE` directo. Un sprint se guarda igual, por su repositorio:
+  `stored_sprint(session_factory, SprintBuilder().for_team(equipo).closed())`; sus
+  participantes deben ser integrantes del equipo, porque la base lo exige.
 - Si te falta un builder, **agrégalo en `builders/`**, no en el archivo de la prueba.
 
 ## Los dobles
@@ -106,6 +109,7 @@ En `tests/api/doubles/`, uno por puerto, en memoria. Los que más se usan:
 | `FakeAuthenticatedUsers` | `AuthenticatedUsers` | Reemplaza la validación del token de Keycloak (HU-03): cada token es un usuario |
 | `FakeTeamAccess`, `FakeTeamQueries` | `TeamAccess`, `TeamQueries` | La membresía y el rol de cada usuario, y lo que leen las consultas |
 | `FakeActiveSprints` | `ActiveSprints` | Los equipos que tienen un sprint en curso |
+| `InMemorySprintRepository`, `FakeSprintQueries` | `SprintRepository`, `SprintQueries` | Los sprints guardados (copias, como la base) y su lectura: `FakeSprintQueries(repositorio)` lee lo que el repositorio guardó, así que una ruta que guarda y luego lee ve lo guardado |
 | `FakeMemberContacts` | `MemberContactsDirectory` | El nombre y el correo de cada integrante; los demás no tienen cuenta |
 
 ### Flujos de punta a punta
@@ -120,7 +124,8 @@ Para los casos de uso que cruzan identity y teams sin pasar por HTTP,
 `tests/api/integration/world.py` arma `World`: base real, repositorios reales y los mismos
 dobles. Tiene la invitación y la activación de HU-02 y, de HU-06, `invite_to_team`,
 `list_members`, `change_role` y `remove`; `admin_invites(team_id, admin_id, …)` invita
-como lo hace la ruta, con la membresía del admin como autora. Escribe los correos con
+como lo hace la ruta, con la membresía del admin como autora. De HU-07 tiene
+`start_sprint`, `reconfigure_sprint` y `active_sprint` (la lectura, con el reloj de `World`). Escribe los correos con
 `FakeRenderer` (plantilla y parámetros); `World(session_factory, JinjaEmailRenderer())` usa
 las plantillas reales cuando la prueba necesita leer lo que recibe la persona.
 

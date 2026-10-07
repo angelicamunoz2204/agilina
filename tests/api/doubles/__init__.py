@@ -17,8 +17,10 @@ from tests.api.doubles.mail import FakeMailer, FakeRenderer
 from tests.api.doubles.teams import (
     FakeActiveSprints,
     FakeMemberContacts,
+    FakeSprintQueries,
     FakeTeamQueries,
     FakeTeamsUnitOfWork,
+    InMemorySprintRepository,
     InMemoryTeamRepository,
 )
 from tests.api.doubles.tenancy import FakeTenantDirectory
@@ -35,6 +37,7 @@ __all__ = [
     "FakeMemberContacts",
     "FakeRealmKeys",
     "FakeRenderer",
+    "FakeSprintQueries",
     "FakeTeamAccess",
     "FakeTeamContactsDirectory",
     "FakeTeamMembership",
@@ -43,6 +46,7 @@ __all__ = [
     "FakeTenantDirectory",
     "FakeTokenGenerator",
     "InMemoryInvitationRepository",
+    "InMemorySprintRepository",
     "InMemoryTeamRepository",
     "InMemoryUserRepository",
 ]

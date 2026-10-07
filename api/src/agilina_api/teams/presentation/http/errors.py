@@ -11,6 +11,7 @@ from agilina_api.teams.domain.errors import (
     InvalidTeamNameError,
     LastAdminError,
     MemberNotFoundError,
+    NoActiveSprintError,
     RoleChangeDuringActiveSprintError,
     TeamNotFoundError,
 )
@@ -27,6 +28,7 @@ class TeamsErrors:
     SPRINT_IN_PROGRESS = ApiError(
         409, "sprint_in_progress", "Roles do not change while a sprint is in progress."
     )
+    NO_ACTIVE_SPRINT = ApiError(404, "no_active_sprint", "The team has no active sprint.")
 
 
 TEAMS_ERRORS: tuple[ErrorMapping, ...] = (
@@ -35,4 +37,5 @@ TEAMS_ERRORS: tuple[ErrorMapping, ...] = (
     ErrorMapping(MemberNotFoundError, TeamsErrors.MEMBER_NOT_FOUND),
     ErrorMapping(LastAdminError, TeamsErrors.LAST_ADMIN),
     ErrorMapping(RoleChangeDuringActiveSprintError, TeamsErrors.SPRINT_IN_PROGRESS),
+    ErrorMapping(NoActiveSprintError, TeamsErrors.NO_ACTIVE_SPRINT),
 )

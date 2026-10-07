@@ -156,6 +156,15 @@ def create_app() -> FastAPI:
         teams_dependencies.get_remove_member_handler: from_container(
             lambda container: container.remove_member
         ),
+        teams_dependencies.get_start_sprint_handler: from_container(
+            lambda container: container.start_sprint
+        ),
+        teams_dependencies.get_reconfigure_sprint_handler: from_container(
+            lambda container: container.reconfigure_sprint
+        ),
+        teams_dependencies.get_get_active_sprint_handler: from_container(
+            lambda container: container.get_active_sprint
+        ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_team_access: from_container(lambda container: container.team_access),
     }
