@@ -164,9 +164,13 @@ test-web: env ## Tests of the Angular application (headless Chromium)
 
 test-e2e: env ## End-to-end tests in a real browser against the running environment (make up first)
 	@run=$$(date +%s); email="e2e-$$run@example.test"; team="E2E $$run"; \
-	echo "Inviting $$email to '$$team'..."; \
+	admin="e2e-admin-$$run@example.test"; admin_team="E2E Integrantes $$run"; \
+	member="e2e-member-$$run@example.test"; \
+	echo "Inviting $$email to '$$team' and $$admin to '$$admin_team'..."; \
 	$(MAKE) --no-print-directory invite team="$$team" email="$$email" name="Eva Prueba" lang=es >/dev/null && \
-	E2E_EMAIL="$$email" E2E_TEAM="$$team" $(COMPOSE) --profile tools run --rm --build e2e
+	$(MAKE) --no-print-directory invite team="$$admin_team" email="$$admin" name="Ada Prueba" lang=es >/dev/null && \
+	E2E_EMAIL="$$email" E2E_TEAM="$$team" E2E_ADMIN_EMAIL="$$admin" E2E_ADMIN_TEAM="$$admin_team" \
+	E2E_MEMBER_EMAIL="$$member" $(COMPOSE) --profile tools run --rm --build e2e
 
 coverage: env ## Unit + integration coverage of the API and the contract; fails below 100 %
 	$(COMPOSE) --profile tools run --rm --build tools sh -c "pytest --cov --cov-report= \

@@ -233,6 +233,9 @@ services:
     environment:
       E2E_EMAIL: ${E2E_EMAIL:-}
       E2E_TEAM: ${E2E_TEAM:-}
+      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-}
+      E2E_ADMIN_TEAM: ${E2E_ADMIN_TEAM:-}
+      E2E_MEMBER_EMAIL: ${E2E_MEMBER_EMAIL:-}
 
   web-test:
     build:

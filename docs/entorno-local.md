@@ -250,9 +250,16 @@ make keycloak-theme    # reconstruye la imagen y reinicia solo Keycloak (conserv
 
 ```bash
 make up           # el entorno tiene que estar levantado
-make test-e2e     # invita a una persona nueva y recorre, en un navegador real (Playwright), invitar →
-                  # activar → iniciar sesión → entrar al equipo → volver a la página pedida
+make test-e2e     # invita a dos personas nuevas, cada una en su equipo, y recorre en un navegador real
+                  # (Playwright) el login (HU-03) y la gestión de integrantes (HU-06)
 ```
+
+- `tests/e2e/specs/sign-in.spec.ts`: invitar → activar → iniciar sesión → entrar al equipo →
+  volver a la página pedida.
+- `tests/e2e/specs/team-members.spec.ts`: una Administradora abre Configuración → Equipo,
+  invita a alguien (el enlace llega a Mailpit), esa persona lo activa y, como Miembro, ve
+  «sin acceso» en la pantalla; luego se le cambia el rol, se la elimina con la confirmación y,
+  al invitarla de nuevo, entra de inmediato con el aviso sin enlace.
 
 Corren en un contenedor sobre la red del anfitrión (Linux), con el entorno de `make up`.
 
@@ -341,6 +348,8 @@ sus códigos de error; sin un token válido responden `401 not_authenticated`.
 
 **Pruebas automatizadas.**
 
+- `make test-e2e` recorre los pasos 1 a 4 y 6 en un navegador real, con Keycloak y Mailpit
+  (ver [Pruebas de punta a punta](#pruebas-de-punta-a-punta)).
 - `make test-integration` corre la API real contra PostgreSQL, con la validación del token
   doblada (`FakeAuthenticatedUsers`) y el correo simulado:
   - `tests/api/integration/teams/presentation/http/test_team_members_flow.py`: el listado
