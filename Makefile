@@ -23,8 +23,8 @@ WEB_RW    := $(COMPOSE) run --rm --no-deps --build -u "$(HOST_UID):$(HOST_GID)" 
 PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
-        lint format typecheck arch test test-python test-integration test-keycloak test-web coverage verify \
-        invite mail-test lock hooks keycloak-admin keycloak-reset credentials clean
+        lint format typecheck arch test test-python test-integration test-keycloak test-web test-e2e coverage verify \
+        invite mail-test lock hooks keycloak-admin keycloak-reset keycloak-theme credentials clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -83,6 +83,9 @@ keycloak-reset: env ## Re-import the Keycloak realm from infra/keycloak (deletes
 	$(COMPOSE) rm -sf keycloak
 	-docker volume rm agilina_keycloak-data
 	$(COMPOSE) up -d --wait keycloak
+
+keycloak-theme: env ## Rebuild the Keycloak login theme and restart only Keycloak (keeps its data)
+	$(COMPOSE) up -d --build --no-deps keycloak
 
 credentials: env ## Show the local URLs and credentials: Postgres, pgAdmin and Keycloak
 	@echo "Postgres   localhost:$$(grep '^POSTGRES_PORT=' .env | cut -d= -f2)   (inside the network: postgres:5432)"
@@ -158,6 +161,12 @@ test-keycloak: env ## Tests against the real Keycloak (starts it and waits for i
 
 test-web: env ## Tests of the Angular application (headless Chromium)
 	$(COMPOSE) --profile tools run --rm --no-deps --build web-test
+
+test-e2e: env ## End-to-end tests in a real browser against the running environment (make up first)
+	@run=$$(date +%s); email="e2e-$$run@example.test"; team="E2E $$run"; \
+	echo "Inviting $$email to '$$team'..."; \
+	$(MAKE) --no-print-directory invite team="$$team" email="$$email" name="Eva Prueba" lang=es >/dev/null && \
+	E2E_EMAIL="$$email" E2E_TEAM="$$team" $(COMPOSE) --profile tools run --rm --build e2e
 
 coverage: env ## Unit + integration coverage of the API and the contract; fails below 100 %
 	$(COMPOSE) --profile tools run --rm --build tools sh -c "pytest --cov --cov-report= \

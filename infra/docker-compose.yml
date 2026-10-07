@@ -45,18 +45,28 @@ services:
       retries: 20
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    # Keycloak with the Agilina login theme built in (infra/docker/keycloak.Dockerfile).
+    build:
+      context: ..
+      dockerfile: infra/docker/keycloak.Dockerfile
+    image: agilina-keycloak
     container_name: agilina-keycloak
     restart: unless-stopped
     # start-dev stores in its own embedded database: it does not depend on
     # Postgres. The cloud deployment will use it (HU-38).
-    command: ["start-dev", "--import-realm"]
+    command: ["start-dev", "--import-realm", "--spi-theme--cache-themes=false", "--spi-theme--cache-templates=false"]
     environment:
       # Keycloak admin credentials: they come from .env, never from the repository.
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is missing in .env; run make env}
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_PORT: "8080"
+      # The issuer of every token is the public URL, whoever asks for it: the browser
+      # reaches Keycloak at localhost:8080 and the API at keycloak:8080, and both must see
+      # the same `iss` or the API would reject every token (HU-03). The backchannel stays
+      # dynamic so that the API keeps reading the keys through the internal network.
+      KC_HOSTNAME: ${AGILINA_KEYCLOAK_URL:-http://localhost:8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       # Substituted into the realm file when it is imported (the API client's secret).
       AGILINA_KEYCLOAK_API_SECRET: ${AGILINA_KEYCLOAK_API_SECRET:?AGILINA_KEYCLOAK_API_SECRET is missing in .env; run make env}
     ports:
@@ -143,6 +153,8 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       AGILINA_KEYCLOAK_URL: http://keycloak:8080
+      # The issuer of the tokens: the URL the browser uses, not the internal one above.
+      AGILINA_KEYCLOAK_PUBLIC_URL: ${AGILINA_KEYCLOAK_URL:-http://localhost:8080}
       AGILINA_STT_URL: http://stt:8001
     ports:
       - "${AGILINA_API_PORT:-8000}:8000"
@@ -204,9 +216,23 @@ services:
       POSTGRES_PORT: "5432"
       # For `make test-keycloak`; the other tests never look at it.
       AGILINA_KEYCLOAK_URL: http://keycloak:8080
+      # The issuer of the tokens: the URL the browser uses, not the internal one above.
+      AGILINA_KEYCLOAK_PUBLIC_URL: ${AGILINA_KEYCLOAK_URL:-http://localhost:8080}
     depends_on:
       postgres:
         condition: service_healthy
+
+  # End-to-end tests in a real browser (`make test-e2e`). On the host network so that the
+  # browser sees the environment the way a person does: web on localhost:4200 and Keycloak on
+  # localhost:8080, the address the web is configured with and the issuer of the tokens.
+  e2e:
+    build:
+      context: ../tests/e2e
+    profiles: ["tools"]
+    network_mode: host
+    environment:
+      E2E_EMAIL: ${E2E_EMAIL:-}
+      E2E_TEAM: ${E2E_TEAM:-}
 
   web-test:
     build:
