@@ -171,7 +171,11 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 
 - **Todo en UTC** (AD-20). El instante se obtiene de un puerto `Clock`, nunca de
   `datetime.now()` en el dominio: así la caducidad de siete días se prueba sin
-  esperar. La zona horaria es asunto del navegador.
+  esperar. La zona horaria es asunto del navegador, con una excepción: la **zona de
+  captura** de la hora de la daily, que se guarda junto al instante UTC y define el
+  calendario del sprint ([AD-31](adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)).
+  Las reglas que dependen de ella (`daily_occurrences`, `sprint_day_at`) reciben el instante
+  como parámetro y viven en `agilina_shared/sprint_calendar/`.
 - Lo aleatorio y lo secreto (tokens) viene de un puerto (`TokenGenerator`) que
   usa `secrets`; el token en claro nunca se persiste, solo su hash.
 - **Dos niveles de aislamiento.** El **tenant** es la organización, con su base de datos y su

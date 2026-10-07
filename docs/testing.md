@@ -26,6 +26,12 @@ tests/
 archivo se repiten entre `unit/` e `integration/`; por eso pytest usa
 `--import-mode=importlib`.
 
+`tests/shared/unit/` sigue el mismo espejo, un subpaquete de `agilina_shared` por carpeta:
+`agilina_shared/sprint_calendar/sprint_day_at.py` se prueba en
+`tests/shared/unit/sprint_calendar/test_sprint_day_at.py`. Las pruebas que ya estaban en la
+raíz (`test_contract.py`, `test_i18n.py`) cubren módulos de la raíz del paquete o varios
+subpaquetes a la vez.
+
 ## Qué se prueba en cada capa
 
 | Capa | Cómo | Árbol |

@@ -13,7 +13,7 @@ contrato entre ellos.
 
 ```
 agilina/
-├── shared/    Contrato worker ↔ API, enums y textos i18n (Python)
+├── shared/    Contrato worker ↔ API, enums, reglas puras compartidas y textos i18n (Python)
 ├── api/       API en FastAPI: un paquete por contexto, cada uno en cuatro capas
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre durante la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper (GPU)
@@ -204,13 +204,20 @@ corre en cualquier máquina y en el pipeline.
 ```
 shared/src/agilina_shared/
 ├── contract/      CeremonyContext, CeremonyResult, ParticipantContext, TranscriptSegment (un archivo por clase)
-├── enums/         OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus (un archivo por clase)
-└── i18n.py        Plantillas de lo que Agilina dice, en español e inglés
+├── enums/            OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus (un archivo por clase)
+├── sprint_calendar/  daily_occurrences, sprint_day_at, SprintDay, SprintPhase (un archivo por clase o función)
+└── i18n.py           Plantillas de lo que Agilina dice, en español e inglés
 ```
 
 Es el *lenguaje publicado* entre desplegables, no un dominio. No puede importar
 ninguno de los tres desplegables. Un cambio incompatible sube
 `CONTRACT_VERSION` y se declara con `BREAKING CHANGE` en el pie del commit.
+
+Aloja también las **reglas puras** que más de un desplegable debe calcular igual: hoy,
+`sprint_calendar/` (las ocurrencias de la daily y el día N de M), que usan la API, el agente y
+el planificador ([AD-31](adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)).
+Una regla así usa solo la biblioteca estándar, no lee el reloj ni la base de datos y recibe el
+instante como parámetro.
 
 ### `web/`
 
