@@ -1,6 +1,6 @@
 {
-  "realm": "agilina",
-  "displayName": "Agilina",
+  "realm": "${TENANT_REALM}",
+  "displayName": "${TENANT_NAME}",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
@@ -19,7 +19,7 @@
     "es",
     "en"
   ],
-  "defaultLocale": "es",
+  "defaultLocale": "${TENANT_LOCALE}",
   "loginTheme": "agilina",
   "passwordPolicy": "length(12) and notUsername and notEmail",
   "accessTokenLifespan": 900,
@@ -88,7 +88,7 @@
     {
       "clientId": "agilina-api",
       "name": "Agilina API",
-      "description": "Service account the API uses to create the account of a person who accepts an invitation (HU-02). It can only manage users. The secret is AGILINA_KEYCLOAK_API_SECRET of the .env, substituted on import: it does not live in the repository.",
+      "description": "Service account the API uses to create the account of a person who accepts an invitation (HU-02). It can only manage users. Its secret is the tenant's, from the .env: not in the repository.",
       "enabled": true,
       "publicClient": false,
       "protocol": "openid-connect",
@@ -97,7 +97,7 @@
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${AGILINA_KEYCLOAK_API_SECRET}",
+      "secret": "${TENANT_API_SECRET}",
       "redirectUris": [],
       "webOrigins": []
     }

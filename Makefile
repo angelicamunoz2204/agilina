@@ -24,7 +24,7 @@ PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
         lint format typecheck arch test test-python test-integration test-keycloak test-web test-e2e coverage verify \
-        invite mail-test lock hooks keycloak-admin keycloak-reset keycloak-theme credentials clean
+        invite mail-test lock hooks keycloak-admin keycloak-reset keycloak-theme tenant-add tenants-dev tenant-realms migration-platform credentials clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -39,7 +39,8 @@ env: ## Create .env from .env.example, or complete it, with generated local pass
 		grep -q "^$$key=" .env || { grep "^$$key=" .env.example >> .env; echo "Added $$key to .env"; }; \
 	done
 	@# Local passwords that are still empty are generated.
-	@for key in POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD PGADMIN_ADMIN_PASSWORD AGILINA_KEYCLOAK_API_SECRET; do \
+	@for key in POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD PGADMIN_ADMIN_PASSWORD \
+			AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET; do \
 		grep -Eq "^$$key=.+" .env || { \
 			sed -i.bak -e "s|^$$key=.*|$$key=$$(openssl rand -hex 16)|" .env && rm -f .env.bak; \
 			echo "Generated $$key in .env"; }; \
@@ -49,6 +50,7 @@ up: env ## THE command: build and start everything, wait, migrate
 	$(COMPOSE) up -d --build postgres pgadmin keycloak mailpit api web
 	./infra/wait-for-services.sh
 	$(MAKE) migrate
+	$(MAKE) tenants-dev
 	@echo ""
 	@echo "Environment ready:"
 	@echo "  API       http://localhost:8000/docs"
@@ -77,12 +79,14 @@ keycloak-admin: env ## Show the Keycloak admin console and its credentials
 	@echo "http://localhost:8080/admin"
 	@grep -E '^KEYCLOAK_ADMIN(_PASSWORD)?=' .env
 
-# The realm is imported only when Keycloak starts with an empty volume: a change to
-# infra/keycloak/realm-agilina.json needs this. It deletes Keycloak's data, not Postgres'.
-keycloak-reset: env ## Re-import the Keycloak realm from infra/keycloak (deletes only Keycloak's data)
+# The realms are the tenants': they are created from infra/keycloak/realm-template.json by
+# `make tenant-add`. A change to the template reaches a realm that already exists only by
+# starting Keycloak from scratch: this deletes Keycloak's data (its users too), not Postgres'.
+keycloak-reset: env ## Start Keycloak from scratch and recreate the realm of every tenant
 	$(COMPOSE) rm -sf keycloak
 	-docker volume rm agilina_keycloak-data
 	$(COMPOSE) up -d --wait keycloak
+	$(MAKE) tenant-realms
 
 keycloak-theme: env ## Rebuild the Keycloak login theme and restart only Keycloak (keeps its data)
 	$(COMPOSE) up -d --build --no-deps keycloak
@@ -96,22 +100,50 @@ credentials: env ## Show the local URLs and credentials: Postgres, pgAdmin and K
 	@grep -E '^KEYCLOAK_ADMIN(_PASSWORD)?=' .env | sed 's/^/           /'
 
 # --------------------------------------------------------------- Database ---
-migrate: env ## Apply the pending database migrations
-	$(COMPOSE) run --rm --build -w /app/api api alembic upgrade head
+migrate: env ## Create and migrate the catalog and the database of every tenant
+	$(COMPOSE) run --rm --build api python -m agilina_api.bootstrap.migrate
 
-# Autogenerate is deliberately not used (see docs/code-conventions.md): this creates an
-# empty revision to fill in by hand, in SQL.
-migration: env ## Create an empty migration to write in SQL: make migration m="description"
+# Autogenerate is deliberately not used (see docs/code-conventions.md): these create an
+# empty revision to fill in by hand, in SQL. `migration` is for the tenants' schema (identity,
+# teams) and `migration-platform` for the catalog's.
+migration: env ## Create an empty migration of the tenants' schema to write in SQL: make migration m="description"
 	@test -n "$(m)" || { echo 'Usage: make migration m="description"'; exit 1; }
-	$(COMPOSE) run --rm --build -w /app/api api alembic revision -m "$(m)"
+	$(COMPOSE) run --rm --build -w /app/api api alembic -n tenant revision -m "$(m)"
+
+migration-platform: env ## Create an empty migration of the catalog to write in SQL: make migration-platform m="description"
+	@test -n "$(m)" || { echo 'Usage: make migration-platform m="description"'; exit 1; }
+	$(COMPOSE) run --rm --build -w /app/api api alembic -n platform revision -m "$(m)"
+
+# ---------------------------------------------------------------- Tenants ---
+# A tenant is an organization: its own database, its own Keycloak realm and its own login
+# (AD-29). There is no panel: the administrators are the developers. Adding one is this
+# command; suspending it or changing its name is an UPDATE of the `tenant` table of the catalog.
+tenant-add: env ## Add a tenant: make tenant-add slug=acme name="ACME Corporation" [lang=en|es]
+	@test -n "$(slug)" -a -n "$(name)" || { \
+		echo 'Usage: make tenant-add slug=acme name="ACME Corporation" [lang=es|en]'; exit 1; }
+	@key=AGILINA_TENANT_$$(echo "$(slug)" | tr 'a-z' 'A-Z')_KEYCLOAK_API_SECRET; \
+	grep -Eq "^$$key=.+" .env || { \
+		sed -i.bak "/^$$key=/d" .env && rm -f .env.bak; \
+		echo "$$key=$$(openssl rand -hex 16)" >> .env; \
+		echo "Generated $$key in .env"; \
+		$(COMPOSE) up -d --no-deps api; }
+	$(COMPOSE) run --rm --build api python -m agilina_api.bootstrap.tenant_admin \
+		--slug "$(slug)" --name "$(name)" $(if $(lang),--lang "$(lang)",)
+
+tenants-dev: env ## Make sure the development tenants (acme, ecomoda) exist; safe to repeat
+	$(MAKE) --no-print-directory tenant-add slug=acme name="ACME Corporation" lang=en
+	$(MAKE) --no-print-directory tenant-add slug=ecomoda name="Ecomoda" lang=es
+
+tenant-realms: env ## Create the Keycloak realm of every tenant of the catalog that has none
+	$(COMPOSE) run --rm --build api python -m agilina_api.bootstrap.tenant_admin --realms-only
 
 # --------------------------------------------------------------- Operator ---
-invite: env ## Create a team and invite its first admin: make invite team="Atlas" email=a@b.com name="Ana Gil" [lang=es] [role=admin]
-	@test -n "$(email)" -a -n "$(name)" -a \( -n "$(team)" -o -n "$(team_id)" \) || { \
-		echo 'Usage: make invite team="Atlas" email=a@b.com name="Ana Gil" [lang=es] [role=admin]'; \
-		echo '       make invite team_id=<uuid> email=a@b.com name="Ana Gil"   (an existing team)'; exit 1; }
+invite: env ## Create a team and invite its first admin: make invite tenant=acme team="Atlas" email=a@b.com name="Ana Gil" [lang=es] [role=admin]
+	@test -n "$(tenant)" -a -n "$(email)" -a -n "$(name)" -a \( -n "$(team)" -o -n "$(team_id)" \) || { \
+		echo 'Usage: make invite tenant=acme team="Atlas" email=a@b.com name="Ana Gil" [lang=es] [role=admin]'; \
+		echo '       make invite tenant=acme team_id=<uuid> email=a@b.com name="Ana Gil"   (an existing team)'; exit 1; }
 	$(COMPOSE) run --rm --build api python -m agilina_api.bootstrap.invite \
-		--email "$(email)" --name "$(name)" \
+		--tenant "$(tenant)" --email "$(email)" --name "$(name)" \
 		$(if $(team),--team "$(team)",--team-id "$(team_id)") \
 		$(if $(lang),--lang "$(lang)",) $(if $(role),--role "$(role)",)
 
@@ -163,10 +195,13 @@ test-web: env ## Tests of the Angular application (headless Chromium)
 	$(COMPOSE) --profile tools run --rm --no-deps --build web-test
 
 test-e2e: env ## End-to-end tests in a real browser against the running environment (make up first)
-	@run=$$(date +%s); email="e2e-$$run@example.test"; team="E2E $$run"; \
-	echo "Inviting $$email to '$$team'..."; \
-	$(MAKE) --no-print-directory invite team="$$team" email="$$email" name="Eva Prueba" lang=es >/dev/null && \
-	E2E_EMAIL="$$email" E2E_TEAM="$$team" $(COMPOSE) --profile tools run --rm --build e2e
+	@run=$$(date +%s); email="e2e-$$run@example.test"; \
+	for tenant in acme ecomoda; do \
+		echo "Inviting $$email to a new team of $$tenant..."; \
+		$(MAKE) --no-print-directory invite tenant=$$tenant team="E2E $$run $$tenant" \
+			email="$$email" name="Eva Prueba" >/dev/null || exit 1; \
+	done; \
+	E2E_RUN="$$run" $(COMPOSE) --profile tools run --rm --build e2e
 
 coverage: env ## Unit + integration coverage of the API and the contract; fails below 100 %
 	$(COMPOSE) --profile tools run --rm --build tools sh -c "pytest --cov --cov-report= \
