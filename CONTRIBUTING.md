@@ -116,6 +116,8 @@ Una historia está terminada cuando:
 - ninguna credencial quedó en el repositorio;
 - la documentación técnica y el documento de flujos quedaron actualizados si la
   historia cambió la arquitectura, un contrato o el comportamiento de Agilina;
+- cada endpoint nuevo, o cada respuesta nueva de uno existente, está en
+  [docs/api.md](docs/api.md) con todas sus respuestas;
 - está desplegada y verificada en el entorno vigente;
 - funciona en español y en inglés si produce texto o voz dirigida al usuario;
 - se puede demostrar de principio a fin sin pasos manuales ocultos.

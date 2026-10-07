@@ -9,6 +9,10 @@ Esta carpeta es la API (FastAPI): el código vive en `src/agilina_api/`, las mig
   [AD-25](../docs/adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md)).
   Si algo no está decidido ahí, **pregunta antes de decidir**: no se inventan librerías,
   capas ni convenciones. Una decisión que cambia la forma del sistema se registra como ADR.
+- **Una clase por archivo**, con el nombre de la clase en `snake_case` (`invalid_email_error.py`);
+  un tema con varias clases es un paquete (`errors/`) que las reexporta en su `__init__.py`. Un
+  comando y su manejador son dos archivos. Una prueba lo verifica; la regla completa está en
+  [code-conventions.md](../docs/code-conventions.md).
 - Código, comentarios, nombres de archivo y mensajes de error en inglés. Commits, pull
   requests, documentación y ADR en español.
 - Todo corre en contenedores; no se instala Python, uv ni nada en la máquina. Usa `make`:
@@ -55,7 +59,13 @@ Las capas apuntan hacia adentro: `presentation` e `infrastructure` → `applicat
   código estable.
 - **Tiempo y azar se inyectan:** el instante sale del puerto `Clock` (siempre en UTC) y los
   identificadores se generan en el caso de uso, nunca dentro del dominio.
-- **Multi-tenant:** el equipo es el tenant. Toda consulta de datos de un equipo filtra por él.
+- **Multi-tenant en dos niveles ([AD-29](../docs/adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)):**
+  el **tenant** es la organización, con su propia base de datos y su propio realm, y se elige en el
+  borde (`X-Agilina-Tenant`, `current_tenant`); dentro, el **equipo** aísla los datos y toda consulta
+  de un equipo filtra por él. Un caso de uso, un repositorio o una consulta no conoce el tenant: recibe
+  la sesión de su base. Todo lo que toca datos de un tenant llega por `current_container`; una ruta
+  nueva no necesita más, y la prueba de inventario falla si olvida el tenant. Nada de un tenant se
+  guarda en el catálogo salvo lo que `tenancy` define, y nadie usa la base de un tenant para otro.
 - **La API hace la autorización.** La interfaz solo oculta lo que la API ya protege.
 
 ## Seguridad
@@ -68,20 +78,34 @@ Las capas apuntan hacia adentro: `presentation` e `infrastructure` → `applicat
   `mask_email`). Un adaptador registra cada llamada a un sistema externo con su resultado, y
   un mensaje de error de un sistema externo no se devuelve al cliente.
 - Las respuestas de autenticación llevan `Cache-Control: no-store`.
-- **Toda ruta nueva exige una sesión.** Declara `Depends(current_user_id)` (o
+- **Toda ruta nueva exige un tenant y una sesión.** Declara `Depends(current_user_id)` (o
   `current_team_member` si es de un equipo): la API valida el token de Keycloak (firma, emisor,
   audiencia, vigencia) antes de confiar en él ([AD-28](../docs/adr/0028-iniciar-sesion-con-keycloak.md)).
   Una ruta pública es una excepción: se agrega a `PUBLIC` en
-  `tests/api/unit/bootstrap/test_authentication.py`, con su razón; si no, esa prueba falla.
+  `tests/api/unit/bootstrap/test_authentication.py` (`TENANT_ONLY` si necesita tenant pero no
+  sesión, `NO_TENANT` si no necesita ninguno), con su razón; si no, esa prueba falla.
   Nunca se lee un rol ni un equipo del token: se consulta lo guardado.
-- Los errores de la API tienen la forma `{code, detail, reasons?}`, con `code` estable: el
-  cliente decide por el código, no por el texto.
+- Todo error de la API tiene el mismo cuerpo, `{"error": {status, code, message, details?,
+  request_id}}`, con `code` estable: el cliente decide por el código, no por el texto
+  ([AD-30](../docs/adr/0030-un-solo-formato-de-error-http-y-un-catalogo-de-la-api.md)). Un error
+  nuevo es una entrada del catálogo de su contexto (`ApiError`), emparejada con su excepción en la
+  tabla del contexto o lanzada como `ApiException`; nunca un `JSONResponse` armado a mano. El
+  `message` es en inglés y genérico, y `details` nunca repite un valor enviado.
+- **Documenta el endpoint.** Una ruta nueva, o una respuesta nueva de una existente, entra en
+  [`docs/api.md`](../docs/api.md) y declara `responses=errors_of(...)` en el mismo cambio; una
+  prueba falla si no coinciden.
 
 ## Migraciones
 
-- Se escriben **a mano, en SQL**, en `migrations/versions/`. El *autogenerate* de Alembic
-  propone borrar columnas reales y no se usa. `make migration m="descripcion"` crea una
-  revisión vacía; `make migrate` aplica las pendientes.
+- Hay dos entornos de Alembic: `tenant` (el esquema de cada base de tenant: identidad y equipos) y
+  `platform` (el catálogo de tenants). Se escriben **a mano, en SQL**, en
+  `migrations/tenant/versions/` o `migrations/platform/versions/`. El *autogenerate* de Alembic
+  propone borrar columnas reales y no se usa. `make migration m="…"` crea una revisión vacía del
+  esquema de los tenants y `make migration-platform m="…"` una del catálogo; `make migrate` aplica
+  las del catálogo y después las de **todos** los tenants.
+- **Mientras el desarrollo sea local, no se parchean: se reescribe la migración inicial** (una por
+  entorno) y se reconstruye con `make clean` y `make up`. Desde el primer despliegue compartido, cada
+  cambio es una migración nueva y las anteriores no se tocan.
 - La prueba de migraciones comprueba que el esquema que producen y los modelos ORM
   coinciden: un cambio de esquema sin su modelo (o al revés) la rompe.
 
