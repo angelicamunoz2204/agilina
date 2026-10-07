@@ -41,7 +41,7 @@ async function activationLink(): Promise<string> {
 
 async function signInOnKeycloak(page: Page, password: string, email = EMAIL): Promise<void> {
   await page.getByLabel('Correo electrónico').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
+  await page.getByLabel('Contraseña', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 }
 
@@ -52,13 +52,28 @@ test('activates the account from the link of the invitation email', async ({ pag
   await expect(page.getByRole('heading', { name: 'Activar cuenta' })).toBeVisible();
   await expect(page).not.toHaveURL(/#t=/); // the token left the address bar once read
 
-  await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
+  const password = page.getByLabel('Contraseña', { exact: true });
+  await password.fill(PASSWORD);
   await page.getByLabel('Confirmar contraseña').fill(PASSWORD);
+  // Each box has its own button to see what was typed.
+  await expect(page.getByRole('button', { name: 'Mostrar contraseña' })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Mostrar contraseña' }).first().click();
+  await expect(password).toHaveAttribute('type', 'text');
   await page.getByRole('button', { name: 'Activar y entrar' }).click();
 
   // The next stop is Keycloak's sign-in, with the email already typed.
   await expect(page).toHaveURL(KEYCLOAK_LOGIN);
   await expect(page.getByLabel('Correo electrónico')).toHaveValue(EMAIL);
+
+  // There, too, the password can be seen while it is typed.
+  const signInPassword = page.getByLabel('Contraseña', { exact: true });
+  await signInPassword.fill('anything');
+  await page.getByRole('button', { name: 'Mostrar contraseña' }).click();
+  await expect(signInPassword).toHaveAttribute('type', 'text');
+  await expect(page.getByRole('button', { name: 'Mostrar contraseña' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('a used link says so and offers a new invitation', async ({ page }) => {
