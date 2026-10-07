@@ -86,6 +86,7 @@ web/
         │   ├── http/             Interceptores
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
+        │   ├── tenant/           El tenant de la dirección: contexto, guards y puerto del catálogo (AD-29)
         │   └── auth/             Sesión: puerto AuthSession, adaptador de keycloak-js, guards e interceptor
         ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
         │                         centered-layout (las pantallas antes de entrar a un equipo)
@@ -112,6 +113,7 @@ concepto se llame igual en todo el sistema:
 | Funcionalidad | Qué contiene | Estado |
 | --- | --- | --- |
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
+| `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
 | `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05). El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
@@ -166,6 +168,9 @@ en inglés.
 
 - Archivos en `kebab-case`; clases y tipos en `PascalCase`; el resto en
   `camelCase`; constantes globales en `UPPER_CASE`. *(ESLint.)*
+- **Una clase por archivo**, con el nombre de la clase en `kebab-case`: `TenantNotFoundError` va en
+  `tenant-not-found-error.ts`. Una interfaz o un tipo viaja con la clase que describe
+  ([code-conventions.md](../docs/code-conventions.md)).
 - Los componentes no llevan sufijo `Component` (guía de estilo de Angular 20+).
 - Selectores con prefijo `agl`. *(ESLint.)*
 - Dentro de una misma funcionalidad, importaciones relativas; entre zonas,
@@ -224,6 +229,10 @@ Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new
 - **La validación del cliente es comodidad; la autoridad es la API.** La API aplica la misma
   regla y responde con un `code` estable; la *facade* lo convierte en un problema que la
   pantalla traduce, o en un error genérico traducido cuando no hace falta distinguirlo.
+- **Un error de la API se lee en un solo lugar:** `readApiError` (`@core/http/api-error`) extrae
+  `error.code`, `error.details.reasons` y `error.request_id` del cuerpo único
+  ([AD-30](../docs/adr/0030-un-solo-formato-de-error-http-y-un-catalogo-de-la-api.md)). El
+  `message` es para desarrolladores y no se muestra; el adaptador decide siempre por `code`.
 - El botón de enviar (`aglButton`) queda deshabilitado mientras el formulario no se pueda
   enviar o se esté guardando. Los mensajes de validación se muestran cuando el usuario ya
   escribió en el campo o salió de él.
@@ -253,6 +262,23 @@ Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new
   cuando se defina.
 - La pantalla no muestra transcripción en vivo.
 
+## Tenants: una organización por dirección ([AD-29](../docs/adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md))
+
+Cada tenant es una organización con su propia base de datos, su propio realm y su propio login. En la
+web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t=…`, `/acme/status`.
+
+- `/:tenant` solo abre las rutas de la organización si el segmento puede ser un nombre de tenant
+  (`tenantMatch`); si no, o si la API dice que no existe (`tenantGuard` pregunta a `GET /v1/tenant`
+  antes de llevar a nadie a iniciar sesión en un realm que no está), es la página «no encontrada».
+  `/` no nombra ninguna organización.
+- `TenantContext` (en `core/tenant`) guarda el tenant de la dirección y arma las rutas de la
+  organización: `tenant.path('teams', id)` para `routerLink` y `navigate`, `tenant.url(...)` para una
+  dirección. **Ningún enlace interno escribe `/teams`**: lleva el tenant.
+- `authInterceptor` pone `X-Agilina-Tenant` en toda llamada a la API (y solo a la API); sin él la API
+  responde `400`. La comprobación del tenant va sin sesión (`WITHOUT_SESSION`).
+- El realm es `AGILINA_TENANT_REALM_PREFIX` más el nombre del tenant (`agilina-acme`) y cada tenant
+  tiene su propia sesión de `keycloak-js`: estar dentro de uno no te mete en otro.
+
 ## Autenticación y autorización
 
 - La sesión la resuelve Keycloak (OIDC, *authorization code* con PKCE), con la **página de login
@@ -260,8 +286,8 @@ Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new
   La integración vive en `core/auth`, detrás del puerto `AuthSession`: nadie más importa
   `keycloak-js`.
 - La sesión se pide **cuando algo la necesita**, no al arrancar: `authGuard` (rutas restringidas),
-  `entranceGuard` (`/`) y `authInterceptor`. Las pantallas públicas (`/activate`, `/status`) nunca
-  llevan a iniciar sesión.
+  `entranceGuard` (`/:tenant`) y `authInterceptor`. Las pantallas públicas (`/:tenant/activate`,
+  `/:tenant/status`) nunca llevan a iniciar sesión.
 - `authInterceptor` envía el token **solo a la API** (nunca a Keycloak ni a otro host) y, ante un
   401, lleva a iniciar sesión y de vuelta a la página donde estaba. Un *guard* también vuelve a la
   página pedida.
@@ -269,7 +295,7 @@ Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new
 - Las rutas restringidas usan un *guard* y los elementos restringidos se
   ocultan según el rol interno, pero **la autorización es de la API**: un
   *guard* es comodidad para el usuario, no seguridad.
-- Con un solo equipo, el selector (`/teams`) entra directo a él. Cerrar sesión y la expiración
+- Con un solo equipo, el selector (`/:tenant/teams`) entra directo a él. Cerrar sesión y la expiración
   por inactividad son HU-09.
 
 ## Fechas y zonas horarias
@@ -350,7 +376,8 @@ variables de entorno ─▶ runtime-config.template.json ─▶ /config.json ─
 - `config.json` es público por naturaleza: **nunca lleva secretos.**
 
 Variables que lee la web: `AGILINA_API_PUBLIC_URL`, `AGILINA_KEYCLOAK_URL`,
-`AGILINA_KEYCLOAK_REALM`, `AGILINA_KEYCLOAK_WEB_CLIENT` y `AGILINA_LOG_LEVEL`.
+`AGILINA_TENANT_REALM_PREFIX` (el realm de un tenant es ese prefijo y su nombre),
+`AGILINA_KEYCLOAK_WEB_CLIENT` y `AGILINA_LOG_LEVEL`.
 
 Para agregar una: declárala en `.env.example`, pásala al servicio `web` en
 `infra/docker-compose.yml`, agrégala a `runtime-config.template.json`, a

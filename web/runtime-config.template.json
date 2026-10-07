@@ -2,7 +2,7 @@
   "apiUrl": "${AGILINA_API_PUBLIC_URL}",
   "keycloak": {
     "url": "${AGILINA_KEYCLOAK_URL}",
-    "realm": "${AGILINA_KEYCLOAK_REALM}",
+    "realmPrefix": "${AGILINA_TENANT_REALM_PREFIX}",
     "clientId": "${AGILINA_KEYCLOAK_WEB_CLIENT}"
   },
   "logLevel": "${AGILINA_LOG_LEVEL}"

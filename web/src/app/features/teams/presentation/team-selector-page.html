@@ -11,7 +11,7 @@
           <li>
             <a
               class="flex w-full items-center gap-3 rounded-xl border border-border p-4 text-left transition-colors hover:border-accent/50 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              [routerLink]="['/teams', team.id]"
+              [routerLink]="tenant.path('teams', team.id)"
             >
               <span
                 class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"
@@ -48,7 +48,7 @@
       <p role="alert" class="text-sm text-danger">{{ t(message) }}</p>
     }
 
-    <a aglButton variant="secondary" routerLink="/teams/new" class="w-full">
+    <a aglButton variant="secondary" [routerLink]="tenant.path('teams', 'new')" class="w-full">
       <!-- Lucide "plus" icon. -->
       <svg
         xmlns="http://www.w3.org/2000/svg"
