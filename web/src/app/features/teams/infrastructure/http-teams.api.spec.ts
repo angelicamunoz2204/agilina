@@ -85,15 +85,18 @@ describe('HttpTeamsApi', () => {
     api.get('someone-elses').subscribe({ error: keep });
     backend
       .expectOne(`${teamsUrl}/someone-elses`)
-      .flush({ code: 'not_a_team_member' }, { status: 403, statusText: 'Forbidden' });
+      .flush({ error: { code: 'not_a_team_member' } }, { status: 403, statusText: 'Forbidden' });
     api.create(' ').subscribe({ error: keep });
     backend
       .expectOne(teamsUrl)
-      .flush({ code: 'invalid_team_name' }, { status: 422, statusText: 'Unprocessable' });
+      .flush(
+        { error: { code: 'invalid_team_name' } },
+        { status: 422, statusText: 'Unprocessable' },
+      );
     api.listMine().subscribe({ error: keep });
     backend
       .expectOne(teamsUrl)
-      .flush({ code: 'not_authenticated' }, { status: 401, statusText: 'Unauthorized' });
+      .flush({ error: { code: 'not_authenticated' } }, { status: 401, statusText: 'Unauthorized' });
 
     expect(failures).toEqual([
       new TeamFailure('not_a_member'),

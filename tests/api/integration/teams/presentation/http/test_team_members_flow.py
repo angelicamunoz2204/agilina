@@ -135,7 +135,7 @@ async def test_with_a_sprint_in_progress_the_role_cannot_change_and_the_list_say
     listed = await members.members()
 
     assert response.status_code == 409
-    assert response.json() == {"code": "sprint_in_progress", "detail": "sprint in progress"}
+    assert response.json()["error"]["code"] == "sprint_in_progress"
     assert (await _roles(engine, members.team.id))[members.bruno.id] == ("member", "active")
     assert [m["role_change_blocked_by"] for m in listed] == ["sprint_in_progress"] * 2
 
@@ -181,7 +181,7 @@ async def test_a_removed_member_leaves_the_team_but_keeps_their_account(members,
     assert accounts is True  # the account is identity's (and Keycloak's): it stays
     assert members.world.provider.deleted == [] and members.world.provider.created == []
     gone = await members.request("GET", "", TOKEN_BRUNO)
-    assert gone.status_code == 403 and gone.json()["code"] == "not_a_team_member"
+    assert gone.status_code == 403 and gone.json()["error"]["code"] == "not_a_team_member"
 
 
 async def test_a_sprint_in_progress_does_not_prevent_a_removal(members, session_factory):
@@ -195,7 +195,7 @@ async def test_a_sprint_in_progress_does_not_prevent_a_removal(members, session_
 async def test_removing_someone_who_is_not_a_member_answers_404(members):
     response = await members.remove(members.carla)
 
-    assert response.status_code == 404 and response.json()["code"] == "member_not_found"
+    assert response.status_code == 404 and response.json()["error"]["code"] == "member_not_found"
 
 
 # ------------------------------------------------------- criterion 5 (DoD) --
@@ -203,14 +203,14 @@ async def test_the_only_admin_cannot_demote_themselves(members, engine):
     response = await members.change_role(members.ana, "member")
 
     assert response.status_code == 409
-    assert response.json() == {"code": "last_admin", "detail": "last admin"}
+    assert response.json()["error"]["code"] == "last_admin"
     assert (await _roles(engine, members.team.id))[members.ana.id] == ("admin", "active")
 
 
 async def test_the_only_admin_cannot_remove_themselves(members, engine):
     response = await members.remove(members.ana)
 
-    assert response.status_code == 409 and response.json()["code"] == "last_admin"
+    assert response.status_code == 409 and response.json()["error"]["code"] == "last_admin"
     assert (await _roles(engine, members.team.id))[members.ana.id] == ("admin", "active")
 
 
@@ -229,8 +229,8 @@ async def test_with_two_admins_one_can_step_down_and_then_the_other_cannot(membe
     leaving = await members.remove(members.bruno, token=TOKEN_BRUNO)
 
     assert stepped_down.status_code == 204
-    assert last.status_code == 409 and last.json()["code"] == "last_admin"
-    assert leaving.status_code == 409 and leaving.json()["code"] == "last_admin"
+    assert last.status_code == 409 and last.json()["error"]["code"] == "last_admin"
+    assert leaving.status_code == 409 and leaving.json()["error"]["code"] == "last_admin"
     roles = await _roles(engine, members.team.id)
     assert roles == {members.ana.id: ("member", "active"), members.bruno.id: ("admin", "active")}
 
@@ -264,7 +264,7 @@ async def test_a_member_calling_a_route_directly_gets_403_and_nothing_changes(
     )
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_admin", "detail": "not a team admin"}
+    assert response.json()["error"]["code"] == "not_a_team_admin"
     assert "Ana Gil" not in response.text
     assert await _roles(engine, members.team.id) == before
     assert members.world.mailer.sent == []
@@ -280,7 +280,7 @@ async def test_someone_outside_the_team_gets_403_not_a_team_member(
         method, path.format(bruno=members.bruno.id), TOKEN_CARLA, **kwargs
     )
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
     assert await _roles(engine, members.team.id) == before
 
 
@@ -290,7 +290,7 @@ async def test_without_a_token_every_route_answers_401(members, engine, method, 
 
     response = await members.request(method, path.format(bruno=members.bruno.id), None, **kwargs)
 
-    assert response.status_code == 401 and response.json()["code"] == "not_authenticated"
+    assert response.status_code == 401 and response.json()["error"]["code"] == "not_authenticated"
     assert await _roles(engine, members.team.id) == before
 
 
@@ -300,7 +300,7 @@ async def test_a_removed_admin_loses_access_to_the_routes(members):
 
     response = await members.request("GET", "/members", TOKEN_BRUNO)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
 
 
 async def test_a_team_that_does_not_exist_answers_like_someone_elses(members):
@@ -311,4 +311,4 @@ async def test_a_team_that_does_not_exist_answers_like_someone_elses(members):
             f"/v1/teams/{next_id()}/members", headers={"Authorization": f"Bearer {TOKEN_ANA}"}
         )
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"

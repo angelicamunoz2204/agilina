@@ -4,6 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { provideTestTenant } from '@testing/tenant';
 
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
@@ -39,11 +40,12 @@ describe('TeamSelectorPage', () => {
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
+        provideTestTenant(),
         provideRouter(
           [
-            { path: 'teams', component: TeamSelectorPage },
-            { path: 'teams/new', component: CreateTeamPage },
-            { path: 'teams/:teamId', component: TeamDashboardPage },
+            { path: ':tenant/teams', component: TeamSelectorPage },
+            { path: ':tenant/teams/new', component: CreateTeamPage },
+            { path: ':tenant/teams/:teamId', component: TeamDashboardPage },
           ],
           withComponentInputBinding(),
         ),
@@ -55,7 +57,7 @@ describe('TeamSelectorPage', () => {
 
   async function open(teams: Observable<readonly Team[]>): Promise<HTMLElement> {
     port.mine = teams;
-    await harness.navigateByUrl('/teams');
+    await harness.navigateByUrl('/acme/teams');
     await harness.fixture.whenStable();
     return harness.routeNativeElement!;
   }
@@ -77,8 +79,8 @@ describe('TeamSelectorPage', () => {
 
     expect(page.querySelector('h1')?.textContent).toBe('Selecciona tu equipo');
     expect(links(page)).toEqual([
-      { text: 'Atlas', href: '/teams/a' },
-      { text: 'Boreal', href: '/teams/b' },
+      { text: 'Atlas', href: '/acme/teams/a' },
+      { text: 'Boreal', href: '/acme/teams/b' },
     ]);
     expect(page.textContent).not.toContain('Todavía no perteneces');
   });
@@ -95,8 +97,8 @@ describe('TeamSelectorPage', () => {
     page.querySelectorAll<HTMLAnchorElement>('ul a')[1]!.click();
     await harness.fixture.whenStable();
 
-    expect(TestBed.inject(Router).url).toBe('/teams/b');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Boreal');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/b');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Boreal');
   });
 
   it('with no team shows the empty list and the button to create one', async () => {
@@ -104,9 +106,9 @@ describe('TeamSelectorPage', () => {
 
     expect(links(page)).toEqual([]);
     expect(page.textContent).toContain('Todavía no perteneces a ningún equipo.');
-    const create = page.querySelector('a[href="/teams/new"]');
+    const create = page.querySelector('a[href="/acme/teams/new"]');
     expect(create?.textContent.trim()).toBe('Crear equipo nuevo');
-    expect(create?.getAttribute('href')).toBe('/teams/new');
+    expect(create?.getAttribute('href')).toBe('/acme/teams/new');
   });
 
   it('goes straight into the only team: there is nothing to choose', async () => {
@@ -114,8 +116,8 @@ describe('TeamSelectorPage', () => {
 
     await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
 
-    expect(TestBed.inject(Router).url).toBe('/teams/a');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Atlas');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/a');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('always offers to create a team', async () => {
@@ -126,16 +128,18 @@ describe('TeamSelectorPage', () => {
       ]),
     );
 
-    expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
+    expect(page.querySelector('a[href="/acme/teams/new"]')?.getAttribute('href')).toBe(
+      '/acme/teams/new',
+    );
   });
 
   it('takes the user to the creation form', async () => {
     const page = await open(of([]));
 
-    page.querySelector<HTMLAnchorElement>('a[href="/teams/new"]')!.click();
+    page.querySelector<HTMLAnchorElement>('a[href="/acme/teams/new"]')!.click();
     await harness.fixture.whenStable();
 
-    expect(TestBed.inject(Router).url).toBe('/teams/new');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/new');
     expect(harness.routeNativeElement?.querySelector('form')).not.toBeNull();
   });
 
@@ -153,7 +157,7 @@ describe('TeamSelectorPage', () => {
   it('says it is loading while the API has not answered', async () => {
     port.mine = new Subject<readonly Team[]>();
     // Not whenStable: the request stays pending, so the page never settles.
-    await harness.navigateByUrl('/teams');
+    await harness.navigateByUrl('/acme/teams');
     TestBed.tick();
     const page = harness.routeNativeElement!;
 
@@ -167,6 +171,8 @@ describe('TeamSelectorPage', () => {
     expect(page.querySelector('[role="alert"]')?.textContent).toBe(
       'No se pudieron cargar tus equipos. Inténtalo de nuevo más tarde.',
     );
-    expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
+    expect(page.querySelector('a[href="/acme/teams/new"]')?.getAttribute('href')).toBe(
+      '/acme/teams/new',
+    );
   });
 });

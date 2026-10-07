@@ -125,7 +125,7 @@ async def test_the_creator_is_admin_of_the_created_team(teams, engine):
 async def test_a_blank_name_is_rejected_and_nothing_is_stored(teams, engine, name):
     response = await teams.request("POST", "", TOKEN_A, json={"name": name})
 
-    assert response.status_code == 422 and response.json()["code"] == "invalid_team_name"
+    assert response.status_code == 422 and response.json()["error"]["code"] == "invalid_team_name"
     assert await _count(engine, "team") == 0
     assert await _count(engine, "team_member") == 0
 
@@ -166,9 +166,15 @@ async def test_a_user_of_team_a_asking_for_team_b_gets_403(teams):
     response = await teams.request("GET", f"/{team_b}", TOKEN_A)
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_member", "detail": "not a team member"}
+    assert response.json()["error"]["code"] == "not_a_team_member"
     assert "Boreal" not in response.text
     assert (await teams.request("GET", f"/{team_a}", TOKEN_A)).status_code == 200
+
+
+def _without_request_id(response) -> dict:
+    """The request id differs on every call; everything else must not."""
+    error = response.json()["error"]
+    return {key: value for key, value in error.items() if key != "request_id"}
 
 
 async def test_a_team_that_does_not_exist_answers_like_someone_elses(teams):
@@ -178,7 +184,7 @@ async def test_a_team_that_does_not_exist_answers_like_someone_elses(teams):
     missing = await teams.request("GET", f"/{next_id()}", TOKEN_A)
 
     assert missing.status_code == foreign.status_code == 403
-    assert missing.json() == foreign.json()
+    assert _without_request_id(missing) == _without_request_id(foreign)
 
 
 async def test_a_removed_member_gets_403(teams, session_factory):
@@ -189,7 +195,7 @@ async def test_a_removed_member_gets_403(teams, session_factory):
     response = await teams.request("GET", f"/{team.id}", TOKEN_A)
     listed = await teams.request("GET", "", TOKEN_A)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
     assert listed.json() == []
 
 
@@ -205,6 +211,6 @@ async def test_without_a_token_every_team_route_answers_401(teams, engine):
 
     for response in responses:
         assert response.status_code == 401
-        assert response.json()["code"] == "not_authenticated"
+        assert response.json()["error"]["code"] == "not_authenticated"
         assert response.headers["www-authenticate"] == "Bearer"
     assert await _count(engine, "team") == 1

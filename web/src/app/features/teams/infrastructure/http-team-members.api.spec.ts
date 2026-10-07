@@ -175,7 +175,9 @@ describe('HttpTeamMembersApi', () => {
         error: (error: unknown) => (failure = error),
       });
 
-      backend.expectOne(`${teamUrl}/members/bruno`).flush({ code }, { status, statusText: 'x' });
+      backend
+        .expectOne(`${teamUrl}/members/bruno`)
+        .flush({ error: { code } }, { status, statusText: 'x' });
 
       expect(failure).toEqual(new MemberFailure(kind as MemberFailure['kind']));
     });

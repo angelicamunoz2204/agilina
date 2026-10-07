@@ -1,16 +1,39 @@
-"""The request-scoped session: one per request, always closed."""
+"""One engine and one session factory per database: the catalog's and each tenant's."""
 
-from agilina_api.shared.infrastructure.database import session as session_module
-from tests.api.doubles.database import RecordingSession
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from agilina_api.shared.infrastructure.database.session import (
+    create_engine_for,
+    create_session_factory,
+)
+
+DSN = "postgresql+psycopg://user:secret@db.test:5432/agilina_acme"
 
 
-async def test_a_session_is_handed_out_and_closed_afterwards(monkeypatch):
-    recording = RecordingSession()
-    monkeypatch.setattr(session_module, "get_session_factory", lambda: lambda: recording)
+def test_an_engine_points_to_its_own_database_without_connecting():
+    engine = create_engine_for(DSN)
 
-    generator = session_module.get_session()
-    handed_out = await anext(generator)
+    assert engine.url.database == "agilina_acme"
+    assert engine.url.host == "db.test"
 
-    assert handed_out is recording and recording.closed is False
-    await generator.aclose()
-    assert recording.closed is True
+
+def test_two_databases_have_two_engines():
+    acme = create_engine_for(DSN)
+    ecomoda = create_engine_for(DSN.replace("acme", "ecomoda"))
+
+    assert acme is not ecomoda
+    assert acme.url.database != ecomoda.url.database
+
+
+def test_the_sql_is_only_echoed_when_asked_for():
+    assert create_engine_for(DSN).echo is False
+    assert create_engine_for(DSN, echo=True).echo is True
+
+
+def test_a_session_belongs_to_the_engine_of_its_factory():
+    engine = create_engine_for(DSN)
+
+    session = create_session_factory(engine)()
+
+    assert isinstance(session, AsyncSession)
+    assert session.bind is engine

@@ -54,7 +54,8 @@ services:
     restart: unless-stopped
     # start-dev stores in its own embedded database: it does not depend on
     # Postgres. The cloud deployment will use it (HU-38).
-    command: ["start-dev", "--import-realm", "--spi-theme--cache-themes=false", "--spi-theme--cache-templates=false"]
+    # No --import-realm: the realms are the tenants', created by `make tenant-add` (AD-29).
+    command: ["start-dev", "--spi-theme--cache-themes=false", "--spi-theme--cache-templates=false"]
     environment:
       # Keycloak admin credentials: they come from .env, never from the repository.
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
@@ -67,13 +68,10 @@ services:
       # dynamic so that the API keeps reading the keys through the internal network.
       KC_HOSTNAME: ${AGILINA_KEYCLOAK_URL:-http://localhost:8080}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
-      # Substituted into the realm file when it is imported (the API client's secret).
-      AGILINA_KEYCLOAK_API_SECRET: ${AGILINA_KEYCLOAK_API_SECRET:?AGILINA_KEYCLOAK_API_SECRET is missing in .env; run make env}
     ports:
       - "8080:8080"
       - "9000:9000"
     volumes:
-      - ./keycloak:/opt/keycloak/data/import:ro
       - keycloak-data:/opt/keycloak/data
     # The image has no curl: the readiness probe on the management port is read with bash.
     healthcheck:
@@ -172,7 +170,7 @@ services:
     environment:
       AGILINA_API_PUBLIC_URL: ${AGILINA_API_PUBLIC_URL:?AGILINA_API_PUBLIC_URL is missing in .env}
       AGILINA_KEYCLOAK_URL: ${AGILINA_KEYCLOAK_URL:?AGILINA_KEYCLOAK_URL is missing in .env}
-      AGILINA_KEYCLOAK_REALM: ${AGILINA_KEYCLOAK_REALM:?AGILINA_KEYCLOAK_REALM is missing in .env}
+      AGILINA_TENANT_REALM_PREFIX: ${AGILINA_TENANT_REALM_PREFIX:-agilina-}
       AGILINA_KEYCLOAK_WEB_CLIENT: ${AGILINA_KEYCLOAK_WEB_CLIENT:?AGILINA_KEYCLOAK_WEB_CLIENT is missing in .env}
       AGILINA_LOG_LEVEL: ${AGILINA_LOG_LEVEL:-INFO}
     ports:
@@ -231,11 +229,7 @@ services:
     profiles: ["tools"]
     network_mode: host
     environment:
-      E2E_EMAIL: ${E2E_EMAIL:-}
-      E2E_TEAM: ${E2E_TEAM:-}
-      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-}
-      E2E_ADMIN_TEAM: ${E2E_ADMIN_TEAM:-}
-      E2E_MEMBER_EMAIL: ${E2E_MEMBER_EMAIL:-}
+      E2E_RUN: ${E2E_RUN:-}
 
   web-test:
     build:

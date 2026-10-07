@@ -23,13 +23,16 @@ JOBS_TABLE = "scheduled_jobs"
 
 
 def create_scheduler(settings: Settings) -> AsyncIOScheduler:
-    """Build the scheduler with its store in Postgres.
+    """Build the scheduler with its store in the platform's database.
+
+    One scheduler serves every tenant (AD-29): the jobs live in the catalog, and each carries
+    the tenant it is for in its arguments.
 
     The same connection string works as is: ``psycopg`` is synchronous for
     classic SQLAlchemy, which is what APScheduler 3 knows how to use, and
     asynchronous for the API engine.
     """
-    store = SQLAlchemyJobStore(url=settings.dsn, tablename=JOBS_TABLE)
+    store = SQLAlchemyJobStore(url=settings.platform_dsn, tablename=JOBS_TABLE)
     scheduler = AsyncIOScheduler(
         jobstores={"default": store},
         timezone="UTC",  # Everything is stored and operated in UTC; the zone is the browser's.

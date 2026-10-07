@@ -21,6 +21,7 @@ from tests.api.doubles.teams import (
     FakeTeamsUnitOfWork,
     InMemoryTeamRepository,
 )
+from tests.api.doubles.tenancy import FakeTenantDirectory
 
 __all__ = [
     "FakeActiveSprints",
@@ -39,6 +40,7 @@ __all__ = [
     "FakeTeamMembership",
     "FakeTeamQueries",
     "FakeTeamsUnitOfWork",
+    "FakeTenantDirectory",
     "FakeTokenGenerator",
     "InMemoryInvitationRepository",
     "InMemoryTeamRepository",

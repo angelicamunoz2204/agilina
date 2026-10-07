@@ -1,10 +1,13 @@
-"""The composition root's object graph: every use case wired to its real adapters.
+"""The composition root's object graph of one tenant: every use case wired to its real
+adapters, to the tenant's own database and to the tenant's own realm (AD-29).
 
-The API (``bootstrap.app``) and the operator commands (``make invite``) build the same
-graph, so they cannot drift apart.
+The API (``bootstrap.app``, through ``TenantContainers``) and the operator commands
+(``make invite``) build the same graph, so they cannot drift apart.
 """
 
 from dataclasses import dataclass
+
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
@@ -34,8 +37,12 @@ from agilina_api.identity.infrastructure.persistence.unit_of_work import (
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.identity.infrastructure.tokens import SecretsActivationTokenGenerator
 from agilina_api.shared.application.access import AuthenticatedUsers, TeamAccess
+from agilina_api.shared.application.tenancy import Tenant
 from agilina_api.shared.infrastructure.clock import SystemClock
-from agilina_api.shared.infrastructure.database.session import get_session_factory
+from agilina_api.shared.infrastructure.database.session import (
+    create_engine_for,
+    create_session_factory,
+)
 from agilina_api.shared.infrastructure.mail.renderer import JinjaEmailRenderer
 from agilina_api.shared.infrastructure.mail.smtp_mailer import SmtpMailer
 from agilina_api.shared.infrastructure.settings import Settings
@@ -53,6 +60,8 @@ from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit
 
 @dataclass
 class Container:
+    tenant: Tenant
+    engine: AsyncEngine
     invitation_status: GetInvitationStatusHandler
     activate_account: ActivateAccountHandler
     request_new_invitation: RequestNewInvitationHandler
@@ -74,13 +83,18 @@ class Container:
     async def aclose(self) -> None:
         await self.identity_provider.aclose()
         await self.access_token_verifier.aclose()
+        await self.engine.dispose()
 
 
-def build_container(settings: Settings) -> Container:
+def build_container(settings: Settings, tenant: Tenant) -> Container:
     """Nothing here connects to anything: sessions, HTTP clients and SMTP are used lazily,
     so building it needs neither PostgreSQL nor Keycloak."""
     clock = SystemClock()
-    session_factory = get_session_factory()
+    engine = create_engine_for(
+        settings.tenant_dsn(tenant.slug), echo=settings.log_level.upper() == "DEBUG"
+    )
+    session_factory = create_session_factory(engine)
+    realm = settings.tenant_realm(tenant.slug)
     renderer = JinjaEmailRenderer()
     mailer = SmtpMailer(
         host=settings.smtp_host,
@@ -92,17 +106,16 @@ def build_container(settings: Settings) -> Container:
     )
     identity_provider = KeycloakIdentityProvider(
         base_url=settings.keycloak_url,
-        realm=settings.keycloak_realm,
+        realm=realm,
         client_id=settings.keycloak_api_client,
-        client_secret=settings.keycloak_api_secret.get_secret_value(),
+        client_secret=settings.tenant_api_secret(tenant.slug).get_secret_value(),
     )
-    realm_url = f"{settings.keycloak_public_url.rstrip('/')}/realms/{settings.keycloak_realm}"
+    realm_url = f"{settings.keycloak_public_url.rstrip('/')}/realms/{realm}"
     access_token_verifier = KeycloakAccessTokenVerifier(
         # The keys are read through the API's own route to Keycloak, but the issuer a token
         # carries is the public one.
         jwks_url=(
-            f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
-            "/protocol/openid-connect/certs"
+            f"{settings.keycloak_url.rstrip('/')}/realms/{realm}/protocol/openid-connect/certs"
         ),
         issuer=realm_url,
         audience=settings.keycloak_api_client,
@@ -113,17 +126,21 @@ def build_container(settings: Settings) -> Container:
     team_queries = SqlTeamQueries(session_factory)
     user_contacts = SqlUserContacts(session_factory)
     team_contacts = TeamsBackedContacts(team_queries, user_contacts)
-    web_url = settings.web_public_url.rstrip("/")
+    # The web lives under the tenant's name (``/<tenant>/…``): its first segment decides
+    # which realm signs the person in.
+    tenant_web_url = f"{settings.web_public_url.rstrip('/')}/{tenant.slug}"
     issue_invitation = IssueInvitationHandler(
         identity_uow,
         SecretsActivationTokenGenerator(),
         renderer,
         mailer,
         clock,
-        f"{web_url}/activate",
+        f"{tenant_web_url}/activate",
     )
 
     return Container(
+        tenant=tenant,
+        engine=engine,
         invitation_status=GetInvitationStatusHandler(SqlInvitationQueries(session_factory), clock),
         activate_account=ActivateAccountHandler(identity_uow, identity_provider, clock),
         request_new_invitation=RequestNewInvitationHandler(
@@ -138,7 +155,7 @@ def build_container(settings: Settings) -> Container:
             mailer,
             clock,
             # The notice to an existing account links to the team, never to an activation.
-            f"{web_url}/teams",
+            f"{tenant_web_url}/teams",
         ),
         create_team=CreateTeamHandler(teams_uow, clock),
         create_team_as_admin=CreateTeamAsAdminHandler(teams_uow, clock),

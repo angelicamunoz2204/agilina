@@ -146,7 +146,7 @@ async def test_a_current_member_is_refused_and_nothing_is_sent(invitations, engi
     response = await invitations.invite(email="diego@example.test")
 
     assert response.status_code == 409
-    assert response.json() == {"code": "already_a_team_member", "detail": "already a team member"}
+    assert response.json()["error"]["code"] == "already_a_team_member"
     assert invitations.world.mailer.sent == []
     assert await _scalar(engine, "SELECT count(*) FROM team_member") == 1
     assert await _scalar(engine, "SELECT count(*) FROM invitation") == 0
@@ -163,8 +163,8 @@ async def test_inviting_again_invalidates_the_previous_link(invitations, engine)
     )
     new = await invitations.client.post("/v1/invitations/status", json={"token": TOKENS[1]})
 
-    assert old.status_code == 410 and old.json()["code"] == "invitation_revoked"
-    assert used.status_code == 410 and used.json()["code"] == "invitation_revoked"
+    assert old.status_code == 410 and old.json()["error"]["code"] == "invitation_revoked"
+    assert used.status_code == 410 and used.json()["error"]["code"] == "invitation_revoked"
     assert new.status_code == 200 and new.json()["status"] == "pending"
     assert len(invitations.world.mailer.sent) == 2
     assert await _scalar(engine, "SELECT count(*) FROM invitation WHERE status = 'revoked'") == 1
@@ -177,7 +177,7 @@ async def test_a_disabled_account_is_refused(invitations, session_factory):
 
     response = await invitations.invite()
 
-    assert response.status_code == 409 and response.json()["code"] == "account_disabled"
+    assert response.status_code == 409 and response.json()["error"]["code"] == "account_disabled"
     assert invitations.world.mailer.sent == []
 
 
@@ -188,7 +188,7 @@ async def test_if_the_email_cannot_be_sent_the_answer_is_502_and_nothing_is_stor
 
     response = await invitations.invite()
 
-    assert response.status_code == 502 and response.json()["code"] == "mail_unavailable"
+    assert response.status_code == 502 and response.json()["error"]["code"] == "mail_unavailable"
     assert await _scalar(engine, "SELECT count(*) FROM invitation") == 0
 
 
@@ -204,5 +204,5 @@ async def test_invalid_data_answers_422_and_stores_nothing(
 ):
     response = await invitations.invite(email=email, full_name=full_name)
 
-    assert response.status_code == 422 and response.json()["code"] == code
+    assert response.status_code == 422 and response.json()["error"]["code"] == code
     assert await _scalar(engine, "SELECT count(*) FROM invitation") == 0

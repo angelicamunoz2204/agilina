@@ -17,6 +17,7 @@
         aglTextField
         id="invite-full-name"
         name="fullName"
+        data-testid="invite-full-name"
         type="text"
         autocomplete="off"
         aria-describedby="invite-full-name-problem"
@@ -47,6 +48,7 @@
         aglTextField
         id="invite-email"
         name="email"
+        data-testid="invite-email"
         type="email"
         autocomplete="off"
         aria-describedby="invite-email-problem"
@@ -76,6 +78,7 @@
         aglSelect
         id="invite-role"
         name="role"
+        data-testid="invite-role"
         class="w-full"
         aria-describedby="invite-role-hint"
         [ngModel]="role()"
@@ -88,7 +91,9 @@
       <p id="invite-role-hint" class="mt-1.5 text-xs text-muted">{{ t('invite.role_hint') }}</p>
 
       @if (problemMessage(); as message) {
-        <p role="alert" class="mt-4 text-sm text-danger">{{ t('invite.' + message) }}</p>
+        <p role="alert" class="mt-4 text-sm text-danger" data-testid="invite-problem">
+          {{ t('invite.' + message) }}
+        </p>
       }
 
       <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -96,12 +101,18 @@
           aglButton
           variant="secondary"
           type="button"
+          data-testid="invite-cancel"
           [disabled]="saving()"
           (click)="dismissed.emit()"
         >
           {{ t('invite.cancel') }}
         </button>
-        <button aglButton type="submit" [disabled]="!canSend() || saving()">
+        <button
+          aglButton
+          type="submit"
+          data-testid="invite-submit"
+          [disabled]="!canSend() || saving()"
+        >
           {{ saving() ? t('invite.saving') : t('invite.submit') }}
         </button>
       </div>

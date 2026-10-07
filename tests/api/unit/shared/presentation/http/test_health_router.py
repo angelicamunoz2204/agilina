@@ -1,9 +1,13 @@
-"""The probes: alive means the process runs; ready means its database answers."""
+"""The probes: alive means the process runs; ready means the catalog's database answers."""
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 
-from agilina_api.shared.infrastructure import database_probe
+from agilina_api import __version__
+from agilina_api.shared.application.health import GetReadiness
+from agilina_api.shared.infrastructure.database_probe import SqlDatabaseProbe
+from agilina_api.shared.presentation.http.dependencies import get_readiness_query
 
 
 class _Session:
@@ -22,18 +26,19 @@ class _Session:
 
 
 @pytest.fixture
-def database(monkeypatch):
-    """Switch the database on or off: ``database(up=False)``."""
+def database(app: FastAPI):
+    """Switch the catalog's database on or off: ``database(up=False)``."""
 
     def choose(*, up: bool) -> None:
-        monkeypatch.setattr(
-            database_probe, "get_session_factory", lambda: lambda: _Session(fails=not up)
+        probe = SqlDatabaseProbe(lambda: _Session(fails=not up))
+        app.dependency_overrides[get_readiness_query] = lambda: GetReadiness(
+            probe, __version__, "local"
         )
 
     return choose
 
 
-async def test_the_liveness_probe_responds(client: AsyncClient):
+async def test_the_liveness_probe_responds_without_a_tenant(client: AsyncClient):
     response = await client.get("/health")
 
     assert response.status_code == 200
@@ -43,9 +48,7 @@ async def test_the_liveness_probe_responds(client: AsyncClient):
     assert body["version"]
 
 
-async def test_the_readiness_probe_is_ready_when_the_database_answers(
-    client: AsyncClient, database
-):
+async def test_the_readiness_probe_is_ready_when_the_database_answers(client, database):
     database(up=True)
 
     response = await client.get("/health/ready")
@@ -54,9 +57,7 @@ async def test_the_readiness_probe_is_ready_when_the_database_answers(
     assert response.json()["status"] == "ready" and response.json()["database"] == "available"
 
 
-async def test_the_readiness_probe_answers_503_when_the_database_does_not(
-    client: AsyncClient, database
-):
+async def test_the_readiness_probe_answers_503_when_the_database_does_not(client, database):
     database(up=False)
 
     response = await client.get("/health/ready")

@@ -1,26 +1,18 @@
 """Health probes: ``/health`` (alive) and ``/health/ready`` (can serve)."""
 
 from fastapi import APIRouter, Depends, Response, status
-from pydantic import BaseModel
 
 from agilina_api.shared.application.health import GetLiveness, GetReadiness
 from agilina_api.shared.presentation.http.dependencies import (
     get_liveness_query,
     get_readiness_query,
 )
+from agilina_api.shared.presentation.http.health_schemas import (
+    ReadinessResponse,
+    ServiceStatusResponse,
+)
 
 router = APIRouter(tags=["health"])
-
-
-class ServiceStatusResponse(BaseModel):
-    service: str = "agilina-api"
-    version: str
-    environment: str
-    status: str
-
-
-class ReadinessResponse(ServiceStatusResponse):
-    database: str
 
 
 @router.get("/health", response_model=ServiceStatusResponse, summary="Liveness probe")

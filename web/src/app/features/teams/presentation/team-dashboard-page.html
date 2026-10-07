@@ -1,9 +1,19 @@
 <section class="mx-auto w-full max-w-5xl" *transloco="let t; prefix: 'teams.dashboard'">
   @if (team(); as team) {
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <h1 class="font-display text-3xl font-bold tracking-tight break-words">{{ team.name }}</h1>
+      <h1
+        class="font-display text-3xl font-bold tracking-tight break-words"
+        data-testid="team-name"
+      >
+        {{ team.name }}
+      </h1>
       @if (team.role === 'admin') {
-        <a aglButton variant="secondary" [routerLink]="['/teams', team.id, 'settings']">
+        <a
+          aglButton
+          variant="secondary"
+          data-testid="team-settings-link"
+          [routerLink]="tenant.path('teams', team.id, 'settings')"
+        >
           <!-- Lucide "settings" icon. -->
           <svg
             xmlns="http://www.w3.org/2000/svg"

@@ -1,7 +1,11 @@
 """Create a team and invite its first admin, as the platform operator (AD-22).
 
-    make invite team="Atlas" email=julian@example.com name="Julián Torres" [lang=es] [role=admin]
-    make invite team-id=<uuid> email=... name=...        # one more person for an existing team
+    make invite tenant=acme team="Atlas" email=julian@example.com name="Julián Torres" \
+        [lang=es] [role=admin]
+    make invite tenant=acme team-id=<uuid> email=... name=...   # one more person for a team
+
+The tenant (AD-29) is the organization the team belongs to: its database, its realm. ``lang``
+is the team's language and, when it is not given, the tenant's.
 
 There is no public registration, so the first admin of a team cannot invite themselves:
 whoever operates the platform does it from here, with access to its database. The person
@@ -18,7 +22,14 @@ from uuid import UUID
 from agilina_api.bootstrap.container import Container, build_container
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitation
 from agilina_api.shared.application.ports import MailDeliveryError
-from agilina_api.shared.infrastructure.settings import get_settings
+from agilina_api.shared.application.tenancy import Tenant
+from agilina_api.shared.infrastructure.clock import SystemClock
+from agilina_api.shared.infrastructure.database.session import (
+    create_engine_for,
+    create_session_factory,
+)
+from agilina_api.shared.infrastructure.settings import Settings, get_settings
+from agilina_api.shared.infrastructure.tenancy.sql_tenant_directory import SqlTenantDirectory
 from agilina_api.shared_kernel import DomainError
 from agilina_api.teams.application.commands.create_team import CreateTeam
 from agilina_shared.enums import Language, TeamRole
@@ -60,15 +71,32 @@ async def invite(
     print(f"The link expires on {issued.expires_at.date().isoformat()} (UTC) and works once.")
 
 
+async def find_tenant(settings: Settings, slug: str) -> Tenant:
+    """The active tenant ``slug`` of the platform's catalog."""
+    engine = create_engine_for(settings.platform_dsn)
+    try:
+        tenant = await SqlTenantDirectory(
+            create_session_factory(engine), SystemClock()
+        ).find_active(slug)
+    finally:
+        await engine.dispose()
+    if tenant is None:
+        raise DomainError(f"There is no active tenant '{slug}' (add it with make tenant-add)")
+    return tenant
+
+
 async def run(arguments: argparse.Namespace) -> None:
-    container = build_container(get_settings())
+    settings = get_settings()
+    tenant = await find_tenant(settings, arguments.tenant)
+    container = build_container(settings, tenant)
+    language = Language(arguments.lang) if arguments.lang else tenant.language
     try:
         await invite(
             container,
             email=arguments.email,
             full_name=arguments.name,
             role=TeamRole(arguments.role),
-            language=Language(arguments.lang),
+            language=language,
             team_name=arguments.team,
             team_id=UUID(arguments.team_id) if arguments.team_id else None,
         )
@@ -78,6 +106,9 @@ async def run(arguments: argparse.Namespace) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Invite a person to a team as the operator.")
+    parser.add_argument(
+        "--tenant", required=True, help="slug of the organization (make tenant-add)"
+    )
     parser.add_argument("--email", required=True)
     parser.add_argument("--name", required=True, help="the person's full name")
     target = parser.add_mutually_exclusive_group(required=True)
@@ -87,8 +118,8 @@ def main() -> int:
     parser.add_argument(
         "--lang",
         choices=[language.value for language in Language],
-        default=get_settings().default_language.value,
-        help="language of the new team and of the email (default: AGILINA_DEFAULT_LANGUAGE)",
+        default=None,
+        help="language of the new team and of the email (default: the tenant's)",
     )
     arguments = parser.parse_args()
     try:

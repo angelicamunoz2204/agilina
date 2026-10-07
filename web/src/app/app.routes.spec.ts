@@ -3,6 +3,7 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, type Observable } from 'rxjs';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HealthPort } from '@features/status/application/health.port';
@@ -13,6 +14,7 @@ import { type TeamMembers } from '@features/teams/domain/team-member';
 import { FakeAuthSession, provideFakeAuthSession } from '@testing/auth';
 import { provideFakeLogger } from '@testing/fake-logger';
 import { provideTestI18n } from '@testing/i18n';
+import { provideFakeTenantPort } from '@testing/tenant';
 
 import { routes } from './app.routes';
 
@@ -34,7 +36,7 @@ class SilentTeamsPort extends TeamsPort {
   }
 }
 
-/** Port double that never answers and remembers which team's members were asked for. */
+/** Members port double that never answers either. */
 class SilentTeamMembersPort extends TeamMembersPort {
   readonly requested: string[] = [];
 
@@ -62,21 +64,27 @@ describe('routes', () => {
   let session: FakeAuthSession;
   let harness: RouterTestingHarness;
 
-  beforeEach(async () => {
+  async function start(signedIn: boolean): Promise<void> {
+    TestBed.resetTestingModule();
     port = new SilentTeamsPort();
     members = new SilentTeamMembersPort();
-    session = new FakeAuthSession(true);
+    session = new FakeAuthSession(signedIn);
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
+        provideFakeLogger(),
         provideRouter(routes, withComponentInputBinding()),
         { provide: TeamsPort, useValue: port },
         { provide: TeamMembersPort, useValue: members },
+        { provide: InvitationPort, useValue: { status: () => NEVER } },
+        { provide: LoginRedirectPort, useValue: {} },
+        { provide: HealthPort, useValue: { check: () => NEVER } },
         provideFakeAuthSession(session),
+        provideFakeTenantPort(),
       ],
     });
     harness = await RouterTestingHarness.create();
-  });
+  }
 
   /** The layout the route opens and the screen inside it. */
   async function screenAt(url: string): Promise<string | undefined> {
@@ -86,96 +94,112 @@ describe('routes', () => {
     return `${layout?.tagName.toLowerCase()} > ${screen?.tagName.toLowerCase()}`;
   }
 
-  it('opens the team selector at /teams', async () => {
-    expect(await screenAt('/teams')).toBe('agl-centered-layout > agl-team-selector-page');
-  });
+  describe('the screens of a tenant', () => {
+    beforeEach(() => start(true));
 
-  it('opens the creation form at /teams/new, not a team called "new"', async () => {
-    expect(await screenAt('/teams/new')).toBe('agl-centered-layout > agl-create-team-page');
-    expect(port.requested).toEqual([]);
-  });
-
-  it('opens the dashboard of the team at /teams/:teamId with that id', async () => {
-    expect(await screenAt('/teams/team-1')).toBe('agl-app-shell > agl-team-dashboard-page');
-    TestBed.tick();
-
-    expect(port.requested).toEqual(['team-1']);
-    expect(TestBed.inject(Router).url).toBe('/teams/team-1');
-  });
-
-  it('opens the settings of the team at /teams/:teamId/settings, with no guard on the role', async () => {
-    expect(await screenAt('/teams/team-1/settings')).toBe('agl-app-shell > agl-team-settings-page');
-    TestBed.tick();
-
-    expect(members.requested).toEqual(['team-1']);
-    expect(port.requested).toEqual([]);
-    expect(TestBed.inject(Router).url).toBe('/teams/team-1/settings');
-  });
-
-  it('sends a signed-in person from the entrance to their teams', async () => {
-    await harness.navigateByUrl('/');
-
-    expect(TestBed.inject(Router).url).toBe('/teams');
-  });
-
-  it('asks a person who is not signed in to sign in from the entrance, to land on their teams', async () => {
-    session = new FakeAuthSession(false);
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        provideTestI18n(),
-        provideRouter(routes, withComponentInputBinding()),
-        { provide: TeamsPort, useValue: port },
-        provideFakeAuthSession(session),
-      ],
+    it('opens the team selector at /:tenant/teams', async () => {
+      expect(await screenAt('/acme/teams')).toBe('agl-centered-layout > agl-team-selector-page');
     });
-    harness = await RouterTestingHarness.create();
 
-    await harness.navigateByUrl('/');
+    it('opens the creation form at /:tenant/teams/new, not a team called "new"', async () => {
+      expect(await screenAt('/acme/teams/new')).toBe('agl-centered-layout > agl-create-team-page');
+      expect(port.requested).toEqual([]);
+    });
 
-    expect(session.ensured).toEqual(['/teams']);
-    expect(TestBed.inject(Router).url).not.toBe('/teams');
+    it('opens the dashboard of the team at /:tenant/teams/:teamId with that id', async () => {
+      expect(await screenAt('/acme/teams/team-1')).toBe('agl-app-shell > agl-team-dashboard-page');
+      TestBed.tick();
+
+      expect(port.requested).toEqual(['team-1']);
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1');
+    });
+
+    it('opens the settings of the team at /:tenant/teams/:teamId/settings, with no guard on the role', async () => {
+      expect(await screenAt('/acme/teams/team-1/settings')).toBe(
+        'agl-app-shell > agl-team-settings-page',
+      );
+      TestBed.tick();
+
+      expect(members.requested).toEqual(['team-1']);
+      expect(port.requested).toEqual([]);
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings');
+    });
+
+    it('records the tenant of the address, whichever it is', async () => {
+      await harness.navigateByUrl('/acme/teams/team-1');
+      expect(TestBed.inject(TenantContext).current()).toBe('acme');
+
+      await harness.navigateByUrl('/ecomoda/teams/team-1');
+      expect(TestBed.inject(TenantContext).current()).toBe('ecomoda');
+    });
+
+    it('sends a signed-in person from the entrance of the tenant to their teams', async () => {
+      await harness.navigateByUrl('/ecomoda');
+
+      expect(TestBed.inject(Router).url).toBe('/ecomoda/teams');
+    });
   });
 
-  it('asks the routes of the teams for a session, and remembers the page asked for', async () => {
-    session = new FakeAuthSession(false);
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        provideTestI18n(),
-        provideRouter(routes, withComponentInputBinding()),
-        { provide: TeamsPort, useValue: port },
-        provideFakeAuthSession(session),
-      ],
+  describe('the session', () => {
+    beforeEach(() => start(false));
+
+    it('asks a person who is not signed in to sign in at the entrance, to land on their teams', async () => {
+      await harness.navigateByUrl('/acme');
+
+      expect(session.ensured).toEqual(['/acme/teams']);
+      expect(TestBed.inject(Router).url).not.toBe('/acme/teams');
     });
-    harness = await RouterTestingHarness.create();
 
-    await harness.navigateByUrl('/teams/team-9');
+    it('asks the routes of the teams for a session, and remembers the page asked for', async () => {
+      await harness.navigateByUrl('/acme/teams/team-9');
 
-    expect(session.ensured).toEqual(['/teams/team-9']);
-    expect(port.requested).toEqual([]);
+      expect(session.ensured).toEqual(['/acme/teams/team-9']);
+      expect(port.requested).toEqual([]);
+    });
+
+    it('asks the settings of a team for a session too', async () => {
+      await harness.navigateByUrl('/acme/teams/team-9/settings');
+
+      expect(session.ensured).toEqual(['/acme/teams/team-9/settings']);
+      expect(members.requested).toEqual([]);
+    });
+
+    it('keeps the activation and the status public: they never ask for a session', async () => {
+      await harness.navigateByUrl('/acme/activate');
+      await harness.navigateByUrl('/acme/status');
+
+      expect(session.ensured).toEqual([]);
+    });
   });
 
-  it('keeps the activation and the status public: they never ask for a session', async () => {
-    session = new FakeAuthSession(false);
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        provideTestI18n(),
-        provideRouter(routes, withComponentInputBinding()),
-        { provide: TeamsPort, useValue: port },
-        { provide: InvitationPort, useValue: { status: () => NEVER } },
-        { provide: LoginRedirectPort, useValue: {} },
-        { provide: HealthPort, useValue: { check: () => NEVER } },
-        provideFakeLogger(),
-        provideFakeAuthSession(session),
-      ],
+  describe('an address that names no organization', () => {
+    beforeEach(() => start(true));
+
+    const notFoundScreen = 'agl-centered-layout > agl-not-found-page';
+
+    it('is not found at /', async () => {
+      expect(await screenAt('/')).toBe(notFoundScreen);
+      expect(TestBed.inject(Router).url).toBe('/not-found');
     });
-    harness = await RouterTestingHarness.create();
 
-    await harness.navigateByUrl('/activate');
-    await harness.navigateByUrl('/status');
+    ['/Acme/teams', '/ac-me', '/platform', '/a'].forEach((url) => {
+      it(`is not found at ${url}: it cannot be a tenant`, async () => {
+        expect(await screenAt(url)).toBe(notFoundScreen);
+        expect(session.ensured).toEqual([]);
+      });
+    });
 
-    expect(session.ensured).toEqual([]);
+    it('is not found at /nobody: it looks like a tenant but there is none, so nobody is sent to sign in', async () => {
+      expect(await screenAt('/nobody/teams')).toBe(notFoundScreen);
+      expect(session.ensured).toEqual([]);
+    });
+
+    it('is not found for a screen that does not exist in the tenant', async () => {
+      expect(await screenAt('/acme/nothing/here')).toBe(notFoundScreen);
+    });
+
+    it('opens the page that is not found at /not-found itself', async () => {
+      expect(await screenAt('/not-found')).toBe(notFoundScreen);
+    });
   });
 });

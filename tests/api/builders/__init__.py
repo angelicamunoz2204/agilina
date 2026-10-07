@@ -27,6 +27,7 @@ from tests.api.builders.identity_commands import (
 from tests.api.builders.invitation import InvitationBuilder
 from tests.api.builders.team import TeamBuilder
 from tests.api.builders.team_commands import ChangeMemberRoleBuilder, RemoveMemberBuilder
+from tests.api.builders.tenant import TenantBuilder
 from tests.api.builders.user import AppUserBuilder
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "RequestNewInvitationBuilder",
     "TeamBuilder",
     "TeamContactsBuilder",
+    "TenantBuilder",
     "next_id",
     "reset_ids",
     "signing_key",

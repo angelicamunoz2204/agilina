@@ -9,7 +9,8 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 
 | Código (EN) | Español | Qué es |
 | --- | --- | --- |
-| `Team` | Equipo | Conjunto de personas que hace la daily. Es el **tenant**: todo dato de negocio pertenece a un equipo |
+| `Tenant` | Organización | Una empresa que usa Agilina: tiene su propia base de datos, su realm de Keycloak y su login, y contiene equipos (AD-29). Se nombra con un *slug* (`acme`) |
+| `Team` | Equipo | Conjunto de personas que hace la daily. Dentro de un tenant, todo dato de negocio pertenece a un equipo |
 | `TeamMember` (membresía) | Integrante | La pertenencia de una persona a un equipo, con su rol. Una persona puede tener roles distintos en equipos distintos |
 | `AppUser` | Usuario | La identidad de una persona en Agilina; su contraseña y sus sesiones viven en Keycloak |
 | `TeamRole` | Rol | El rol **interno** por equipo: `admin` o `member`. Es lo único contra lo que se autoriza |

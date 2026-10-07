@@ -100,7 +100,7 @@ async def test_an_expired_token_is_a_401_so_that_the_application_signs_in_again(
     response = await api.get("/v1/teams", headers=_bearer(expired))
 
     assert response.status_code == 401
-    assert response.json()["code"] == "not_authenticated"
+    assert response.json()["error"]["code"] == "not_authenticated"
 
 
 async def test_a_token_signed_by_someone_else_is_a_401(api, session_factory):

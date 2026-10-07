@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 
@@ -23,6 +24,7 @@ import { TEAM_NAME_MAX_LENGTH, teamNameProblem } from '../domain/team-name';
 export class CreateTeamPage {
   private readonly facade = inject(CreateTeamFacade);
   private readonly router = inject(Router);
+  protected readonly tenant = inject(TenantContext);
 
   protected readonly maxLength = TEAM_NAME_MAX_LENGTH;
   protected readonly name = signal('');
@@ -44,7 +46,7 @@ export class CreateTeamPage {
     }
     const teamId = await this.facade.create(this.name());
     if (teamId !== null) {
-      await this.router.navigate(['/teams', teamId]);
+      await this.router.navigate(this.tenant.path('teams', teamId));
     }
   }
 }

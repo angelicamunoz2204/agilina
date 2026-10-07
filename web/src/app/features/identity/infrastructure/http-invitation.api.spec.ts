@@ -115,7 +115,9 @@ describe('HttpInvitationApi', () => {
   answers.forEach(([status, code, kind]) => {
     it(`turns the code ${code} (${String(status)}) into the failure ${kind}`, () => {
       const failure = failureOf(api.status('t'), () => {
-        backend.expectOne(`${BASE}/status`).flush({ code }, { status, statusText: 'Error' });
+        backend
+          .expectOne(`${BASE}/status`)
+          .flush({ error: { code } }, { status, statusText: 'Error' });
       });
 
       expect(failure).toBeInstanceOf(InvitationFailure);
@@ -129,12 +131,15 @@ describe('HttpInvitationApi', () => {
       .activate('t', 'short', 'short')
       .subscribe({ error: (error: unknown) => (received = error) });
 
-    backend
-      .expectOne(`${BASE}/activate`)
-      .flush(
-        { code: 'password_policy', reasons: ['min_length', 'not_email', 'a_rule_from_the_future'] },
-        { status: 422, statusText: 'Unprocessable Entity' },
-      );
+    backend.expectOne(`${BASE}/activate`).flush(
+      {
+        error: {
+          code: 'password_policy',
+          details: { reasons: ['min_length', 'not_email', 'a_rule_from_the_future'] },
+        },
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
 
     expect(received).toBeInstanceOf(InvitationFailure);
     expect((received as InvitationFailure).kind).toBe('password_rejected');

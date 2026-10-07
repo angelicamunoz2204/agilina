@@ -2,6 +2,7 @@ import { Component, computed, inject, input, type OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 
 import { problemMessageKey } from './problem-message';
@@ -23,6 +24,7 @@ export class TeamDashboardPage implements OnInit {
   readonly teamId = input.required<string>();
 
   private readonly facade = inject(TeamDashboardFacade);
+  protected readonly tenant = inject(TenantContext);
 
   protected readonly team = this.facade.team;
   protected readonly loading = this.facade.loading;

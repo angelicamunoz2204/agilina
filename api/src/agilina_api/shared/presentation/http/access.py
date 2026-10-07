@@ -37,7 +37,7 @@ bearer = HTTPBearer(
     description="The access token Keycloak issues at login, in `Authorization: Bearer <token>`.",
 )
 """``auto_error=False`` so that a missing token goes through the API's single error handler
-and answers with the common ``ErrorResponse``. It also documents the security scheme in
+and answers with the common error body. It also documents the security scheme in
 OpenAPI."""
 
 
@@ -67,7 +67,7 @@ async def current_team_member(
     user_id: UUID = Depends(current_user_id),
     access: TeamAccess = Depends(get_team_access),
 ) -> TeamContext:
-    """The team of the route's ``{team_id}`` and the caller's role in it.
+    """The team of the route's ``{team_id}`` and the caller's membership in it.
 
     Generic on purpose: it knows nothing of the route, so any route of a team can use it,
     and a rule on the role (only an admin may…) is another dependency built on top of

@@ -80,12 +80,17 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
   modelos ORM son un subconjunto deliberado de las tablas. `make migration` crea una
   migración vacía para escribirla en SQL; el test de migraciones comprueba que cada columna
   del ORM exista en la base de datos con la misma nulabilidad.
+- **Mientras el desarrollo sea local, las migraciones no se parchean: se reescriben.** Nadie más
+  tiene datos que dependan de ellas, así que un cambio de esquema se hace en la migración
+  inicial (hoy una por entorno: `tenant` y `platform`) y se construye todo de nuevo con
+  `make clean` y `make up`. Desde el primer despliegue compartido, un cambio es una migración
+  nueva y las anteriores ya no se tocan.
 
 ## Entre contextos
 
 - Un contexto **declara como puerto** lo que necesita de otro (`TeamMembership`,
   `TeamContactsDirectory` en `identity`) y la **raíz de composición** lo implementa llamando
-  al caso de uso del otro (`bootstrap/context_adapters.py`). Ningún contexto importa a otro;
+  al caso de uso del otro (`bootstrap/context_adapters/`). Ningún contexto importa a otro;
   import-linter lo impide.
 - Un manejador que **abre su propia transacción** (`CreateTeam`, `ActivateAccount`) recibe una
   fábrica de unidad de trabajo. Uno que existe para usarse **dentro** de la transacción de
@@ -134,6 +139,21 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
 - Tipado completo en Python (`mypy --strict`, *lo verifica la CI*) y
   `strict` en TypeScript.
 - Sin valores mágicos: una constante con nombre o un ajuste de configuración.
+- **Una clase por archivo**, y el nombre del archivo es el de la clase: `InvalidEmailError` vive
+  en `invalid_email_error.py` (Python, `snake_case`) o `invalid-email-error.ts` (TypeScript,
+  `kebab-case`). Un comando y su manejador son dos clases, así que dos archivos
+  (`activate_account.py` y `activate_account_handler.py`). Una constante o una función auxiliar va
+  en el archivo de la única clase que la usa; si nadie la usa, tiene el suyo (`catalog_of.py`).
+  Los tipos y las interfaces de TypeScript viajan con la clase a la que describen.
+  - Cuando un tema reúne varias clases (los errores de un dominio, los objetos de valor, los
+    esquemas HTTP, los modelos ORM), es un **paquete** con el nombre del tema (`errors/`,
+    `value_objects/`, `schemas/`, `orm_models/`) cuyo `__init__.py` reexporta sus clases con
+    `__all__`: quien importa escribe `from agilina_api.identity.domain.errors import
+    InvalidEmailError`, no la ruta del archivo. La docstring del módulo original pasa al
+    `__init__.py`.
+  - Una prueba (`tests/api/unit/test_one_class_per_file.py`) falla si un archivo de `api/src` o de
+    `shared/src` declara más de una clase. Los dobles y *builders* de `tests/` no se rigen por
+    esta regla.
 
 ## Errores
 
@@ -141,8 +161,9 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
   (`InvitationExpiredError`), con nombre que termina en `Error`. Nunca
   `Exception` pelada ni `except Exception` fuera de un borde del sistema (una
   frontera donde degradar es la política, como el planificador en el `lifespan`).
-- Un único manejador en `presentation` traduce cada excepción a una respuesta
-  HTTP y a una clave de i18n. El dominio no conoce códigos HTTP.
+- Los manejadores de `presentation` traducen cada excepción a una respuesta HTTP con el
+  formato único de error y un `code` estable que la web traduce ([AD-30](adr/0030-un-solo-formato-de-error-http-y-un-catalogo-de-la-api.md)).
+  El dominio no conoce códigos HTTP. Cada endpoint se documenta en [api.md](api.md).
 - Un error de un servicio externo se traduce en el adaptador a un error del
   puerto; los detalles del proveedor no suben a `application`.
 
@@ -153,9 +174,11 @@ review. Lo que una herramienta hace cumplir no se discute en el review.
   esperar. La zona horaria es asunto del navegador.
 - Lo aleatorio y lo secreto (tokens) viene de un puerto (`TokenGenerator`) que
   usa `secrets`; el token en claro nunca se persiste, solo su hash.
-- **El equipo es el tenant.** Todo repositorio y toda consulta con datos de
-  equipo reciben el `team_id` como parámetro obligatorio: no puede olvidarse
-  porque la firma lo pide. La autorización se evalúa contra el **rol interno**
+- **Dos niveles de aislamiento.** El **tenant** es la organización, con su base de datos y su
+  realm ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)): se elige en
+  el borde, una vez por petición, y nada de lo que hay detrás lo repite ni lo conoce. Dentro de
+  él, el **equipo** aísla los datos: todo repositorio y toda consulta con datos de equipo reciben
+  el `team_id` como parámetro obligatorio, y no puede olvidarse porque la firma lo pide. La autorización se evalúa contra el **rol interno**
   del integrante en ese equipo, nunca contra la etiqueta visible ni contra un
   claim del token sin contrastarlo con la membresía.
 

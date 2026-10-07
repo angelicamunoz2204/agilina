@@ -10,7 +10,6 @@ admins reach it (``current_team_admin``).
 """
 
 from fastapi import APIRouter, Depends, Response, status
-from fastapi.responses import JSONResponse
 
 from agilina_api.identity.application.commands.activate_account import (
     ActivateAccount,
@@ -24,6 +23,7 @@ from agilina_api.identity.application.commands.request_new_invitation import (
     RequestNewInvitation,
     RequestNewInvitationHandler,
 )
+from agilina_api.identity.application.dtos import TeamInvitationOutcome
 from agilina_api.identity.application.queries.get_invitation_status import (
     GetInvitationStatus,
     GetInvitationStatusHandler,
@@ -35,6 +35,7 @@ from agilina_api.identity.presentation.http.dependencies import (
     get_invite_to_team_handler,
     get_request_new_invitation_handler,
 )
+from agilina_api.identity.presentation.http.errors import IdentityErrors
 from agilina_api.identity.presentation.http.presenters import present_activated, present_status
 from agilina_api.identity.presentation.http.schemas import (
     ActivatedAccountResponse,
@@ -47,7 +48,9 @@ from agilina_api.identity.presentation.http.schemas import (
 )
 from agilina_api.shared.application.access import TeamContext
 from agilina_api.shared.presentation.http.access import current_team_admin
-from agilina_api.shared.presentation.http.errors import ErrorResponse, error_response
+from agilina_api.shared.presentation.http.api_error import ApiException, SharedErrors
+from agilina_api.shared.presentation.http.error_schema import errors_of
+from agilina_shared.enums import TeamRole
 
 
 def _no_store(response: Response) -> None:
@@ -59,29 +62,34 @@ router = APIRouter(
 )
 
 GONE = {
-    InvitationStatus.ACCEPTED: "invitation_used",
-    InvitationStatus.EXPIRED: "invitation_expired",
-    InvitationStatus.REVOKED: "invitation_revoked",
+    InvitationStatus.ACCEPTED: IdentityErrors.INVITATION_USED,
+    InvitationStatus.EXPIRED: IdentityErrors.INVITATION_EXPIRED,
+    InvitationStatus.REVOKED: IdentityErrors.INVITATION_REVOKED,
 }
+
+TENANT = (SharedErrors.TENANT_REQUIRED, SharedErrors.TENANT_NOT_FOUND)
+LINK_GONE = (
+    IdentityErrors.INVITATION_USED,
+    IdentityErrors.INVITATION_EXPIRED,
+    IdentityErrors.INVITATION_REVOKED,
+)
 
 
 @router.post(
     "/status",
     response_model=InvitationStatusResponse,
     summary="What the activation page shows about a link",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        410: {"model": ErrorResponse, "description": "The link was used, expired or revoked"},
-    },
+    responses=errors_of(
+        *TENANT, SharedErrors.VALIDATION, IdentityErrors.INVITATION_NOT_FOUND, *LINK_GONE
+    ),
 )
 async def invitation_status(
     request: TokenRequest,
     handler: GetInvitationStatusHandler = Depends(get_invitation_status_handler),
-) -> InvitationStatusResponse | JSONResponse:
+) -> InvitationStatusResponse:
     view = await handler.handle(GetInvitationStatus(token=request.token))
     if view.status is not InvitationStatus.PENDING:
-        code = GONE[view.status]
-        return error_response(status.HTTP_410_GONE, code, code.replace("_", " "))
+        raise ApiException(GONE[view.status])
     return present_status(view)
 
 
@@ -90,23 +98,23 @@ async def invitation_status(
     response_model=ActivatedAccountResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Choose a password and activate the account",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        409: {"model": ErrorResponse, "description": "That email already has an account"},
-        410: {"model": ErrorResponse, "description": "The link was used, expired or revoked"},
-        422: {
-            "model": ErrorResponse,
-            "description": "The password does not match or breaks the policy",
-        },
-        503: {"model": ErrorResponse, "description": "The identity provider is unavailable"},
-    },
+    responses=errors_of(
+        *TENANT,
+        SharedErrors.VALIDATION,
+        IdentityErrors.INVITATION_NOT_FOUND,
+        IdentityErrors.ACCOUNT_ALREADY_EXISTS,
+        *LINK_GONE,
+        IdentityErrors.PASSWORD_MISMATCH,
+        IdentityErrors.PASSWORD_POLICY,
+        IdentityErrors.IDENTITY_PROVIDER_UNAVAILABLE,
+    ),
 )
 async def activate_account(
     request: ActivateRequest,
     handler: ActivateAccountHandler = Depends(get_activate_account_handler),
-) -> ActivatedAccountResponse | JSONResponse:
+) -> ActivatedAccountResponse:
     if request.password != request.confirmation:
-        return error_response(422, "password_mismatch", "password mismatch")
+        raise ApiException(IdentityErrors.PASSWORD_MISMATCH)
     account = await handler.handle(ActivateAccount(token=request.token, password=request.password))
     return present_activated(account)
 
@@ -116,11 +124,14 @@ async def activate_account(
     response_model=RequestedResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Ask the team's admins for a new invitation",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        409: {"model": ErrorResponse, "description": "The link still works, or nobody can be told"},
-        502: {"model": ErrorResponse, "description": "The email could not be sent"},
-    },
+    responses=errors_of(
+        *TENANT,
+        SharedErrors.VALIDATION,
+        IdentityErrors.INVITATION_NOT_FOUND,
+        IdentityErrors.INVITATION_STILL_VALID,
+        IdentityErrors.NO_ADMINS_TO_NOTIFY,
+        SharedErrors.MAIL_UNAVAILABLE,
+    ),
 )
 async def request_new_invitation(
     request: TokenRequest,
@@ -132,21 +143,23 @@ async def request_new_invitation(
 
 team_invitations_router = APIRouter(prefix="/v1/teams", tags=["teams"])
 
-INVITE_TO_TEAM_DESCRIPTION = """
-Invites a person to the team with a role (`member` by default). What happens depends on
-the email:
+INVITE_TO_TEAM_DESCRIPTION = f"""
+Invites a person to the team with a role (`{TeamRole.MEMBER}` by default). What happens
+depends on the email:
 
-- **no account in Agilina:** an invitation is stored and its activation link (single use,
+- **no account in the tenant:** an invitation is stored and its activation link (single use,
   valid for seven days) is e-mailed; activating it puts the person in the team with the
-  chosen role (`invitation_sent`);
+  chosen role (`{TeamInvitationOutcome.INVITATION_SENT}`);
 - **an existing account:** the person joins the team right away with the chosen role and
-  gets a notice without an activation link (`member_added`);
+  gets a notice with a link to the team, without an activation link
+  (`{TeamInvitationOutcome.MEMBER_ADDED}`);
 - **already an active member:** refused with `409 already_a_team_member`; nothing is
   stored or sent.
 
 A pending invitation of that email to the team stops working: the new one replaces it.
 The email is sent before anything is stored, so if the mail server refuses it the answer
-is `502 mail_unavailable` and nothing changes. Only an admin of the team may invite.
+is `502 mail_unavailable` and nothing changes. Only an admin of the team may invite; the
+role is the one stored in the membership.
 """
 
 
@@ -158,31 +171,20 @@ is `502 mail_unavailable` and nothing changes. Only an admin of the team may inv
     description=INVITE_TO_TEAM_DESCRIPTION,
     responses={
         201: {"description": "Invited: an invitation was sent or the account joined the team"},
-        401: {
-            "model": ErrorResponse,
-            "description": "No access token, or one that does not identify a user "
-            "(`not_authenticated`)",
-        },
-        403: {
-            "model": ErrorResponse,
-            "description": "The user is not an active member of the team "
-            "(`not_a_team_member`), or is a member but not one of its admins "
-            "(`not_a_team_admin`)",
-        },
-        404: {"model": ErrorResponse, "description": "The team does not exist (`team_not_found`)"},
-        409: {
-            "model": ErrorResponse,
-            "description": "The person is already an active member (`already_a_team_member`), "
-            "their account is disabled (`account_disabled`), or another invitation to them "
-            "was being issued at the same moment (`pending_invitation_exists`)",
-        },
-        422: {
-            "model": ErrorResponse,
-            "description": "The email is malformed (`invalid_email`) or the name blank "
-            "(`invalid_full_name`). A malformed body (a missing or unknown field, an unknown "
-            "role) answers with FastAPI's validation format instead",
-        },
-        502: {"model": ErrorResponse, "description": "The email could not be sent"},
+        **errors_of(
+            *TENANT,
+            SharedErrors.NOT_AUTHENTICATED,
+            SharedErrors.NOT_A_TEAM_MEMBER,
+            SharedErrors.NOT_A_TEAM_ADMIN,
+            SharedErrors.TEAM_NOT_FOUND,
+            IdentityErrors.ALREADY_A_TEAM_MEMBER,
+            IdentityErrors.ACCOUNT_DISABLED,
+            IdentityErrors.PENDING_INVITATION_EXISTS,
+            SharedErrors.VALIDATION,
+            IdentityErrors.INVALID_EMAIL,
+            IdentityErrors.INVALID_FULL_NAME,
+            SharedErrors.MAIL_UNAVAILABLE,
+        ),
     },
 )
 async def invite_to_team(

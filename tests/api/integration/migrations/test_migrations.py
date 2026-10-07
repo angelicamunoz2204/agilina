@@ -13,9 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agilina_api.identity.infrastructure.persistence import orm_models as identity_models
 from agilina_api.shared.infrastructure.database.base import Base
-from agilina_api.shared.infrastructure.settings import get_settings
+from agilina_api.shared.infrastructure.migrations import (
+    alembic_config,
+    drop_database,
+    ensure_database,
+)
 from agilina_api.teams.infrastructure.persistence import orm_models as teams_models
-from tests.api.integration.helpers import alembic_config, create_database, drop_database
 
 pytestmark = pytest.mark.integration
 
@@ -183,47 +186,88 @@ async def test_deleting_a_team_deletes_its_sprints(engine: AsyncEngine):
     assert remaining == 0
 
 
+async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
+    """The ``set_updated_at`` trigger of every table also runs on ``sprint``."""
+    team = await _a_team(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO sprint (team_id, start_date, end_date, updated_at) "
+                "VALUES (:t, :d, :d, '2000-01-01')"
+            ),
+            {"t": team, "d": date(2026, 10, 5)},
+        )
+        await connection.execute(text("UPDATE sprint SET status = 'active'"))
+        updated = (
+            await connection.execute(text("SELECT updated_at > '2000-01-02' FROM sprint"))
+        ).scalar_one()
+
+    assert updated is True
+
+
 def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
     """Downgrading removes everything the migration created, and upgrading restores it."""
     name = f"agilina_it_{uuid.uuid4().hex[:12]}"
     url = make_url(admin_dsn).set(database=name).render_as_string(hide_password=False)
-    create_database(admin_dsn, name)
+    ensure_database(admin_dsn, name)
     try:
-        with pytest.MonkeyPatch.context() as patch:
-            patch.setenv("AGILINA_DB_URL", url)
-            get_settings.cache_clear()
-            command.upgrade(alembic_config(), "head")
-            command.downgrade(alembic_config(), "0003_team_name_max_length")
+        command.upgrade(alembic_config("tenant", url), "head")
+        command.downgrade(alembic_config("tenant", url), "base")
 
-            engine = create_engine(url)
-            with engine.connect() as connection:
-                tables = set(inspect(connection).get_table_names())
-                enums = {
-                    r[0]
-                    for r in connection.execute(
-                        text("SELECT typname FROM pg_type WHERE typtype='e'")
-                    )
-                }
-            engine.dispose()
-            assert "sprint" not in tables and "sprint_status" not in enums  # HU-06 undone
-            assert "team" in tables
+        engine = create_engine(url)
+        with engine.connect() as connection:
+            tables = set(inspect(connection).get_table_names())
+            enums = {
+                r[0]
+                for r in connection.execute(text("SELECT typname FROM pg_type WHERE typtype='e'"))
+            }
+        engine.dispose()
+        assert not {"app_user", "team", "team_member", "invitation", "sprint"} & tables
+        assert not {"team_role", "invitation_status", "sprint_status"} & enums
 
-            command.downgrade(alembic_config(), "0001_base")
-
-            engine = create_engine(url)
-            with engine.connect() as connection:
-                tables = set(inspect(connection).get_table_names())
-                enums = {
-                    r[0]
-                    for r in connection.execute(
-                        text("SELECT typname FROM pg_type WHERE typtype='e'")
-                    )
-                }
-            engine.dispose()
-            assert not {"app_user", "team", "team_member", "invitation", "sprint"} & tables
-            assert not {"team_role", "invitation_status", "sprint_status"} & enums
-
-            command.upgrade(alembic_config(), "head")
+        command.upgrade(alembic_config("tenant", url), "head")
     finally:
-        get_settings.cache_clear()
         drop_database(admin_dsn, name)
+
+
+def test_the_catalog_migration_creates_the_tenant_table_and_goes_back_cleanly(admin_dsn: str):
+    name = f"agilina_it_{uuid.uuid4().hex[:12]}"
+    url = make_url(admin_dsn).set(database=name).render_as_string(hide_password=False)
+    ensure_database(admin_dsn, name)
+    try:
+        command.upgrade(alembic_config("platform", url), "head")
+        engine = create_engine(url)
+        with engine.connect() as connection:
+            columns = {c["name"] for c in inspect(connection).get_columns("tenant")}
+        assert columns == {"slug", "display_name", "language", "status", "created_at"}
+
+        command.downgrade(alembic_config("platform", url), "base")
+        with engine.connect() as connection:
+            assert "tenant" not in inspect(connection).get_table_names()
+        engine.dispose()
+    finally:
+        drop_database(admin_dsn, name)
+
+
+@pytest.mark.parametrize(
+    "slug", ["Acme", "a", "1acme", "ac-me", "platform", "admin", "api", "x" * 40, ""]
+)
+async def test_the_catalog_refuses_a_slug_that_cannot_be_a_database_or_a_realm(
+    platform_engine: AsyncEngine, slug: str
+):
+    with pytest.raises(IntegrityError, match="tenant_slug"):
+        async with platform_engine.begin() as connection:
+            await connection.execute(
+                text("INSERT INTO tenant (slug, display_name) VALUES (:slug, 'Whatever')"),
+                {"slug": slug},
+            )
+
+
+async def test_the_catalog_refuses_a_language_the_product_does_not_speak(
+    platform_engine: AsyncEngine,
+):
+    with pytest.raises(IntegrityError, match="tenant_language_known"):
+        async with platform_engine.begin() as connection:
+            await connection.execute(
+                text("INSERT INTO tenant (slug, display_name, language) VALUES ('ab', 'Ab', 'fr')")
+            )

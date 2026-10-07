@@ -161,6 +161,7 @@
       "password": "Contraseña",
       "password_hint": "Mínimo 12 caracteres. No puede ser igual a tu correo ni a tu nombre de usuario.",
       "confirmation": "Confirmar contraseña",
+      "show_password": "Mostrar contraseña",
       "submit": "Activar y entrar",
       "submitting": "Activando…",
       "checking": "Comprobando tu invitación…",
@@ -215,6 +216,12 @@
         "title": "Cuenta activada",
         "text": "Te llevamos al inicio de sesión…"
       }
+    }
+  },
+  "tenancy": {
+    "not_found": {
+      "title": "No encontramos esta organización",
+      "text": "Revisa la dirección o abre el enlace que te envió tu organización. Si el problema sigue, pide ayuda a tu administrador."
     }
   }
 }

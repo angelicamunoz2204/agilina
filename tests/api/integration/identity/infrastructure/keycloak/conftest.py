@@ -7,19 +7,27 @@ import pytest
 from agilina_api.identity.infrastructure.keycloak.identity_provider import KeycloakIdentityProvider
 from agilina_api.shared.infrastructure.settings import get_settings
 
+TENANTS = ("acme", "ecomoda")
+
 
 @pytest.fixture
 def settings():
     return get_settings()
 
 
+@pytest.fixture(params=TENANTS)
+def tenant(request) -> str:
+    """Each test that asks for a tenant runs once per tenant: they must behave the same."""
+    return str(request.param)
+
+
 @pytest.fixture
-async def provider(settings) -> AsyncIterator[KeycloakIdentityProvider]:
+async def provider(settings, tenant) -> AsyncIterator[KeycloakIdentityProvider]:
     provider = KeycloakIdentityProvider(
         base_url=settings.keycloak_url,
-        realm=settings.keycloak_realm,
+        realm=settings.tenant_realm(tenant),
         client_id=settings.keycloak_api_client,
-        client_secret=settings.keycloak_api_secret.get_secret_value(),
+        client_secret=settings.tenant_api_secret(tenant).get_secret_value(),
     )
     yield provider
     await provider._client.aclose()

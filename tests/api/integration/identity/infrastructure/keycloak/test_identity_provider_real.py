@@ -97,10 +97,10 @@ async def test_a_name_without_a_last_name_is_accepted(provider, created):
     created.append(await provider.create_user(email=_email(), full_name="Cher", password=PASSWORD))
 
 
-async def test_a_wrong_client_secret_is_an_outage_not_a_crash(settings):
+async def test_a_wrong_client_secret_is_an_outage_not_a_crash(settings, tenant):
     provider = KeycloakIdentityProvider(
         base_url=settings.keycloak_url,
-        realm=settings.keycloak_realm,
+        realm=settings.tenant_realm(tenant),
         client_id=settings.keycloak_api_client,
         client_secret="not-the-secret",  # noqa: S106
     )

@@ -2,6 +2,7 @@ import { Component, computed, inject, input, type OnInit, signal } from '@angula
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { Select } from '@shared/ui/select';
 
@@ -29,6 +30,7 @@ export class TeamSettingsPage implements OnInit {
   readonly teamId = input.required<string>();
 
   private readonly facade = inject(TeamMembersFacade);
+  protected readonly tenant = inject(TenantContext);
 
   protected readonly members = this.facade.members;
   protected readonly roles = this.facade.roles;

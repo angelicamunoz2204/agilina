@@ -7,10 +7,11 @@ import {
 } from '@angular/router';
 
 import { FakeAuthSession, provideFakeAuthSession } from '@testing/auth';
+import { provideTestTenant } from '@testing/tenant';
 
 import { authGuard, entranceGuard } from './auth.guard';
 
-function run(guard: CanActivateFn, url = '/teams/a'): Promise<unknown> {
+function run(guard: CanActivateFn, url = '/acme/teams/a'): Promise<unknown> {
   return TestBed.runInInjectionContext(async () =>
     guard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot),
   );
@@ -19,7 +20,7 @@ function run(guard: CanActivateFn, url = '/teams/a'): Promise<unknown> {
 describe('authGuard', () => {
   it('lets a signed-in person through', async () => {
     TestBed.configureTestingModule({
-      providers: [provideFakeAuthSession(new FakeAuthSession(true))],
+      providers: [provideFakeAuthSession(new FakeAuthSession(true)), provideTestTenant()],
     });
 
     expect(await run(authGuard)).toBeTrue();
@@ -27,30 +28,34 @@ describe('authGuard', () => {
 
   it('stops the others and asks to sign in, back to the page they asked for', async () => {
     const session = new FakeAuthSession(false);
-    TestBed.configureTestingModule({ providers: [provideFakeAuthSession(session)] });
+    TestBed.configureTestingModule({
+      providers: [provideFakeAuthSession(session), provideTestTenant()],
+    });
 
-    expect(await run(authGuard, '/teams/b')).toBeFalse();
-    expect(session.ensured).toEqual(['/teams/b']);
+    expect(await run(authGuard, '/acme/teams/b')).toBeFalse();
+    expect(session.ensured).toEqual(['/acme/teams/b']);
   });
 });
 
 describe('entranceGuard', () => {
-  it('sends a signed-in person to their teams', async () => {
+  it('sends a signed-in person to the teams of their tenant', async () => {
     TestBed.configureTestingModule({
-      providers: [provideFakeAuthSession(new FakeAuthSession(true))],
+      providers: [provideFakeAuthSession(new FakeAuthSession(true)), provideTestTenant()],
     });
 
-    const result = await run(entranceGuard, '/');
+    const result = await run(entranceGuard, '/acme');
 
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/teams');
+    expect((result as UrlTree).toString()).toBe('/acme/teams');
   });
 
   it('asks the others to sign in and to land on their teams afterwards', async () => {
     const session = new FakeAuthSession(false);
-    TestBed.configureTestingModule({ providers: [provideFakeAuthSession(session)] });
+    TestBed.configureTestingModule({
+      providers: [provideFakeAuthSession(session), provideTestTenant()],
+    });
 
-    expect(await run(entranceGuard, '/')).toBeFalse();
-    expect(session.ensured).toEqual(['/teams']);
+    expect(await run(entranceGuard, '/acme')).toBeFalse();
+    expect(session.ensured).toEqual(['/acme/teams']);
   });
 });

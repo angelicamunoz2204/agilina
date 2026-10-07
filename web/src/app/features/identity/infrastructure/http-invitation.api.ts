@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, map, type Observable, throwError } from 'rxjs';
 
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
+import { readApiError } from '@core/http/api-error';
 
 import { type InvitationPort } from '../application/invitation.port';
 import { type ActivatedAccount, type Invitation, type TeamRole } from '../domain/invitation';
@@ -25,12 +26,6 @@ interface ActivatedResponse {
   email: string;
   team_id: string;
   role: string;
-}
-
-/** Every error of the API has a stable `code`; a refused password also lists its `reasons`. */
-interface ErrorResponse {
-  code?: string;
-  reasons?: string[];
 }
 
 const FAILURES: Readonly<Record<string, InvitationFailureKind>> = {
@@ -102,18 +97,15 @@ function toFailure(error: unknown): InvitationFailure {
   if (!(error instanceof HttpErrorResponse)) {
     return new InvitationFailure('unavailable');
   }
-  const body = asErrorResponse(error.error);
-  const kind = (body.code !== undefined ? FAILURES[body.code] : undefined) ?? 'unavailable';
-  return new InvitationFailure(kind, toRejections(body.reasons));
-}
-
-function asErrorResponse(body: unknown): ErrorResponse {
-  return typeof body === 'object' && body !== null ? body : {};
+  // A refused password also lists its `reasons`.
+  const body = readApiError(error.error);
+  const kind = (body !== undefined ? FAILURES[body.code] : undefined) ?? 'unavailable';
+  return new InvitationFailure(kind, toRejections(body?.reasons ?? []));
 }
 
 /** A rule this screen does not know about still counts as a refusal: it shows as `other`. */
-function toRejections(reasons: string[] | undefined): PasswordRejection[] {
-  return (reasons ?? []).map((reason) =>
+function toRejections(reasons: readonly string[]): PasswordRejection[] {
+  return reasons.map((reason) =>
     REJECTIONS.includes(reason) ? (reason as PasswordRejection) : 'other',
   );
 }

@@ -18,7 +18,8 @@ from agilina_api.shared.presentation.http.access import (
     current_team_member,
     current_user_id,
 )
-from agilina_api.shared.presentation.http.errors import ErrorResponse
+from agilina_api.shared.presentation.http.api_error import SharedErrors
+from agilina_api.shared.presentation.http.error_schema import errors_of
 from agilina_api.teams.application.commands.change_member_role import (
     ChangeMemberRole,
     ChangeMemberRoleHandler,
@@ -42,6 +43,7 @@ from agilina_api.teams.presentation.http.dependencies import (
     get_list_team_members_handler,
     get_remove_member_handler,
 )
+from agilina_api.teams.presentation.http.errors import TeamsErrors
 from agilina_api.teams.presentation.http.presenters import (
     present_created,
     present_members,
@@ -60,42 +62,14 @@ from agilina_shared.enums import Language, OperationMode, TeamRole
 
 router = APIRouter(prefix="/v1/teams", tags=["teams"])
 
-NOT_AUTHENTICATED = {
-    "model": ErrorResponse,
-    "description": "No access token, or one that does not identify a user (`not_authenticated`)",
-}
-
-NOT_A_TEAM_MEMBER = {
-    "model": ErrorResponse,
-    "description": "The user is not an active member of the team: it is someone else's, "
-    "they were removed from it, or it does not exist (`not_a_team_member`)",
-}
-
-NOT_A_TEAM_ADMIN = {
-    "model": ErrorResponse,
-    "description": "The user is not an active member of the team (`not_a_team_member`, the "
-    "same answer whether the team exists or not), or is a member but not one of its admins "
-    "(`not_a_team_admin`). The role is the one stored in the membership",
-}
-
-MEMBER_NOT_FOUND = {
-    "model": ErrorResponse,
-    "description": "The user is not an active member of the team: never was or was removed "
-    "(`member_not_found`)",
-}
-
-ROLE_CHANGE_REFUSED = {
-    "model": ErrorResponse,
-    "description": "The team has a sprint in progress, and roles do not change while it lasts "
-    "(`sprint_in_progress`), or the member is the team's only admin and would be demoted, "
-    "also when they ask it themselves (`last_admin`). Nothing changes",
-}
-
-REMOVAL_REFUSED = {
-    "model": ErrorResponse,
-    "description": "The member is the team's only admin, also when they ask it themselves: the "
-    "team cannot be left without one (`last_admin`). Nothing changes",
-}
+SIGNED_IN = (
+    SharedErrors.TENANT_REQUIRED,
+    SharedErrors.TENANT_NOT_FOUND,
+    SharedErrors.NOT_AUTHENTICATED,
+)
+# A route only the team's admins may use: a user outside the team gets the first, the same
+# whether the team exists or not; a member who is not an admin, the second.
+ADMINS_ONLY = (SharedErrors.NOT_A_TEAM_MEMBER, SharedErrors.NOT_A_TEAM_ADMIN)
 
 USER_ID = Path(description="The `app_user` id of the member.")
 
@@ -118,13 +92,7 @@ If anything fails, neither the team nor the membership is stored.
     description=CREATE_TEAM_DESCRIPTION,
     responses={
         201: {"description": "Created; `Location` points to the new team"},
-        401: NOT_AUTHENTICATED,
-        422: {
-            "model": ErrorResponse,
-            "description": "The name is blank or too long once trimmed (`invalid_team_name`). "
-            "A malformed body (no name, an unknown field) answers with FastAPI's validation "
-            "format instead",
-        },
+        **errors_of(*SIGNED_IN, SharedErrors.VALIDATION, TeamsErrors.INVALID_TEAM_NAME),
     },
 )
 async def create_team(
@@ -146,7 +114,7 @@ async def create_team(
         "Every team where the user is an active member, with their role in it, ordered by "
         "name ignoring case. Empty when the user has no team."
     ),
-    responses={401: NOT_AUTHENTICATED},
+    responses=errors_of(*SIGNED_IN),
 )
 async def list_my_teams(
     user_id: UUID = Depends(current_user_id),
@@ -163,10 +131,9 @@ async def list_my_teams(
     description=(
         "The team's name, mode and language, and the user's role in it. Only an active "
         "member gets it: any other user receives `403 not_a_team_member`, whether the team "
-        "exists or not. A `team_id` that is not a UUID answers `422` with FastAPI's "
-        "validation format."
+        "exists or not. A `team_id` that is not a UUID answers `422 validation_error`."
     ),
-    responses={401: NOT_AUTHENTICATED, 403: NOT_A_TEAM_MEMBER},
+    responses=errors_of(*SIGNED_IN, SharedErrors.VALIDATION, SharedErrors.NOT_A_TEAM_MEMBER),
 )
 async def get_team(
     team: TeamContext = Depends(current_team_member),
@@ -185,9 +152,10 @@ async def get_team(
         "the role's visible label, ordered by name ignoring case, and the roles an admin can "
         "give with their labels. Each member says why their role cannot change "
         "(`role_change_blocked_by`) or why they cannot be removed (`removal_blocked_by`) "
-        "right now, with the same rules the changes enforce. Only an admin of the team gets it."
+        "right now, with the same rules the changes enforce. Only an admin of the team gets "
+        "it; the role is the one stored in the membership."
     ),
-    responses={401: NOT_AUTHENTICATED, 403: NOT_A_TEAM_ADMIN},
+    responses=errors_of(*SIGNED_IN, SharedErrors.VALIDATION, *ADMINS_ONLY),
 )
 async def list_team_members(
     team: TeamContext = Depends(current_team_admin),
@@ -205,16 +173,22 @@ async def list_team_members(
     description=(
         "Changes the internal role of an active member, who may be the admin who asks. "
         "Giving the role the member already has changes nothing. No role changes while the "
-        "team has a sprint in progress, and the team's only admin cannot be demoted. Only an "
-        "admin of the team may do it. A body with an unknown field or an unknown role answers "
-        "`422` with FastAPI's validation format."
+        "team has a sprint in progress (`sprint_in_progress`), and the team's only admin "
+        "cannot be demoted, also when they ask it themselves (`last_admin`); either way "
+        "nothing changes. Only an admin of the team may do it. A body with an unknown field "
+        "or an unknown role answers `422 validation_error`."
     ),
     responses={
         204: {"description": "Changed"},
-        401: NOT_AUTHENTICATED,
-        403: NOT_A_TEAM_ADMIN,
-        404: MEMBER_NOT_FOUND,
-        409: ROLE_CHANGE_REFUSED,
+        **errors_of(
+            *SIGNED_IN,
+            SharedErrors.VALIDATION,
+            *ADMINS_ONLY,
+            TeamsErrors.MEMBER_NOT_FOUND,
+            SharedErrors.TEAM_NOT_FOUND,
+            TeamsErrors.SPRINT_IN_PROGRESS,
+            TeamsErrors.LAST_ADMIN,
+        ),
     },
 )
 async def change_member_role(
@@ -240,15 +214,19 @@ async def change_member_role(
         "Ends the membership of an active member, who may be the admin who asks: they stop "
         "being called to the team's ceremonies. Their account is not deleted, since it may "
         "belong to other teams, and they can be invited again. The team's only admin cannot "
-        "be removed; a sprint in progress does not prevent it. Only an admin of the team may "
-        "do it."
+        "be removed, also when they ask it themselves (`last_admin`); a sprint in progress "
+        "does not prevent it. Only an admin of the team may do it."
     ),
     responses={
         204: {"description": "Removed"},
-        401: NOT_AUTHENTICATED,
-        403: NOT_A_TEAM_ADMIN,
-        404: MEMBER_NOT_FOUND,
-        409: REMOVAL_REFUSED,
+        **errors_of(
+            *SIGNED_IN,
+            SharedErrors.VALIDATION,
+            *ADMINS_ONLY,
+            TeamsErrors.MEMBER_NOT_FOUND,
+            SharedErrors.TEAM_NOT_FOUND,
+            TeamsErrors.LAST_ADMIN,
+        ),
     },
 )
 async def remove_member(

@@ -182,7 +182,7 @@ async def test_a_blank_name_answers_422_invalid_team_name(api, name):
     response = await api.request("POST", "", TOKEN_BRUNO, json={"name": name})
 
     assert response.status_code == 422
-    assert response.json() == {"code": "invalid_team_name", "detail": "invalid team name"}
+    assert response.json()["error"]["code"] == "invalid_team_name"
     assert response.headers["cache-control"] == "no-store"
     assert api.uow.teams.teams == {} and api.uow.committed is False
 
@@ -190,7 +190,7 @@ async def test_a_blank_name_answers_422_invalid_team_name(api, name):
 async def test_a_name_longer_than_80_answers_422_invalid_team_name(api):
     response = await api.request("POST", "", TOKEN_BRUNO, json={"name": "x" * 81})
 
-    assert response.status_code == 422 and response.json()["code"] == "invalid_team_name"
+    assert response.status_code == 422 and response.json()["error"]["code"] == "invalid_team_name"
     assert api.uow.teams.teams == {}
 
 
@@ -244,14 +244,14 @@ async def test_a_non_member_gets_403_when_reading_a_team(api):
     response = await api.request("GET", f"/{api.atlas}", TOKEN_BRUNO)
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_member", "detail": "not a team member"}
+    assert response.json()["error"]["code"] == "not_a_team_member"
     assert "Atlas" not in response.text
 
 
 async def test_a_team_that_does_not_exist_answers_403_like_a_foreign_one(api):
     response = await api.request("GET", f"/{next_id()}", TOKEN_ANA)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
 
 
 async def test_a_member_of_a_team_that_vanished_gets_404_team_not_found(api):
@@ -260,7 +260,7 @@ async def test_a_member_of_a_team_that_vanished_gets_404_team_not_found(api):
 
     response = await api.request("GET", f"/{api.atlas}", TOKEN_ANA)
 
-    assert response.status_code == 404 and response.json()["code"] == "team_not_found"
+    assert response.status_code == 404 and response.json()["error"]["code"] == "team_not_found"
 
 
 async def test_a_malformed_team_id_answers_422(api):
@@ -278,7 +278,7 @@ async def test_without_a_token_the_team_routes_answer_401(api, method, path, kwa
     response = await api.request(method, path.format(atlas=api.atlas), **kwargs)
 
     assert response.status_code == 401
-    assert response.json()["code"] == "not_authenticated"
+    assert response.json()["error"]["code"] == "not_authenticated"
     assert response.headers["www-authenticate"] == "Bearer"
     assert api.uow.teams.teams == {}
 
@@ -287,7 +287,7 @@ async def test_without_a_token_the_team_routes_answer_401(api, method, path, kwa
 async def test_an_invalid_token_answers_401(api, method, path, kwargs):
     response = await api.request(method, path.format(atlas=api.atlas), "forged-token", **kwargs)
 
-    assert response.status_code == 401 and response.json()["code"] == "not_authenticated"
+    assert response.status_code == 401 and response.json()["error"]["code"] == "not_authenticated"
     assert api.uow.teams.teams == {}
 
 
@@ -321,7 +321,7 @@ async def test_the_openapi_documents_support_and_en_as_defaults_and_the_401_422_
     assert "`en`" in team["language"]["description"]
 
     assert spec["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
-    assert "ErrorResponse" in spec["components"]["schemas"]
+    assert "ErrorEnvelope" in spec["components"]["schemas"]
 
 
 # ------------------------------------------------------------- members (HU-06) --
@@ -388,7 +388,7 @@ async def test_the_only_admin_cannot_demote_themselves_and_gets_409_last_admin(a
     )
 
     assert response.status_code == 409
-    assert response.json() == {"code": "last_admin", "detail": "last admin"}
+    assert response.json()["error"]["code"] == "last_admin"
     assert api.role_in_atlas(api.ana) is TeamRole.ADMIN and api.members_uow.committed is False
 
 
@@ -399,7 +399,7 @@ async def test_with_a_sprint_in_progress_a_role_change_gets_409_sprint_in_progre
         "PATCH", f"/{api.atlas}/members/{api.carla}", TOKEN_ANA, json={"role": "admin"}
     )
 
-    assert response.status_code == 409 and response.json()["code"] == "sprint_in_progress"
+    assert response.status_code == 409 and response.json()["error"]["code"] == "sprint_in_progress"
     assert api.role_in_atlas(api.carla) is TeamRole.MEMBER
 
 
@@ -408,7 +408,7 @@ async def test_changing_the_role_of_someone_outside_the_team_answers_404(api):
         "PATCH", f"/{api.atlas}/members/{api.bruno}", TOKEN_ANA, json={"role": "admin"}
     )
 
-    assert response.status_code == 404 and response.json()["code"] == "member_not_found"
+    assert response.status_code == 404 and response.json()["error"]["code"] == "member_not_found"
 
 
 @pytest.mark.parametrize(
@@ -446,14 +446,14 @@ async def test_a_sprint_in_progress_does_not_prevent_a_removal(api):
 async def test_the_only_admin_cannot_remove_themselves_and_gets_409_last_admin(api):
     response = await api.request("DELETE", f"/{api.atlas}/members/{api.ana}", TOKEN_ANA)
 
-    assert response.status_code == 409 and response.json()["code"] == "last_admin"
+    assert response.status_code == 409 and response.json()["error"]["code"] == "last_admin"
     assert api.role_in_atlas(api.ana) is TeamRole.ADMIN
 
 
 async def test_removing_someone_outside_the_team_answers_404(api):
     response = await api.request("DELETE", f"/{api.atlas}/members/{api.bruno}", TOKEN_ANA)
 
-    assert response.status_code == 404 and response.json()["code"] == "member_not_found"
+    assert response.status_code == 404 and response.json()["error"]["code"] == "member_not_found"
 
 
 async def test_a_malformed_member_id_answers_422(api):
@@ -478,7 +478,7 @@ async def test_a_member_who_is_not_an_admin_gets_403_not_a_team_admin(api, metho
     response = await api.request(method, _path(api, path), TOKEN_CARLA, **kwargs)
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_admin", "detail": "not a team admin"}
+    assert response.json()["error"]["code"] == "not_a_team_admin"
     assert "Ana Gil" not in response.text
     assert api.role_in_atlas(api.carla) is TeamRole.MEMBER and api.members_uow.committed is False
 
@@ -487,7 +487,7 @@ async def test_a_member_who_is_not_an_admin_gets_403_not_a_team_admin(api, metho
 async def test_someone_outside_the_team_gets_403_not_a_team_member(api, method, path, kwargs):
     response = await api.request(method, _path(api, path), TOKEN_BRUNO, **kwargs)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
     assert api.role_in_atlas(api.carla) is TeamRole.MEMBER
 
 
@@ -498,7 +498,7 @@ async def test_admin_rights_in_one_team_do_not_reach_another(api, method, path, 
 
     response = await api.request(method, _path(api, path), TOKEN_ANA, **kwargs)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_admin"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_admin"
 
 
 @pytest.mark.parametrize(("method", "path", "kwargs"), MEMBER_ROUTES)
@@ -507,7 +507,9 @@ async def test_without_a_valid_token_the_member_routes_answer_401(api, method, p
     forged = await api.request(method, _path(api, path), "forged-token", **kwargs)
 
     for response in (missing, forged):
-        assert response.status_code == 401 and response.json()["code"] == "not_authenticated"
+        assert (
+            response.status_code == 401 and response.json()["error"]["code"] == "not_authenticated"
+        )
     assert api.role_in_atlas(api.carla) is TeamRole.MEMBER
 
 

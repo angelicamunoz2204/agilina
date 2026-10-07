@@ -4,6 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { provideTestTenant } from '@testing/tenant';
 
 import { TeamSettingsPage } from './team-settings-page';
 import { TeamMembersPort } from '../application/team-members.port';
@@ -112,8 +113,9 @@ describe('TeamSettingsPage', () => {
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
+        provideTestTenant(),
         provideRouter(
-          [{ path: 'teams/:teamId/settings', component: TeamSettingsPage }],
+          [{ path: ':tenant/teams/:teamId/settings', component: TeamSettingsPage }],
           withComponentInputBinding(),
         ),
         { provide: TeamMembersPort, useValue: port },
@@ -122,7 +124,7 @@ describe('TeamSettingsPage', () => {
     harness = await RouterTestingHarness.create();
   });
 
-  async function open(url = '/teams/atlas/settings'): Promise<void> {
+  async function open(url = '/acme/teams/atlas/settings'): Promise<void> {
     await harness.navigateByUrl(url);
     await harness.fixture.whenStable();
     page = harness.routeNativeElement!;
@@ -169,7 +171,7 @@ describe('TeamSettingsPage', () => {
     await open();
 
     expect(port.listed).toEqual(['atlas']);
-    expect(page.querySelector('h1')?.textContent).toBe('Equipo');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Equipo');
     const [ana, bruno] = rows();
     expect(text(ana)).toContain('Ana Gil');
     expect(text(ana)).toContain('ana@example.com');
@@ -194,7 +196,7 @@ describe('TeamSettingsPage', () => {
   });
 
   it('says it is loading while the API has not answered', async () => {
-    await harness.navigateByUrl('/teams/slow/settings');
+    await harness.navigateByUrl('/acme/teams/slow/settings');
     TestBed.tick();
     page = harness.routeNativeElement!;
 
@@ -370,13 +372,13 @@ describe('TeamSettingsPage', () => {
     port.answer = new MemberFailure('forbidden');
     await open();
 
-    expect(page.querySelector('h1')?.textContent).toBe('No tienes acceso a esta pantalla');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('No tienes acceso a esta pantalla');
     expect(text(page)).toContain(
       'Solo los Administradores del equipo pueden gestionar a sus integrantes.',
     );
     expect(rows()).toEqual([]);
     expect(page.querySelector('select')).toBeNull();
-    expect(page.querySelector('a[href="/teams/atlas"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/acme/teams/atlas"]')).not.toBeNull();
   });
 
   it('says the admin lost the access by their own role change, and leads back to the team', async () => {
@@ -392,9 +394,9 @@ describe('TeamSettingsPage', () => {
     port.accept();
     await settled();
 
-    expect(page.querySelector('h1')?.textContent).toBe('Ya no administras este equipo');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Ya no administras este equipo');
     expect(text(page)).toContain('Tu cambio quedó guardado: ahora eres Miembro');
-    expect(page.querySelector('a[href="/teams/atlas"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/acme/teams/atlas"]')).not.toBeNull();
   });
 
   it('says the admin left the team by their own removal, and leads to their teams', async () => {
@@ -411,9 +413,9 @@ describe('TeamSettingsPage', () => {
     port.accept();
     await settled();
 
-    expect(page.querySelector('h1')?.textContent).toBe('Ya no administras este equipo');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Ya no administras este equipo');
     expect(text(page)).toContain('ya no perteneces a este equipo');
-    expect(page.querySelector('a[href="/teams"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/acme/teams"]')).not.toBeNull();
   });
 
   it('asks to sign in again when the API does not recognise the session', async () => {
@@ -433,6 +435,6 @@ describe('TeamSettingsPage', () => {
     expect(text(page.querySelector('[role="alert"]'))).toBe(
       'No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.',
     );
-    expect(page.querySelector('h1')?.textContent).toBe('Equipo');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Equipo');
   });
 });
