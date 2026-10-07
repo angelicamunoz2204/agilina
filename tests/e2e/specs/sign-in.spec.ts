@@ -7,6 +7,9 @@ import { MAILPIT } from '../playwright.config';
  * before this runs), they activate their account from the email, sign in with Keycloak and
  * land on their team; a page they open without a session takes them to sign in and brings
  * them back.
+ *
+ * Elements are found by their `data-testid`, which does not move when a text, a label or the
+ * markup changes; what the person reads is still checked, on the element found that way.
  */
 const EMAIL = process.env['E2E_EMAIL'] ?? '';
 const TEAM = process.env['E2E_TEAM'] ?? '';
@@ -40,47 +43,50 @@ async function activationLink(): Promise<string> {
 }
 
 async function signInOnKeycloak(page: Page, password: string, email = EMAIL): Promise<void> {
-  await page.getByLabel('Correo electrónico').fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  await page.getByTestId('login-email').fill(email);
+  await page.getByTestId('login-password').fill(password);
+  await page.getByTestId('login-submit').click();
 }
 
 let teamUrl = '';
 
 test('activates the account from the link of the invitation email', async ({ page }) => {
   await page.goto(await activationLink());
-  await expect(page.getByRole('heading', { name: 'Activar cuenta' })).toBeVisible();
+  await expect(page.getByTestId('activate-title')).toHaveText('Activar cuenta');
   await expect(page).not.toHaveURL(/#t=/); // the token left the address bar once read
 
-  const password = page.getByLabel('Contraseña', { exact: true });
+  const password = page.getByTestId('activate-password');
+  const confirmation = page.getByTestId('activate-confirmation');
   await password.fill(PASSWORD);
-  await page.getByLabel('Confirmar contraseña').fill(PASSWORD);
+  await confirmation.fill(PASSWORD);
   // Each box has its own button to see what was typed.
-  await expect(page.getByRole('button', { name: 'Mostrar contraseña' })).toHaveCount(2);
-  await page.getByRole('button', { name: 'Mostrar contraseña' }).first().click();
+  await page.getByTestId('activate-password-toggle').click();
   await expect(password).toHaveAttribute('type', 'text');
-  await page.getByRole('button', { name: 'Activar y entrar' }).click();
+  await expect(confirmation).toHaveAttribute('type', 'password');
+  await page.getByTestId('activate-confirmation-toggle').click();
+  await expect(confirmation).toHaveAttribute('type', 'text');
+  await page.getByTestId('activate-submit').click();
 
   // The next stop is Keycloak's sign-in, with the email already typed.
   await expect(page).toHaveURL(KEYCLOAK_LOGIN);
-  await expect(page.getByLabel('Correo electrónico')).toHaveValue(EMAIL);
+  await expect(page.getByTestId('login-email')).toHaveValue(EMAIL);
 
   // There, too, the password can be seen while it is typed.
-  const signInPassword = page.getByLabel('Contraseña', { exact: true });
+  const signInPassword = page.getByTestId('login-password');
+  const toggle = page.getByTestId('login-password-toggle');
   await signInPassword.fill('anything');
-  await page.getByRole('button', { name: 'Mostrar contraseña' }).click();
+  await toggle.click();
   await expect(signInPassword).toHaveAttribute('type', 'text');
-  await expect(page.getByRole('button', { name: 'Mostrar contraseña' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('a used link says so and offers a new invitation', async ({ page }) => {
   await page.goto(await activationLink());
 
-  await expect(page.getByRole('heading', { name: 'Este enlace ya se usó' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Solicitar una invitación nueva' })).toBeVisible();
+  await expect(page.getByTestId('activate-link-problem-title')).toHaveText('Este enlace ya se usó');
+  await expect(page.getByTestId('activate-request-new')).toHaveText(
+    'Solicitar una invitación nueva',
+  );
 });
 
 test('refused credentials get one generic message, whether or not the email exists', async ({ page }) => {
@@ -88,10 +94,10 @@ test('refused credentials get one generic message, whether or not the email exis
   await expect(page).toHaveURL(KEYCLOAK_LOGIN);
 
   await signInOnKeycloak(page, 'not-the-password');
-  await expect(page.getByRole('alert')).toHaveText(REFUSED);
+  await expect(page.getByTestId('login-error')).toHaveText(REFUSED);
 
   await signInOnKeycloak(page, 'not-the-password', 'nobody@example.test');
-  await expect(page.getByRole('alert')).toHaveText(REFUSED);
+  await expect(page.getByTestId('login-error')).toHaveText(REFUSED);
 });
 
 test('signing in from the entrance lands on the only team of the person', async ({ page }) => {
@@ -101,7 +107,7 @@ test('signing in from the entrance lands on the only team of the person', async 
   await signInOnKeycloak(page, PASSWORD);
 
   await expect(page).toHaveURL(/\/teams\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole('heading', { name: TEAM })).toBeVisible();
+  await expect(page.getByTestId('team-name')).toHaveText(TEAM);
   teamUrl = page.url();
 });
 
@@ -114,7 +120,7 @@ test('a page opened without a session asks to sign in and comes back to it', asy
   await expect(page).toHaveURL(KEYCLOAK_LOGIN);
   await signInOnKeycloak(page, PASSWORD);
 
-  await expect(page.getByRole('heading', { name: TEAM })).toBeVisible();
+  await expect(page.getByTestId('team-name')).toHaveText(TEAM);
   // Read once the team shows, not polled: Keycloak's answer (#state=…&code=…) must not come
   // back to the address bar after a first moment without it.
   expect(page.url()).toBe(teamUrl);
@@ -127,7 +133,7 @@ test('the environment status stays public', async ({ browser }) => {
 
   await page.goto('/status');
 
-  await expect(page.getByRole('heading', { name: 'Estado del entorno' })).toBeVisible();
+  await expect(page.getByTestId('status-title')).toHaveText('Estado del entorno');
   await expect(page).toHaveURL(/\/status$/);
   await context.close();
 });

@@ -2,7 +2,7 @@
   class="max-w-xl rounded-lg border border-border bg-surface p-6"
   *transloco="let t; prefix: 'status'"
 >
-  <h1 class="mb-2 text-lg font-semibold">{{ t('title') }}</h1>
+  <h1 class="mb-2 text-lg font-semibold" data-testid="status-title">{{ t('title') }}</h1>
   <p class="mb-4 text-sm text-muted">{{ t('description') }}</p>
 
   @if (serviceStatus(); as api) {

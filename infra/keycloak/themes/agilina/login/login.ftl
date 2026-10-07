@@ -12,7 +12,7 @@
 
                 <#if !usernameHidden??>
                     <label for="username" class="mt-6 mb-1 text-sm font-medium">${msg("usernameOrEmail")}</label>
-                    <input id="username" name="username" value="${(login.username!'')}" type="text"
+                    <input id="username" name="username" value="${(login.username!'')}" type="text" data-testid="login-email"
                            autofocus autocomplete="username" dir="ltr"
                            aria-invalid="<#if messagesPerField.existsError('username','password')>true<#else>false</#if>"
                            <#if messagesPerField.existsError('username','password')>aria-describedby="input-error"</#if>
@@ -21,11 +21,11 @@
 
                 <label for="password" class="mt-4 mb-1 text-sm font-medium">${msg("password")}</label>
                 <div class="relative">
-                    <input id="password" name="password" type="password" autocomplete="current-password" dir="ltr"
+                    <input id="password" name="password" type="password" autocomplete="current-password" dir="ltr" data-testid="login-password"
                            aria-invalid="<#if messagesPerField.existsError('username','password')>true<#else>false</#if>"
                            class="block min-h-11 w-full rounded-md border border-border bg-background py-2 pr-11 pl-3 shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent" />
                     <#-- Shows or hides the password (js/password-visibility.js, which also unhides it). -->
-                    <button type="button" data-password-toggle hidden aria-controls="password" aria-pressed="false"
+                    <button type="button" data-password-toggle data-testid="login-password-toggle" hidden aria-controls="password" aria-pressed="false"
                             aria-label="${msg("agilinaShowPassword")}"
                             class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center rounded-md text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent">
                         <!-- Lucide "eye" icon. -->
@@ -42,7 +42,7 @@
                 <#-- A refused login. Keycloak says it once for both fields, and with the same text
                      whether the email exists or not (see messages_*.properties). -->
                 <#if messagesPerField.existsError('username','password')>
-                    <p id="input-error" role="alert" aria-live="polite"
+                    <p id="input-error" role="alert" aria-live="polite" data-testid="login-error"
                        class="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                         ${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}
                     </p>
@@ -53,7 +53,7 @@
                 </#if>
 
                 <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>/>
-                <input id="kc-login" name="login" type="submit" value="${msg("doLogIn")}"
+                <input id="kc-login" name="login" type="submit" value="${msg("doLogIn")}" data-testid="login-submit"
                        class="mt-6 min-h-11 w-full cursor-pointer rounded-md border border-accent bg-accent px-4 py-2 font-semibold text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-progress disabled:opacity-60" />
             </form>
         </#if>

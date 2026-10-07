@@ -17,7 +17,9 @@
 
     @case ('link_problem') {
       @let problem = linkProblem() ?? 'not_found';
-      <h1 class="mb-2 text-xl font-semibold">{{ t('link.' + problem + '.title') }}</h1>
+      <h1 class="mb-2 text-xl font-semibold" data-testid="activate-link-problem-title">
+        {{ t('link.' + problem + '.title') }}
+      </h1>
       <p class="text-sm text-muted">{{ t('link.' + problem + '.text') }}</p>
 
       @if (canRequestNew()) {
@@ -26,6 +28,7 @@
             aglButton
             type="button"
             class="mt-4 w-full"
+            data-testid="activate-request-new"
             [disabled]="request() === 'sending'"
             (click)="requestNew()"
           >
@@ -74,7 +77,7 @@
     }
 
     @default {
-      <h1 class="mb-2 text-xl font-semibold">{{ t('title') }}</h1>
+      <h1 class="mb-2 text-xl font-semibold" data-testid="activate-title">{{ t('title') }}</h1>
       <p class="text-sm text-muted">{{ t('subtitle') }}</p>
 
       @if (invitation(); as invited) {
@@ -97,10 +100,14 @@
         />
 
         <label for="password" class="mb-1 text-sm">{{ t('password') }}</label>
-        <agl-password-field [toggleLabel]="t('show_password')">
+        <agl-password-field
+          toggleTestId="activate-password-toggle"
+          [toggleLabel]="t('show_password')"
+        >
           <input
             aglTextField
             id="password"
+            data-testid="activate-password"
             name="password"
             type="password"
             autocomplete="new-password"
@@ -112,10 +119,14 @@
         <p id="password-hint" class="mt-1 mb-4 text-sm text-muted">{{ t('password_hint') }}</p>
 
         <label for="confirmation" class="mb-1 text-sm">{{ t('confirmation') }}</label>
-        <agl-password-field [toggleLabel]="t('show_password')">
+        <agl-password-field
+          toggleTestId="activate-confirmation-toggle"
+          [toggleLabel]="t('show_password')"
+        >
           <input
             aglTextField
             id="confirmation"
+            data-testid="activate-confirmation"
             name="confirmation"
             type="password"
             autocomplete="new-password"
@@ -150,7 +161,13 @@
           }
         }
 
-        <button aglButton type="submit" class="mt-4 w-full" [disabled]="phase() === 'submitting'">
+        <button
+          aglButton
+          type="submit"
+          class="mt-4 w-full"
+          data-testid="activate-submit"
+          [disabled]="phase() === 'submitting'"
+        >
           {{ phase() === 'submitting' ? t('submitting') : t('submit') }}
         </button>
       </form>

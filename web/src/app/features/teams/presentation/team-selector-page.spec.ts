@@ -96,7 +96,7 @@ describe('TeamSelectorPage', () => {
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(Router).url).toBe('/teams/b');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Boreal');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Boreal');
   });
 
   it('with no team shows the empty list and the button to create one', async () => {
@@ -115,7 +115,7 @@ describe('TeamSelectorPage', () => {
     await open(of([{ id: 'a', name: 'Atlas' }]));
 
     expect(TestBed.inject(Router).url).toBe('/teams/a');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Atlas');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('always offers to create a team', async () => {

@@ -8,7 +8,7 @@ import { TextField } from './text-field';
   imports: [PasswordField, TextField],
   template: `
     <label for="secret">Contraseña</label>
-    <agl-password-field toggleLabel="Mostrar contraseña">
+    <agl-password-field toggleLabel="Mostrar contraseña" toggleTestId="secret-toggle">
       <input aglTextField id="secret" type="password" value="a-long-password-1" />
     </agl-password-field>
   `,
@@ -61,6 +61,10 @@ describe('PasswordField', () => {
 
   it('leaves room for the button so that the text never runs under it', () => {
     expect(input().classList).toContain('pr-11');
+  });
+
+  it('gives the button the test id it is given, for the end-to-end tests', () => {
+    expect(toggle().dataset['testid']).toBe('secret-toggle');
   });
 
   it('keeps the label of the box on the box', () => {

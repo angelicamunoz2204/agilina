@@ -169,7 +169,7 @@ describe('CreateTeamPage', () => {
 
     expect(port.names).toEqual(['  Atlas  ']);
     expect(TestBed.inject(Router).url).toBe('/teams/new-id');
-    expect(page.querySelector('h1')?.textContent).toBe('Atlas');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('cannot be sent twice while it is saving', async () => {

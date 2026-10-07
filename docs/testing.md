@@ -81,6 +81,15 @@ entorno levantado, en un contenedor sobre la red del anfitrión (`make test-e2e`
 persona nueva por cada ejecución). Son pocas a propósito: cubren los recorridos, no las reglas, que
 siguen en las pruebas de cada capa. Aún no corren en la CI.
 
+Una prueba de punta a punta encuentra los elementos por su `data-testid` (`page.getByTestId(…)`),
+nunca por su texto, su etiqueta, su rol o su clase: un texto o una etiqueta que cambian no la rompen.
+Lo que la persona lee se sigue comprobando, sobre el elemento encontrado así
+(`expect(page.getByTestId('login-error')).toHaveText(…)`). Los nombres van en kebab-case, con el
+prefijo de la pantalla: `activate-password`, `login-submit`, `team-name`. Un elemento que una prueba
+necesita y no tiene `data-testid` se le agrega en la plantilla (también en las del tema de
+Keycloak); las piezas de `shared/ui` lo reciben por una entrada (`toggleTestId` de
+`agl-password-field`).
+
 ## Comandos
 
 | Quiero… | Comando |

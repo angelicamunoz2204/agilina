@@ -33,6 +33,8 @@ import { TextField } from './text-field';
 export class PasswordField {
   /** The name of the button, already translated. */
   readonly toggleLabel = input.required<string>();
+  /** The `data-testid` of the button, for the end-to-end tests. */
+  readonly toggleTestId = input<string>();
 
   private readonly input = contentChild.required(TextField, { read: ElementRef });
 

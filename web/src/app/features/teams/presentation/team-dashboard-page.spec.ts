@@ -64,7 +64,7 @@ describe('TeamDashboardPage', () => {
     const page = await open('/teams/atlas');
 
     expect(port.requested).toEqual(['atlas']);
-    expect(page.querySelector('h1')?.textContent).toBe('Atlas');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('loads the other team when the :teamId changes', async () => {
@@ -73,7 +73,7 @@ describe('TeamDashboardPage', () => {
     const page = await open('/teams/boreal');
 
     expect(port.requested).toEqual(['atlas', 'boreal']);
-    expect(page.querySelector('h1')?.textContent).toBe('Boreal');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Boreal');
   });
 
   it('says it is loading while the API has not answered', async () => {

@@ -383,7 +383,8 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 - Nada de estilos en línea (`style="…"`). *(ESLint.)*
 - Un `.scss` de componente (`styleUrl`) es la excepción, solo para lo que las utilidades no
   expresan (por ejemplo una animación); se justifica en el pull request.
-- Una prueba no busca un elemento por su clase de estilo: usa el texto, el rol o la etiqueta.
+- Una prueba no busca un elemento por su clase de estilo: usa el texto, el rol o la etiqueta. Las
+  de punta a punta (`tests/e2e`) usan `data-testid` (ver [docs/testing.md](../docs/testing.md)).
 - Adaptable por defecto: se escribe primero para móvil y se amplía con `sm:`, `md:`…
 
 ## Accesibilidad
