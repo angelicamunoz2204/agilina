@@ -102,8 +102,12 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 datos, planificador, sondas de salud, quién llama y a qué equipo pertenece, y el
 formato de error común) con las mismas cuatro capas.
 
-El **equipo es el tenant**: todo repositorio y toda consulta de un contexto con
-datos de equipo deben exigir el `team_id` en su firma. La única consulta que filtra
+El **tenant es la organización** ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)):
+cada una tiene su base de datos, su realm de Keycloak y su login, y contiene equipos. El tenant se
+elige en el borde, una vez por petición (`X-Agilina-Tenant`, `shared/presentation/http/tenancy.py`),
+y `bootstrap/tenants.py` da a cada tenant su propio grafo de objetos; lo que hay detrás no lo sabe.
+Dentro de un tenant, el **equipo** sigue aislado por `team_id`: todo repositorio y toda consulta de un
+contexto con datos de equipo deben exigir el `team_id` en su firma. La única consulta que filtra
 por usuario en lugar de por equipo es la que lista los equipos de quien pregunta
 (`ListMyTeams`).
 
@@ -122,15 +126,16 @@ esa. La autorización nunca vive en la web.
 api/
 ├── pyproject.toml
 ├── alembic.ini
-├── migrations/                       Alembic; env.py lee la URL de la configuración
-│   └── versions/
+├── migrations/                       Alembic, dos entornos (AD-29); la URL la da quien migra
+│   ├── tenant/versions/              El esquema de la base de cada tenant
+│   └── platform/versions/            El catálogo de tenants
 ├── src/agilina_api/
-│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams) e invite.py (`make invite`)
+│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters/ (lo que conecta identity con teams), tenants.py (un grafo por tenant), migrate.py y tenant_admin.py (`make migrate`, `make tenant-add`) e invite.py (`make invite`)
 │   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
 │   │   ├── application/              Consultas de salud, los puertos Clock, UnitOfWork, Mailer y EmailRenderer, y los de acceso (AuthenticatedUsers y TeamAccess)
 │   │   ├── infrastructure/           settings, logging, base de datos, planificador, reloj, sonda SQL, correo SMTP y plantillas de correo (Jinja2)
-│   │   └── presentation/http/        Router de salud, dependencias declaradas, acceso (current_user_id y current_team_member) y el formato de error común (ErrorResponse y el manejador único, con una tabla de errores por contexto)
+│   │   └── presentation/http/        Router de salud, dependencias declaradas, acceso (current_user_id y current_team_member) y el formato de error único (catálogo `ApiError`, manejadores, `request_id`; una tabla de errores por contexto)
 │   ├── identity/                     Contexto (HU-02): dominio (Invitation, AppUser), puertos y DTO de lectura, persistencia
 │   ├── teams/                        Contexto (HU-02 lo creó; HU-05 en adelante lo amplía): dominio (Team con sus membresías y TeamName), comandos, consultas, persistencia y API HTTP
 │   └── ceremonies/
@@ -142,10 +147,13 @@ Las pruebas de la API no están aquí sino en `tests/api/`, con la misma estruct
 
 La forma que tendrá cada contexto con dominio (por ejemplo `identity`):
 
+Una clase por archivo ([code-conventions.md](code-conventions.md)): donde esta guía nombra
+`errors`, `dtos` o `schemas`, es un paquete con una clase por archivo.
+
 ```
 identity/
-├── domain/            model/ (agregados y objetos de valor), events.py, errors.py, repositories.py
-├── application/       ports/ (inbound y outbound), commands/, queries/, dtos.py
+├── domain/            model/ (agregados y objetos de valor), events.py, errors/, repositories/
+├── application/       ports/ (inbound y outbound), commands/, queries/, dtos/, errors/
 ├── presentation/      http/ (router, schemas, presenters), cli/
 └── infrastructure/    persistence/ (modelos ORM, mapeadores, repositorio, consultas), keycloak/, mail/
 ```
@@ -192,8 +200,8 @@ corre en cualquier máquina y en el pipeline.
 
 ```
 shared/src/agilina_shared/
-├── contract.py    CeremonyContext, CeremonyResult, ParticipantContext, TranscriptSegment
-├── enums.py       OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus
+├── contract/      CeremonyContext, CeremonyResult, ParticipantContext, TranscriptSegment (un archivo por clase)
+├── enums/         OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus (un archivo por clase)
 └── i18n.py        Plantillas de lo que Agilina dice, en español e inglés
 ```
 
@@ -295,6 +303,8 @@ en el code review.
 ## Dónde está el porqué
 
 - Cómo se da estilo a la web (Tailwind CSS con los tokens `--agl-*` como tema): [AD-27](adr/0027-dar-estilo-a-la-web-con-tailwind-css.md).
+- Cómo responde la API a un fallo y dónde se listan sus endpoints: [AD-30](adr/0030-un-solo-formato-de-error-http-y-un-catalogo-de-la-api.md) y [api.md](api.md).
+- Cómo se aíslan las organizaciones (una base, un realm y un login por tenant, y el tenant en cada petición): [AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md).
 - Cómo se inicia sesión (página de Keycloak con tema propio, `keycloak-js`, validación del token en la API): [AD-28](adr/0028-iniciar-sesion-con-keycloak.md).
 - Cómo se organizan las pruebas (árbol espejo, *Data Builders*, cobertura del 100 %): [AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).

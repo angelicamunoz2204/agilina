@@ -115,5 +115,11 @@
         "text": "Taking you to the sign-in…"
       }
     }
+  },
+  "tenancy": {
+    "not_found": {
+      "title": "We could not find this organization",
+      "text": "Check the address or open the link your organization sent you. If the problem continues, ask your administrator for help."
+    }
   }
 }

@@ -3,6 +3,9 @@ import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import type Keycloak from 'keycloak-js';
 
+import { RUNTIME_CONFIG } from '@core/config/runtime-config';
+import { TenantContext } from '@core/tenant/tenant-context';
+
 import { type AuthSession, type SignInOptions } from './auth-session';
 
 /** The part of keycloak-js this adapter uses: what a test double has to answer. */
@@ -11,73 +14,94 @@ export type KeycloakClient = Pick<
   'init' | 'login' | 'updateToken' | 'authenticated' | 'token'
 >;
 
-/** The configured keycloak-js client, built in provide-auth.ts. */
-export const KEYCLOAK_CLIENT = new InjectionToken<KeycloakClient>('KEYCLOAK_CLIENT');
+/** Builds the keycloak-js client of a realm; bound in provide-auth.ts. */
+export type KeycloakClientFactory = (realm: string) => KeycloakClient;
+
+export const KEYCLOAK_CLIENT_FACTORY = new InjectionToken<KeycloakClientFactory>(
+  'KEYCLOAK_CLIENT_FACTORY',
+);
 
 /** The access token is renewed when it has less than this many seconds left. */
 const MIN_TOKEN_VALIDITY_SECONDS = 30;
 
+interface TenantSession {
+  readonly client: KeycloakClient;
+  readonly started: Promise<void>;
+}
+
 /**
  * Keycloak adapter of the session (authorization code flow with PKCE, which the realm's
- * `agilina-web` client requires). The tokens live in memory only: never in localStorage.
+ * `agilina-web` client requires). Every tenant has its own realm (AD-29): the client is the
+ * one of the realm of the tenant in the address, made the first time it is needed. The tokens
+ * live in memory only: never in localStorage.
  */
 @Injectable()
 export class KeycloakAuthSession implements AuthSession {
-  private readonly keycloak = inject(KEYCLOAK_CLIENT);
+  private readonly newClient = inject(KEYCLOAK_CLIENT_FACTORY);
+  private readonly realmPrefix = inject(RUNTIME_CONFIG).keycloak.realmPrefix;
+  private readonly tenant = inject(TenantContext);
   private readonly document = inject(DOCUMENT);
   private readonly language = inject(TranslocoService);
+  private readonly sessions = new Map<string, TenantSession>();
   private readonly signedIn = signal(false);
-  private started: Promise<void> | null = null;
 
   readonly authenticated = this.signedIn.asReadonly();
 
   async ensureSignedIn(returnUrl?: string): Promise<boolean> {
-    await this.start();
-    if (this.keycloak.authenticated) {
+    const { client } = await this.start();
+    if (client.authenticated) {
       return true;
     }
-    await this.redirectToSignIn(returnUrl === undefined ? {} : { returnUrl });
+    await this.redirectToSignIn(client, returnUrl === undefined ? {} : { returnUrl });
     return false;
   }
 
   async accessToken(): Promise<string | null> {
-    await this.start();
-    if (!this.keycloak.authenticated) {
+    const { client } = await this.start();
+    if (!client.authenticated) {
       return null;
     }
     try {
-      await this.keycloak.updateToken(MIN_TOKEN_VALIDITY_SECONDS);
+      await client.updateToken(MIN_TOKEN_VALIDITY_SECONDS);
     } catch {
       // The session cannot be renewed (it ended in Keycloak): sign in again.
       this.signedIn.set(false);
-      await this.redirectToSignIn({});
+      await this.redirectToSignIn(client, {});
       return null;
     }
-    return this.keycloak.token ?? null;
+    return client.token ?? null;
   }
 
   async signIn(options: SignInOptions = {}): Promise<void> {
-    await this.start();
-    await this.redirectToSignIn(options);
+    const { client } = await this.start();
+    await this.redirectToSignIn(client, options);
   }
 
   /**
-   * Starts keycloak-js once. With no `onLoad` it only reads the answer of a sign-in that
-   * has just come back (the `code` in the address) and redirects nowhere.
+   * Starts keycloak-js for the tenant of the address, once. With no `onLoad` it only reads the
+   * answer of a sign-in that has just come back (the `code` in the address) and redirects
+   * nowhere.
    */
-  private start(): Promise<void> {
-    this.started ??= this.keycloak
-      .init({ pkceMethod: 'S256', checkLoginIframe: false })
-      .then(() => {
-        this.signedIn.set(this.keycloak.authenticated);
+  private async start(): Promise<TenantSession> {
+    const slug = this.tenant.require();
+    let session = this.sessions.get(slug);
+    if (session === undefined) {
+      const client = this.newClient(`${this.realmPrefix}${slug}`);
+      const started = client.init({ pkceMethod: 'S256', checkLoginIframe: false }).then(() => {
+        this.signedIn.set(client.authenticated);
       });
-    return this.started;
+      session = { client, started };
+      this.sessions.set(slug, session);
+    }
+    await session.started;
+    this.signedIn.set(session.client.authenticated);
+    return session;
   }
 
-  private async redirectToSignIn(options: SignInOptions): Promise<void> {
+  private async redirectToSignIn(client: KeycloakClient, options: SignInOptions): Promise<void> {
     const location = this.document.location;
     const returnUrl = options.returnUrl;
-    await this.keycloak.login({
+    await client.login({
       redirectUri: returnUrl === undefined ? location.href : `${location.origin}${returnUrl}`,
       locale: this.language.getActiveLang(),
       ...(options.loginHint !== undefined && { loginHint: options.loginHint }),

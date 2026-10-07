@@ -81,7 +81,7 @@ async def test_the_whole_story_of_the_first_admin(world, client, engine):
 
     # 4. the link works once
     again = await _post(client, "status", token=link_token)
-    assert again.status_code == 410 and again.json()["code"] == "invitation_used"
+    assert again.status_code == 410 and again.json()["error"]["code"] == "invitation_used"
     second = await _post(
         client, "activate", token=link_token, password=PASSWORD, confirmation=PASSWORD
     )
@@ -98,7 +98,7 @@ async def test_a_link_that_expired_can_be_reported_and_the_admin_hears_about_it(
     world.clock.advance(days=8)
 
     expired = await _post(client, "status", token=TOKENS[1])
-    assert expired.status_code == 410 and expired.json()["code"] == "invitation_expired"
+    assert expired.status_code == 410 and expired.json()["error"]["code"] == "invitation_expired"
 
     asked = await _post(client, "request-new", token=TOKENS[1])
 
@@ -118,7 +118,9 @@ async def test_a_refused_password_leaves_the_database_untouched_and_the_link_usa
         client, "activate", token=TOKENS[0], password="short", confirmation="short"
     )
 
-    assert refused.status_code == 422 and refused.json()["reasons"] == ["min_length"]
+    assert refused.status_code == 422 and refused.json()["error"]["details"]["reasons"] == [
+        "min_length"
+    ]
     assert await _scalar(engine, "SELECT count(*) FROM app_user") == 0
     assert (await _post(client, "status", token=TOKENS[0])).status_code == 200
 
@@ -128,4 +130,6 @@ async def test_an_altered_link_is_not_found_over_http(world, client):
 
     response = await _post(client, "status", token=TOKENS[0][:-1] + "Z")
 
-    assert response.status_code == 404 and response.json()["code"] == "invitation_not_found"
+    assert (
+        response.status_code == 404 and response.json()["error"]["code"] == "invitation_not_found"
+    )

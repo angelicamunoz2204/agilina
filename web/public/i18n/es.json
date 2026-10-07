@@ -115,5 +115,11 @@
         "text": "Te llevamos al inicio de sesión…"
       }
     }
+  },
+  "tenancy": {
+    "not_found": {
+      "title": "No encontramos esta organización",
+      "text": "Revisa la dirección o abre el enlace que te envió tu organización. Si el problema sigue, pide ayuda a tu administrador."
+    }
   }
 }

@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, map, type Observable, throwError } from 'rxjs';
 
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
+import { readApiError } from '@core/http/api-error';
 
 import { type TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
@@ -32,11 +33,6 @@ interface TeamResponse {
   mode: string;
   language: string;
   role: string;
-}
-
-/** Every error of the API has a stable `code`. */
-interface ErrorResponse {
-  code?: string;
 }
 
 const FAILURES: Readonly<Record<string, TeamFailureKind>> = {
@@ -90,12 +86,6 @@ function toFailure(error: unknown): TeamFailure {
   if (!(error instanceof HttpErrorResponse)) {
     return new TeamFailure('unavailable');
   }
-  const body = asErrorResponse(error.error);
-  return new TeamFailure(
-    (body.code !== undefined ? FAILURES[body.code] : undefined) ?? 'unavailable',
-  );
-}
-
-function asErrorResponse(body: unknown): ErrorResponse {
-  return typeof body === 'object' && body !== null ? body : {};
+  const body = readApiError(error.error);
+  return new TeamFailure((body !== undefined ? FAILURES[body.code] : undefined) ?? 'unavailable');
 }

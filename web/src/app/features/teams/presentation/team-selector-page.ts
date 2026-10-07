@@ -2,6 +2,7 @@ import { Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 
 import { problemMessageKey } from './problem-message';
@@ -17,6 +18,7 @@ import { TeamSelectorFacade } from '../application/team-selector.facade';
 export class TeamSelectorPage {
   private readonly facade = inject(TeamSelectorFacade);
   private readonly router = inject(Router);
+  protected readonly tenant = inject(TenantContext);
 
   protected readonly teams = this.facade.teams;
   protected readonly loading = this.facade.loading;
@@ -27,7 +29,7 @@ export class TeamSelectorPage {
   private readonly enterTheOnlyTeam = effect(() => {
     const team = this.facade.onlyTeam();
     if (team !== null) {
-      void this.router.navigate(['/teams', team.id], { replaceUrl: true });
+      void this.router.navigate(this.tenant.path('teams', team.id), { replaceUrl: true });
     }
   });
 }

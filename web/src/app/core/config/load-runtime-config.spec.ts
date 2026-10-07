@@ -5,7 +5,7 @@ describe('loadRuntimeConfig', () => {
   it('loads and validates config.json', async () => {
     const body = {
       apiUrl: '/api',
-      keycloak: { url: '/auth', realm: 'agilina', clientId: 'agilina-web' },
+      keycloak: { url: '/auth', realmPrefix: 'agilina-', clientId: 'agilina-web' },
       logLevel: 'error',
     };
     const fetchFn = jasmine

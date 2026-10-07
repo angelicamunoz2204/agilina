@@ -26,7 +26,9 @@ Medido entonces:
 2. **Dos árboles por pieza, `unit/` e `integration/`, cada uno con la estructura de
    `src/`**: el archivo que prueba `identity/domain/invitation.py` es
    `tests/api/unit/identity/domain/test_invitation.py`. Lo que necesita PostgreSQL o
-   Keycloak reales va en `integration/`, en la misma ruta, con su marcador.
+   Keycloak reales va en `integration/`, en la misma ruta, con su marcador. Un módulo que
+   pasó a ser un paquete de una clase por archivo (`errors/`) conserva un solo archivo de
+   pruebas, `test_errors.py`, en la ruta del paquete.
 3. **Los datos se arman con *Data Builders*** (`tests/api/builders/`): valores por defecto
    válidos y fijos, un cambio por llamada (`.with_…`, `.as_admin()`, `.expired()`), cada
    llamada devuelve un builder nuevo y `build()` pasa por las reglas del dominio. Un estado

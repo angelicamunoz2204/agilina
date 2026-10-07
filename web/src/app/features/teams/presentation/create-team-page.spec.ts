@@ -4,6 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { provideTestTenant } from '@testing/tenant';
 
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
@@ -55,18 +56,19 @@ describe('CreateTeamPage', () => {
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
+        provideTestTenant(),
         provideRouter(
           [
-            { path: 'teams', component: TeamSelectorPage },
-            { path: 'teams/new', component: CreateTeamPage },
-            { path: 'teams/:teamId', component: TeamDashboardPage },
+            { path: ':tenant/teams', component: TeamSelectorPage },
+            { path: ':tenant/teams/new', component: CreateTeamPage },
+            { path: ':tenant/teams/:teamId', component: TeamDashboardPage },
           ],
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
       ],
     });
-    harness = await RouterTestingHarness.create('/teams/new');
+    harness = await RouterTestingHarness.create('/acme/teams/new');
     await harness.fixture.whenStable();
     page = harness.routeNativeElement!;
   });
@@ -168,7 +170,7 @@ describe('CreateTeamPage', () => {
     await settled();
 
     expect(port.names).toEqual(['  Atlas  ']);
-    expect(TestBed.inject(Router).url).toBe('/teams/new-id');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/new-id');
     expect(page.querySelector('h1')?.textContent).toBe('Atlas');
   });
 
@@ -190,7 +192,7 @@ describe('CreateTeamPage', () => {
     port.refuse();
     await settled();
 
-    expect(TestBed.inject(Router).url).toBe('/teams/new');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/new');
     expect(page.querySelector('[role="alert"]')?.textContent).toBe(
       'No se pudo crear el equipo. Inténtalo de nuevo.',
     );
@@ -205,17 +207,17 @@ describe('CreateTeamPage', () => {
     port.refuse(new TeamFailure('not_authenticated'));
     await settled();
 
-    expect(TestBed.inject(Router).url).toBe('/teams/new');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/new');
     expect(page.querySelector('[role="alert"]')?.textContent).toBe(
       'Tu sesión no es válida o expiró. Inicia sesión de nuevo.',
     );
   });
 
   it('goes back to the team selector on cancel', async () => {
-    page.querySelector<HTMLAnchorElement>('a[href="/teams"]')!.click();
+    page.querySelector<HTMLAnchorElement>('a[href="/acme/teams"]')!.click();
     await settled();
 
-    expect(TestBed.inject(Router).url).toBe('/teams');
+    expect(TestBed.inject(Router).url).toBe('/acme/teams');
     expect(port.names).toEqual([]);
   });
 });

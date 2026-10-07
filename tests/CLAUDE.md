@@ -45,6 +45,10 @@ módulo cuando este se mueve.
   reglas del dominio; un estado se alcanza por comportamiento (`accepted_by` llama a
   `accept`), no escribiendo atributos privados. Si falta uno, **se agrega en `builders/`**,
   no dentro del archivo de la prueba.
+- **El tenant también es un dato de prueba:** `TenantBuilder` (acme, en inglés; `.ecomoda()` el
+  otro) y `FakeTenantDirectory` en las unitarias; en integración, `platform_databases` crea un
+  catálogo y las bases de `acme` y `ecomoda`, y `session_factory` / `ecomoda_session_factory` son
+  las de cada uno. Una prueba que muestra aislamiento usa los dos y comprueba que no se mezclan.
 - **Los identificadores salen de `next_id()`**, un contador que se reinicia en cada prueba;
   no uses `uuid4()` ni `datetime.now()`. El reloj es `FakeClock`.
 - Una prueba describe un comportamiento, no un método: `test_an_expired_link_cannot_be_used`.

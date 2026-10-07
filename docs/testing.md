@@ -58,6 +58,13 @@ Reglas:
   escribiendo atributos privados. Lo que el dominio todavía no sabe hacer (una invitación
   *revocada*) se restaura con `restored_as(...)`.
 - `saved_in(repositorio)` sirve para el doble en memoria y para el repositorio SQL.
+- **Multitenencia ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)):** en
+  integración, el *fixture* `platform_databases` crea, con un prefijo aleatorio, el catálogo y las
+  bases de `acme` y `ecomoda`, todas migradas. `session_factory` y `engine` son las de `acme`;
+  `ecomoda_session_factory` y `ecomoda_engine`, las del otro. Una prueba de aislamiento usa las dos
+  y comprueba que nada se mezcla (`integration/shared/presentation/http/test_multitenancy_flow.py`).
+  En las unitarias, `TenantBuilder` y `FakeTenantDirectory` dan el catálogo, y el cliente HTTP
+  (`client`) va sin encabezado de tenant: cada prueba nombra el suyo.
 - En integración, `tests/api/integration/support.py` guarda con *commit* un equipo, un
   usuario o una invitación como datos de partida. La base impide dos invitaciones con el
   mismo token o dos usuarios con el mismo correo: `with_unique_token()` y
@@ -76,9 +83,11 @@ Reglas:
 ## De punta a punta
 
 `tests/e2e/` (Playwright, Chromium) recorre en un navegador real lo que ninguna otra prueba junta:
-invitar → activar → iniciar sesión → entrar al equipo → volver a la página pedida. Corren contra el
-entorno levantado, en un contenedor sobre la red del anfitrión (`make test-e2e`, que invita a una
-persona nueva por cada ejecución). Son pocas a propósito: cubren los recorridos, no las reglas, que
+invitar → activar → iniciar sesión → entrar al equipo → volver a la página pedida. Lo hacen en los
+dos tenants de desarrollo con **la misma persona** (el mismo correo, dos cuentas separadas), y
+comprueban que los tenants no se mezclan y que una dirección sin organización no se encuentra. Corren
+contra el entorno levantado, en un contenedor sobre la red del anfitrión (`make test-e2e`, que invita
+a una persona nueva a un equipo nuevo de cada tenant en cada ejecución). Son pocas a propósito: cubren los recorridos, no las reglas, que
 siguen en las pruebas de cada capa. Aún no corren en la CI.
 
 ## Comandos
@@ -88,7 +97,7 @@ siguen en las pruebas de cada capa. Aún no corren en la CI.
 | Las pruebas unitarias | `make test-python` |
 | Las de integración (levanta PostgreSQL) | `make test-integration` |
 | Las del adaptador de Keycloak real | `make test-keycloak` |
-| Un recorrido completo en un navegador real | `make test-e2e` (con `make up`) |
+| Un recorrido completo en un navegador real, en los dos tenants | `make test-e2e` (con `make up`) |
 | La cobertura, con el umbral del 100 % | `make coverage` |
 | Todo lo que corre la CI | `make verify` |
 

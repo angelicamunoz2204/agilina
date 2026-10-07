@@ -47,7 +47,6 @@ async def test_the_scheduler_starts_with_the_application_and_stops_with_it(
         assert app.state.scheduler is scheduler and scheduler.running is True
 
     assert scheduler.shut_down is True
-    assert app.state.container.identity_provider._client.is_closed is True  # noqa: SLF001
 
 
 async def test_without_a_database_the_api_still_starts_without_a_scheduler(

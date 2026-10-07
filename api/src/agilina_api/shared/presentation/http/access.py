@@ -32,7 +32,7 @@ bearer = HTTPBearer(
     description="The access token Keycloak issues at login, in `Authorization: Bearer <token>`.",
 )
 """``auto_error=False`` so that a missing token goes through the API's single error handler
-and answers with the common ``ErrorResponse``. It also documents the security scheme in
+and answers with the common error body. It also documents the security scheme in
 OpenAPI."""
 
 

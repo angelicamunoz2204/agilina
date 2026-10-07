@@ -1,6 +1,6 @@
 # AD-28: iniciar sesión con Keycloak desde su página, validar el token en la API
 
-- **Estado:** propuesta (pasa a aceptada al integrarse este PR)
+- **Estado:** propuesta (pasa a aceptada al integrarse este PR); en lo del realm único, supersedida por [AD-29](0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)
 - **Fecha:** 2026-10-06
 - **Deciden:** Diego, Angélica
 - **Historia:** HU-03

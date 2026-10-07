@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthSession, type SignInOptions } from '@core/auth/auth-session';
+import { provideTestTenant } from '@testing/tenant';
 
 import { SessionLoginAdapter } from './session-login.adapter';
 
@@ -30,20 +31,26 @@ describe('SessionLoginAdapter', () => {
   beforeEach(() => {
     session = new FakeSession();
     TestBed.configureTestingModule({
-      providers: [SessionLoginAdapter, { provide: AuthSession, useValue: session }],
+      providers: [
+        SessionLoginAdapter,
+        { provide: AuthSession, useValue: session },
+        provideTestTenant('ecomoda'),
+      ],
     });
     adapter = TestBed.inject(SessionLoginAdapter);
   });
 
-  it('signs in with the email filled in and lands on the teams afterwards', async () => {
+  it('signs in with the email filled in and lands on the teams of the tenant afterwards', async () => {
     await adapter.redirect('julian@example.test');
 
-    expect(session.signIns).toEqual([{ returnUrl: '/teams', loginHint: 'julian@example.test' }]);
+    expect(session.signIns).toEqual([
+      { returnUrl: '/ecomoda/teams', loginHint: 'julian@example.test' },
+    ]);
   });
 
   it('can also sign in without knowing the email', async () => {
     await adapter.redirect();
 
-    expect(session.signIns).toEqual([{ returnUrl: '/teams' }]);
+    expect(session.signIns).toEqual([{ returnUrl: '/ecomoda/teams' }]);
   });
 });

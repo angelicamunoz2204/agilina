@@ -1,6 +1,8 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 
+import { TenantContext } from '@core/tenant/tenant-context';
+
 import { AuthSession } from './auth-session';
 
 /**
@@ -12,13 +14,14 @@ export const authGuard: CanActivateFn = (route, state) => {
 };
 
 /**
- * The entrance of the product (`/`): whoever is signed in goes to their teams, and whoever is
+ * The entrance of a tenant (`/acme`): whoever is signed in goes to their teams, and whoever is
  * not goes to sign in, and then to their teams.
  */
 export const entranceGuard: CanActivateFn = async () => {
-  // Both are injected before the first `await`: after it there is no injection context.
+  // Everything is injected before the first `await`: after it there is no injection context.
   const session = inject(AuthSession);
   const router = inject(Router);
-  const signedIn = await session.ensureSignedIn('/teams');
-  return signedIn ? router.createUrlTree(['/teams']) : false;
+  const tenant = inject(TenantContext);
+  const signedIn = await session.ensureSignedIn(tenant.url('teams'));
+  return signedIn ? router.createUrlTree(tenant.path('teams')) : false;
 };

@@ -2,9 +2,15 @@ import { DOCUMENT } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { provideTestI18n } from '@testing/i18n';
+import { provideTestRuntimeConfig } from '@testing/runtime-config';
 
-import { KEYCLOAK_CLIENT, KeycloakAuthSession, type KeycloakClient } from './keycloak-auth-session';
+import {
+  KEYCLOAK_CLIENT_FACTORY,
+  KeycloakAuthSession,
+  type KeycloakClient,
+} from './keycloak-auth-session';
 
 /** keycloak-js double: records what the adapter asks of it. */
 class FakeKeycloak {
@@ -34,21 +40,82 @@ class FakeKeycloak {
 describe('KeycloakAuthSession', () => {
   let keycloak: FakeKeycloak;
   let session: KeycloakAuthSession;
+  /** The realm each client was made for, in order, and the clients of each realm. */
+  let realms: string[];
+  let clients: Map<string, FakeKeycloak>;
 
   beforeEach(() => {
+    realms = [];
+    clients = new Map();
     keycloak = new FakeKeycloak();
     TestBed.configureTestingModule({
       providers: [
         KeycloakAuthSession,
         provideTestI18n(),
-        { provide: KEYCLOAK_CLIENT, useValue: keycloak as unknown as KeycloakClient },
+        provideTestRuntimeConfig(),
+        {
+          provide: KEYCLOAK_CLIENT_FACTORY,
+          useValue: (realm: string): KeycloakClient => {
+            realms.push(realm);
+            const client = realms.length === 1 ? keycloak : new FakeKeycloak();
+            clients.set(realm, client);
+            return client as unknown as KeycloakClient;
+          },
+        },
         {
           provide: DOCUMENT,
-          useValue: { location: { href: 'http://app.test/teams/a', origin: 'http://app.test' } },
+          useValue: {
+            location: { href: 'http://app.test/acme/teams/a', origin: 'http://app.test' },
+          },
         },
       ],
     });
+    TestBed.inject(TenantContext).set('acme');
     session = TestBed.inject(KeycloakAuthSession);
+  });
+
+  describe('one realm per tenant', () => {
+    it('uses the realm of the tenant in the address: the prefix and its name', async () => {
+      await session.accessToken();
+
+      expect(realms).toEqual(['agilina-acme']);
+    });
+
+    it('makes the client of a realm once, however many times it is asked', async () => {
+      await session.accessToken();
+      await session.ensureSignedIn();
+      await session.signIn();
+
+      expect(realms).toEqual(['agilina-acme']);
+    });
+
+    it('keeps a separate session for each tenant: signing in to one is not signing in to another', async () => {
+      keycloak.authenticated = true;
+      expect(await session.ensureSignedIn()).toBeTrue();
+
+      TestBed.inject(TenantContext).set('ecomoda');
+      expect(await session.ensureSignedIn()).toBeFalse();
+
+      expect(realms).toEqual(['agilina-acme', 'agilina-ecomoda']);
+      expect(clients.get('agilina-ecomoda')?.logins).toHaveSize(1);
+      expect(keycloak.logins).toEqual([]);
+    });
+
+    it('cannot work without a tenant: the address names none', async () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          KeycloakAuthSession,
+          provideTestI18n(),
+          provideTestRuntimeConfig(),
+          { provide: KEYCLOAK_CLIENT_FACTORY, useValue: () => new FakeKeycloak() },
+        ],
+      });
+
+      await expectAsync(TestBed.inject(KeycloakAuthSession).accessToken()).toBeRejectedWithError(
+        /No tenant/,
+      );
+    });
   });
 
   it('starts keycloak-js once, with PKCE and without any redirect of its own', async () => {
@@ -67,7 +134,7 @@ describe('KeycloakAuthSession', () => {
     it('says yes when there is a session, and records it', async () => {
       keycloak.authenticated = true;
 
-      expect(await session.ensureSignedIn('/teams')).toBeTrue();
+      expect(await session.ensureSignedIn('/acme/teams')).toBeTrue();
       expect(session.authenticated()).toBeTrue();
       expect(keycloak.logins).toEqual([]);
     });
@@ -75,13 +142,17 @@ describe('KeycloakAuthSession', () => {
     it('takes the person to sign in, back to the page they were on, in their language', async () => {
       expect(await session.ensureSignedIn()).toBeFalse();
 
-      expect(keycloak.logins).toEqual([{ redirectUri: 'http://app.test/teams/a', locale: 'es' }]);
+      expect(keycloak.logins).toEqual([
+        { redirectUri: 'http://app.test/acme/teams/a', locale: 'es' },
+      ]);
     });
 
     it('comes back to the page the guard asked for', async () => {
-      await session.ensureSignedIn('/teams/b');
+      await session.ensureSignedIn('/acme/teams/b');
 
-      expect(keycloak.logins).toEqual([{ redirectUri: 'http://app.test/teams/b', locale: 'es' }]);
+      expect(keycloak.logins).toEqual([
+        { redirectUri: 'http://app.test/acme/teams/b', locale: 'es' },
+      ]);
     });
 
     it('asks in the language the application is in', async () => {
@@ -89,7 +160,9 @@ describe('KeycloakAuthSession', () => {
 
       await session.ensureSignedIn();
 
-      expect(keycloak.logins).toEqual([{ redirectUri: 'http://app.test/teams/a', locale: 'en' }]);
+      expect(keycloak.logins).toEqual([
+        { redirectUri: 'http://app.test/acme/teams/a', locale: 'en' },
+      ]);
     });
   });
 
@@ -127,17 +200,23 @@ describe('KeycloakAuthSession', () => {
 
   describe('signIn', () => {
     it('goes to the sign-in with the email and the page to come back to', async () => {
-      await session.signIn({ loginHint: 'julian@example.test', returnUrl: '/teams' });
+      await session.signIn({ loginHint: 'julian@example.test', returnUrl: '/acme/teams' });
 
       expect(keycloak.logins).toEqual([
-        { redirectUri: 'http://app.test/teams', locale: 'es', loginHint: 'julian@example.test' },
+        {
+          redirectUri: 'http://app.test/acme/teams',
+          locale: 'es',
+          loginHint: 'julian@example.test',
+        },
       ]);
     });
 
     it('works with no options', async () => {
       await session.signIn();
 
-      expect(keycloak.logins).toEqual([{ redirectUri: 'http://app.test/teams/a', locale: 'es' }]);
+      expect(keycloak.logins).toEqual([
+        { redirectUri: 'http://app.test/acme/teams/a', locale: 'es' },
+      ]);
     });
   });
 });
