@@ -1,11 +1,17 @@
 """tenant schema: what a tenant's database holds (identity and teams)
 
 The whole schema of the database of one tenant, in one initial migration (AD-29): ``app_user``,
-``team``, ``team_member`` and ``invitation``, as the reference schema (``agilina_schema.sql``)
-defines them, with the changes the stories made: ``team.created_by`` and
+``team``, ``team_member``, ``invitation`` and ``sprint``, as the reference schema
+(``agilina_schema.sql``) defines them, with the changes the stories made: ``team.created_by`` and
 ``invitation.created_by`` accept NULL, meaning "created by the platform operator" (AD-22), and
 a team's name has at most 80 characters, which backs the ``TeamName`` rule of the domain (HU-05;
 ``char_length`` counts characters like Python's ``len`` does, so both sides agree on the limit).
+
+``sprint`` is minimal (HU-06): only what answers "does the team have a sprint in progress?",
+that is the team, the dates and the status. HU-07 extends it with the daily's time, its
+participants and their order. The statuses are the glossary's (``planned``, ``active``,
+``closed``), so HU-07 needs no ``ALTER TYPE``, and the partial unique index makes the database
+keep a team to one active sprint at most.
 
 Development is local, so this migration is rewritten, not added to, while nobody else holds
 data that depends on it: ``make clean`` and ``make up`` build every database from it. From the
@@ -38,6 +44,7 @@ UPGRADE = [
     "CREATE TYPE team_role AS ENUM ('admin', 'member')",
     "CREATE TYPE membership_status AS ENUM ('active', 'removed')",
     "CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired', 'revoked')",
+    "CREATE TYPE sprint_status AS ENUM ('planned', 'active', 'closed')",
     # --------------------------------------------------- updated_at maintenance --
     """
     CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
@@ -138,14 +145,36 @@ UPGRADE = [
     "'NULL when the platform operator issued it, to create a team''s first admin (AD-22).'",
     "CREATE UNIQUE INDEX invitation_pending_unique "
     "ON invitation (team_id, email) WHERE status = 'pending'",
+    # ----------------------------------------------------------------- sprint --
+    """
+    CREATE TABLE sprint (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        team_id     UUID          NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+        start_date  DATE          NOT NULL,
+        end_date    DATE          NOT NULL,
+        status      sprint_status NOT NULL DEFAULT 'planned',
+        created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        updated_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        CONSTRAINT sprint_dates_ordered CHECK (end_date >= start_date)
+    )
+    """,
+    "COMMENT ON TABLE sprint IS "
+    "'Minimal sprint (HU-06): enough to know whether a team has one in progress. "
+    "HU-07 extends it with the daily''s time, participants and order.'",
+    "CREATE INDEX sprint_team_idx ON sprint (team_id)",
+    "CREATE UNIQUE INDEX sprint_one_active_per_team ON sprint (team_id) WHERE status = 'active'",
+    "CREATE TRIGGER trg_sprint_updated BEFORE UPDATE ON sprint "
+    "FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
 ]
 
 DOWNGRADE = [
+    "DROP TABLE sprint",
     "DROP TABLE invitation",
     "DROP TABLE team_member",
     "DROP TABLE team",
     "DROP TABLE app_user",
     "DROP FUNCTION set_updated_at()",
+    "DROP TYPE sprint_status",
     "DROP TYPE invitation_status",
     "DROP TYPE membership_status",
     "DROP TYPE team_role",

@@ -173,6 +173,42 @@ async def test_a_team_of_one_tenant_does_not_exist_in_another(
     assert there.status_code == 403 and there.json()["error"]["code"] == "not_a_team_member"
 
 
+async def test_the_members_of_a_team_are_read_from_the_database_of_its_tenant(
+    platform, session_factory, ecomoda_session_factory
+):
+    """HU-06 through the real wiring: the list joins the memberships and the accounts of the
+    tenant the request names, and an admin of a team in one tenant is nobody in another."""
+    shared = AppUserBuilder().with_subject("sub-ana").named("Ana")
+    ana = await stored_user(session_factory, shared.with_email("ana@acme.test"))
+    bruno = await stored_user(
+        session_factory, AppUserBuilder().with_email("bruno@acme.test").named("Bruno")
+    )
+    atlas = await stored_team(
+        session_factory, TeamBuilder().named("Atlas").with_admin(ana.id).with_member(bruno.id)
+    )
+    ana_there = await stored_user(ecomoda_session_factory, shared.with_email("ana@ecomoda.test"))
+    moda = await stored_team(
+        ecomoda_session_factory, TeamBuilder().named("Moda").with_admin(ana_there.id)
+    )
+
+    here = await platform.get(
+        f"/v1/teams/{atlas.id}/members", headers=_bearer(_token("acme", "sub-ana"), "acme")
+    )
+    there = await platform.get(
+        f"/v1/teams/{moda.id}/members", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
+    )
+    crossed = await platform.get(
+        f"/v1/teams/{atlas.id}/members", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
+    )
+
+    assert [member["email"] for member in here.json()["members"]] == [
+        "ana@acme.test",
+        "bruno@acme.test",
+    ]
+    assert [member["email"] for member in there.json()["members"]] == ["ana@ecomoda.test"]
+    assert crossed.status_code == 403 and crossed.json()["error"]["code"] == "not_a_team_member"
+
+
 async def test_an_invitation_is_only_found_in_the_database_of_its_tenant(platform, session_factory):
     team = await stored_team(session_factory)
     await stored_invitation(session_factory, InvitationBuilder().for_team(team.id))

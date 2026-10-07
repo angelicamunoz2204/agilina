@@ -16,7 +16,9 @@ import { HttpInvitationApi } from '@features/identity/infrastructure/http-invita
 import { SessionLoginAdapter } from '@features/identity/infrastructure/session-login.adapter';
 import { HealthPort } from '@features/status/application/health.port';
 import { HttpHealthApi } from '@features/status/infrastructure/http-health.api';
+import { TeamMembersPort } from '@features/teams/application/team-members.port';
 import { TeamsPort } from '@features/teams/application/teams.port';
+import { HttpTeamMembersApi } from '@features/teams/infrastructure/http-team-members.api';
 import { HttpTeamsApi } from '@features/teams/infrastructure/http-teams.api';
 
 import { routes } from './app.routes';
@@ -42,6 +44,7 @@ export function createAppConfig(runtimeConfig: RuntimeConfig): ApplicationConfig
       { provide: InvitationPort, useClass: HttpInvitationApi },
       { provide: LoginRedirectPort, useClass: SessionLoginAdapter },
       { provide: TeamsPort, useClass: HttpTeamsApi },
+      { provide: TeamMembersPort, useClass: HttpTeamMembersApi },
     ],
   };
 }

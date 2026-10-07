@@ -1,4 +1,5 @@
-"""The Invitation aggregate: the three states of the link and the seven-day deadline (HU-02)."""
+"""The Invitation aggregate: the states of the link, the seven-day deadline (HU-02) and
+its revocation when the same person is invited again (HU-06)."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -151,3 +152,39 @@ def test_expiry_is_not_stored_before_the_deadline_nor_over_a_used_link():
     invitation.accept(user_id=next_id(), now=NOW)
     assert invitation.expire_if_due(NOW + timedelta(days=30)) is False
     assert invitation.status is InvitationStatus.ACCEPTED
+
+
+# ------------------------------------------------------------ revoking (HU-06) --
+def test_a_pending_invitation_can_be_revoked_and_its_link_stops_working():
+    invitation = InvitationBuilder().build()
+
+    invitation.revoke(NOW + timedelta(hours=1))
+
+    assert invitation.status is InvitationStatus.REVOKED
+    assert invitation.state_at(NOW + timedelta(hours=2)) is InvitationStatus.REVOKED
+    with pytest.raises(InvitationRevokedError):
+        invitation.accept(user_id=next_id(), now=NOW + timedelta(hours=2))
+
+
+def test_the_builder_reaches_the_revoked_state_through_revoke():
+    assert InvitationBuilder().revoked().build().status is InvitationStatus.REVOKED
+
+
+@pytest.mark.parametrize(
+    ("builder", "state"),
+    [
+        (InvitationBuilder().accepted_by(next_id()), InvitationStatus.ACCEPTED),
+        (InvitationBuilder().past_its_deadline(), InvitationStatus.EXPIRED),
+        (InvitationBuilder().expired(), InvitationStatus.EXPIRED),
+        (InvitationBuilder().revoked(), InvitationStatus.REVOKED),
+    ],
+)
+def test_only_an_invitation_whose_link_still_works_can_be_revoked(builder, state):
+    invitation = builder.build()
+    stored = invitation.status
+
+    with pytest.raises(InvitationNotPendingError) as raised:
+        invitation.revoke(NOW + timedelta(hours=2))
+
+    assert raised.value.state is state
+    assert invitation.status is stored  # a failed attempt changes nothing

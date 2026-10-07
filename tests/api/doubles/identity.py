@@ -72,6 +72,9 @@ class InMemoryUserRepository:
     async def add(self, user: AppUser) -> None:
         self.users.append(user)
 
+    async def get(self, user_id: UUID) -> AppUser | None:
+        return next((u for u in self.users if u.id == user_id), None)
+
     async def get_by_email(self, email: Email) -> AppUser | None:
         return next((u for u in self.users if u.email == email), None)
 

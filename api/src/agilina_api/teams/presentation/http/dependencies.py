@@ -4,9 +4,12 @@ The composition root overrides them with the real handlers, so this layer never 
 the infrastructure one.
 """
 
+from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
 from agilina_api.teams.application.commands.create_team_as_admin import CreateTeamAsAdminHandler
+from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
+from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
 
 
 def get_create_team_as_admin_handler() -> CreateTeamAsAdminHandler:
@@ -18,4 +21,16 @@ def get_list_my_teams_handler() -> ListMyTeamsHandler:
 
 
 def get_get_team_handler() -> GetTeamHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_list_team_members_handler() -> ListTeamMembersHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_change_member_role_handler() -> ChangeMemberRoleHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_remove_member_handler() -> RemoveMemberHandler:
     raise NotImplementedError("Wired by the composition root")

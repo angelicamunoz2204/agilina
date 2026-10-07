@@ -4,6 +4,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { provideTestTenant } from '@testing/tenant';
 
 import { TeamDashboardPage } from './team-dashboard-page';
 import { TeamsPort } from '../application/teams.port';
@@ -13,8 +14,9 @@ import { type Team } from '../domain/team';
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
   readonly known: readonly Team[] = [
-    { id: 'atlas', name: 'Atlas' },
-    { id: 'boreal', name: 'Boreal' },
+    { id: 'atlas', name: 'Atlas', role: 'admin' },
+    { id: 'boreal', name: 'Boreal', role: 'admin' },
+    { id: 'cielo', name: 'Cielo', role: 'member' },
   ];
 
   listMine(): Observable<readonly Team[]> {
@@ -44,8 +46,9 @@ describe('TeamDashboardPage', () => {
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
+        provideTestTenant(),
         provideRouter(
-          [{ path: 'teams/:teamId', component: TeamDashboardPage }],
+          [{ path: ':tenant/teams/:teamId', component: TeamDashboardPage }],
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
@@ -61,16 +64,16 @@ describe('TeamDashboardPage', () => {
   }
 
   it('shows the name of the team of the :teamId', async () => {
-    const page = await open('/teams/atlas');
+    const page = await open('/acme/teams/atlas');
 
     expect(port.requested).toEqual(['atlas']);
     expect(page.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('loads the other team when the :teamId changes', async () => {
-    await open('/teams/atlas');
+    await open('/acme/teams/atlas');
 
-    const page = await open('/teams/boreal');
+    const page = await open('/acme/teams/boreal');
 
     expect(port.requested).toEqual(['atlas', 'boreal']);
     expect(page.querySelector('h1')?.textContent.trim()).toBe('Boreal');
@@ -78,7 +81,7 @@ describe('TeamDashboardPage', () => {
 
   it('says it is loading while the API has not answered', async () => {
     // Not whenStable: the request stays pending, so the page never settles.
-    await harness.navigateByUrl('/teams/slow');
+    await harness.navigateByUrl('/acme/teams/slow');
     TestBed.tick();
     const page = harness.routeNativeElement!;
 
@@ -87,9 +90,26 @@ describe('TeamDashboardPage', () => {
   });
 
   it('shows a translated message when the API refuses the team', async () => {
-    const page = await open('/teams/someone-elses');
+    const page = await open('/acme/teams/someone-elses');
 
     expect(page.querySelector('[role="alert"]')?.textContent).toBe('No se pudo abrir este equipo.');
     expect(page.querySelector('h1')).toBeNull();
+  });
+
+  it('shows an admin the way to the settings of the team', async () => {
+    const page = await open('/acme/teams/atlas');
+
+    const link = Array.from(page.querySelectorAll('a')).find(
+      (candidate) => candidate.textContent.trim() === 'Configuración',
+    );
+    expect(link?.getAttribute('href')).toBe('/acme/teams/atlas/settings');
+  });
+
+  it('does not show a member the way to the settings: the API would refuse them', async () => {
+    const page = await open('/acme/teams/cielo');
+
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Cielo');
+    expect(page.querySelector('a[href="/acme/teams/cielo/settings"]')).toBeNull();
+    expect(page.textContent).not.toContain('Configuración');
   });
 });

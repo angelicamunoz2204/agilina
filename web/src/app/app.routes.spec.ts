@@ -7,8 +7,10 @@ import { TenantContext } from '@core/tenant/tenant-context';
 import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HealthPort } from '@features/status/application/health.port';
+import { TeamMembersPort } from '@features/teams/application/team-members.port';
 import { TeamsPort } from '@features/teams/application/teams.port';
 import { type Team } from '@features/teams/domain/team';
+import { type TeamMembers } from '@features/teams/domain/team-member';
 import { FakeAuthSession, provideFakeAuthSession } from '@testing/auth';
 import { provideFakeLogger } from '@testing/fake-logger';
 import { provideTestI18n } from '@testing/i18n';
@@ -34,14 +36,38 @@ class SilentTeamsPort extends TeamsPort {
   }
 }
 
+/** Members port double that never answers either. */
+class SilentTeamMembersPort extends TeamMembersPort {
+  readonly requested: string[] = [];
+
+  list(teamId: string): Observable<TeamMembers> {
+    this.requested.push(teamId);
+    return NEVER;
+  }
+
+  invite(): Observable<never> {
+    return NEVER;
+  }
+
+  changeRole(): Observable<never> {
+    return NEVER;
+  }
+
+  remove(): Observable<never> {
+    return NEVER;
+  }
+}
+
 describe('routes', () => {
   let port: SilentTeamsPort;
+  let members: SilentTeamMembersPort;
   let session: FakeAuthSession;
   let harness: RouterTestingHarness;
 
   async function start(signedIn: boolean): Promise<void> {
     TestBed.resetTestingModule();
     port = new SilentTeamsPort();
+    members = new SilentTeamMembersPort();
     session = new FakeAuthSession(signedIn);
     TestBed.configureTestingModule({
       providers: [
@@ -49,6 +75,7 @@ describe('routes', () => {
         provideFakeLogger(),
         provideRouter(routes, withComponentInputBinding()),
         { provide: TeamsPort, useValue: port },
+        { provide: TeamMembersPort, useValue: members },
         { provide: InvitationPort, useValue: { status: () => NEVER } },
         { provide: LoginRedirectPort, useValue: {} },
         { provide: HealthPort, useValue: { check: () => NEVER } },
@@ -87,6 +114,17 @@ describe('routes', () => {
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1');
     });
 
+    it('opens the settings of the team at /:tenant/teams/:teamId/settings, with no guard on the role', async () => {
+      expect(await screenAt('/acme/teams/team-1/settings')).toBe(
+        'agl-app-shell > agl-team-settings-page',
+      );
+      TestBed.tick();
+
+      expect(members.requested).toEqual(['team-1']);
+      expect(port.requested).toEqual([]);
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings');
+    });
+
     it('records the tenant of the address, whichever it is', async () => {
       await harness.navigateByUrl('/acme/teams/team-1');
       expect(TestBed.inject(TenantContext).current()).toBe('acme');
@@ -117,6 +155,13 @@ describe('routes', () => {
 
       expect(session.ensured).toEqual(['/acme/teams/team-9']);
       expect(port.requested).toEqual([]);
+    });
+
+    it('asks the settings of a team for a session too', async () => {
+      await harness.navigateByUrl('/acme/teams/team-9/settings');
+
+      expect(session.ensured).toEqual(['/acme/teams/team-9/settings']);
+      expect(members.requested).toEqual([]);
     });
 
     it('keeps the activation and the status public: they never ask for a session', async () => {

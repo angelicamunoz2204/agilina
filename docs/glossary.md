@@ -40,6 +40,7 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | `autonomous` | Modo autónomo | Agilina ejecuta y luego informa |
 | `Language` | Idioma | `es` o `en`. Atributo del equipo; parametriza transcripción, plantillas, voz y resumen |
 | `Sprint` | Sprint | Periodo de trabajo del equipo. Puede estar `planned`, `active` o `closed` |
+| `SprintStatus` | Estado del sprint | `planned`, `active` o `closed`. Un equipo tiene a lo sumo un sprint `active`; mientras dura no se cambian roles (HU-06) |
 | `MemberPreference` | Preferencia del integrante | Hora y zona del recordatorio matutino; lo único que el rol Miembro configura |
 
 ## La ceremonia

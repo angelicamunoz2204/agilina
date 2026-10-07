@@ -7,6 +7,12 @@ from agilina_api.identity.presentation.http.schemas.activated_account_response i
 from agilina_api.identity.presentation.http.schemas.invitation_status_response import (
     InvitationStatusResponse,
 )
+from agilina_api.identity.presentation.http.schemas.invite_to_team_request import (
+    InviteToTeamRequest,
+)
+from agilina_api.identity.presentation.http.schemas.invite_to_team_response import (
+    InviteToTeamResponse,
+)
 from agilina_api.identity.presentation.http.schemas.requested_response import RequestedResponse
 from agilina_api.identity.presentation.http.schemas.token_request import TokenRequest
 
@@ -14,6 +20,8 @@ __all__ = [
     "ActivateRequest",
     "ActivatedAccountResponse",
     "InvitationStatusResponse",
+    "InviteToTeamRequest",
+    "InviteToTeamResponse",
     "RequestedResponse",
     "TokenRequest",
 ]

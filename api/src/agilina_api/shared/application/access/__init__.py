@@ -7,6 +7,8 @@ that turns every token away (``bootstrap.authentication``).
 """
 
 from agilina_api.shared.application.access.authenticated_users import AuthenticatedUsers
+from agilina_api.shared.application.access.membership_ref import MembershipRef
+from agilina_api.shared.application.access.not_a_team_admin_error import NotATeamAdminError
 from agilina_api.shared.application.access.not_a_team_member_error import NotATeamMemberError
 from agilina_api.shared.application.access.not_authenticated_error import NotAuthenticatedError
 from agilina_api.shared.application.access.team_access import TeamAccess
@@ -14,6 +16,8 @@ from agilina_api.shared.application.access.team_context import TeamContext
 
 __all__ = [
     "AuthenticatedUsers",
+    "MembershipRef",
+    "NotATeamAdminError",
     "NotATeamMemberError",
     "NotAuthenticatedError",
     "TeamAccess",

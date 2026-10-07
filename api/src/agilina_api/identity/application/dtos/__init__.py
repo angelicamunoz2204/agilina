@@ -5,6 +5,7 @@ from agilina_api.identity.application.dtos.contact import Contact
 from agilina_api.identity.application.dtos.invitation_status_view import InvitationStatusView
 from agilina_api.identity.application.dtos.issued_invitation import IssuedInvitation
 from agilina_api.identity.application.dtos.team_contacts import TeamContacts
+from agilina_api.identity.application.dtos.team_invitation_outcome import TeamInvitationOutcome
 
 __all__ = [
     "ActivatedAccount",
@@ -12,4 +13,5 @@ __all__ = [
     "InvitationStatusView",
     "IssuedInvitation",
     "TeamContacts",
+    "TeamInvitationOutcome",
 ]

@@ -5,6 +5,7 @@ from agilina_api.identity.domain.errors import (
     InvalidFullNameError,
     InvitationAlreadyUsedError,
     InvitationExpiredError,
+    InvitationNotPendingError,
     InvitationRevokedError,
 )
 from agilina_api.identity.domain.events import InvitationAccepted
@@ -180,3 +181,12 @@ class Invitation(AggregateRoot[UUID]):
             self._status = InvitationStatus.EXPIRED
             return True
         return False
+
+    def revoke(self, now: datetime) -> None:
+        """Cancel an invitation whose link still works, so it can no longer be used (HU-06:
+        inviting the same person again replaces it). One that is not pending at ``now``
+        (used, expired or already revoked) cannot be revoked."""
+        state = self.state_at(now)
+        if state is not InvitationStatus.PENDING:
+            raise InvitationNotPendingError(self.id, state, now)
+        self._status = InvitationStatus.REVOKED

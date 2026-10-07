@@ -32,7 +32,7 @@ def _operations() -> list[tuple[str, str]]:
 
 
 def _url(path: str) -> str:
-    return path.replace("{team_id}", str(next_id()))
+    return path.replace("{team_id}", str(next_id())).replace("{user_id}", str(next_id()))
 
 
 def test_the_open_routes_are_routes_that_exist():

@@ -1,0 +1,220 @@
+<section class="mx-auto w-full max-w-5xl" *transloco="let t; prefix: 'teams.settings'">
+  @if (lostAccess(); as change) {
+    <div class="rounded-2xl border border-border bg-surface p-6 text-center shadow-sm sm:p-8">
+      <h1 class="font-display text-xl font-semibold" data-testid="settings-lost-access-title">
+        {{ t('lost_access.title') }}
+      </h1>
+      <p class="mt-2 text-sm text-muted">{{ t('lost_access.' + change) }}</p>
+      @if (change === 'removal') {
+        <a aglButton variant="secondary" class="mt-6" [routerLink]="tenant.path('teams')">
+          {{ t('lost_access.to_teams') }}
+        </a>
+      } @else {
+        <a aglButton variant="secondary" class="mt-6" [routerLink]="tenant.path('teams', teamId())">
+          {{ t('back') }}
+        </a>
+      }
+    </div>
+  } @else if (forbidden()) {
+    <div class="rounded-2xl border border-border bg-surface p-6 text-center shadow-sm sm:p-8">
+      <h1 class="font-display text-xl font-semibold" data-testid="settings-forbidden-title">
+        {{ t('forbidden.title') }}
+      </h1>
+      <p class="mt-2 text-sm text-muted">{{ t('forbidden.text') }}</p>
+      <a aglButton variant="secondary" class="mt-6" [routerLink]="tenant.path('teams', teamId())">
+        {{ t('back') }}
+      </a>
+    </div>
+  } @else {
+    <a
+      class="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      [routerLink]="tenant.path('teams', teamId())"
+    >
+      <!-- Lucide "arrow-left" icon. -->
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="size-4"
+        aria-hidden="true"
+      >
+        <path d="m12 19-7-7 7-7" />
+        <path d="M19 12H5" />
+      </svg>
+      {{ t('back') }}
+    </a>
+
+    <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="font-display text-3xl font-bold tracking-tight" data-testid="settings-title">
+          {{ t('title') }}
+        </h1>
+        <p class="mt-1 text-sm text-muted">{{ t('subtitle') }}</p>
+      </div>
+      @if (members() !== null) {
+        <button aglButton type="button" data-testid="invite-open" (click)="openInvitation()">
+          <!-- Lucide "user-plus" icon. -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-4"
+            aria-hidden="true"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" x2="19" y1="8" y2="14" />
+            <line x1="22" x2="16" y1="11" y2="11" />
+          </svg>
+          {{ t('invite.open') }}
+        </button>
+      }
+    </div>
+
+    @if (lastInvitation(); as outcome) {
+      <p
+        role="status"
+        class="mt-6 rounded-lg bg-accent/5 px-3 py-2 text-sm"
+        data-testid="invite-outcome"
+      >
+        {{ t('invite.outcomes.' + outcome) }}
+      </p>
+    }
+    @if (roleChangeMessage(); as message) {
+      <p role="alert" class="mt-6 text-sm text-danger" data-testid="role-change-problem">
+        {{ t('role_change.' + message) }}
+      </p>
+    }
+
+    <div class="mt-6 rounded-2xl border border-border bg-surface shadow-sm">
+      @if (members(); as members) {
+        <h2 class="sr-only">{{ t('members') }}</h2>
+        <ul class="divide-y divide-border">
+          @for (member of members; track member.userId) {
+            <li
+              class="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:p-6"
+              [attr.data-testid]="'member-' + member.email"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium break-words" data-testid="member-name">{{
+                    member.fullName
+                  }}</span>
+                  <span
+                    class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent"
+                    data-testid="member-label"
+                  >
+                    {{ t('roles.' + member.label) }}
+                  </span>
+                </p>
+                <p class="mt-0.5 text-sm break-all text-muted" data-testid="member-email">
+                  {{ member.email }}
+                </p>
+              </div>
+
+              <div class="sm:w-56">
+                <label
+                  class="mb-1 block text-xs font-medium text-muted"
+                  [for]="'member-role-' + member.userId"
+                >
+                  {{ t('role_of', { name: member.fullName }) }}
+                </label>
+                <select
+                  #roleControl
+                  aglSelect
+                  class="w-full"
+                  data-testid="member-role"
+                  [id]="'member-role-' + member.userId"
+                  [disabled]="member.roleChangeBlockedBy !== null || saving()"
+                  [attr.aria-describedby]="
+                    member.roleChangeBlockedBy !== null
+                      ? 'member-role-blocked-' + member.userId
+                      : null
+                  "
+                  (change)="changeRole(member, roleControl)"
+                >
+                  @for (option of roles(); track option.role) {
+                    <option [value]="option.role" [selected]="option.role === member.role">
+                      {{ t('roles.' + option.label) }}
+                    </option>
+                  }
+                </select>
+                @if (member.roleChangeBlockedBy; as reason) {
+                  <p
+                    class="mt-1 text-xs text-muted"
+                    data-testid="member-role-blocked"
+                    [id]="'member-role-blocked-' + member.userId"
+                  >
+                    {{ t('blocked.role_change.' + reason) }}
+                  </p>
+                }
+                @if (savingMember() === member.userId) {
+                  <p role="status" class="mt-1 text-xs text-muted">{{ t('saving') }}</p>
+                }
+              </div>
+
+              <div class="sm:w-40">
+                <button
+                  aglButton
+                  variant="secondary"
+                  type="button"
+                  class="w-full"
+                  data-testid="member-remove"
+                  [attr.aria-label]="t('remove.open_label', { name: member.fullName })"
+                  [attr.aria-describedby]="
+                    member.removalBlockedBy !== null
+                      ? 'member-removal-blocked-' + member.userId
+                      : null
+                  "
+                  [disabled]="member.removalBlockedBy !== null || saving()"
+                  (click)="askToRemove(member)"
+                >
+                  {{ t('remove.open') }}
+                </button>
+                @if (member.removalBlockedBy; as reason) {
+                  <p
+                    class="mt-1 text-xs text-muted"
+                    data-testid="member-removal-blocked"
+                    [id]="'member-removal-blocked-' + member.userId"
+                  >
+                    {{ t('blocked.removal.' + reason) }}
+                  </p>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      } @else if (loading()) {
+        <p role="status" class="p-6 text-sm text-muted">{{ t('loading') }}</p>
+      } @else if (problemMessage(); as message) {
+        <p role="alert" class="p-6 text-sm text-danger">{{ t(message) }}</p>
+      }
+    </div>
+  }
+
+  @if (inviting()) {
+    <agl-invite-member-dialog
+      [teamId]="teamId()"
+      [roles]="roles()"
+      (invited)="invited($event)"
+      (dismissed)="inviting.set(false)"
+    />
+  }
+  @if (removing(); as member) {
+    <agl-remove-member-dialog
+      [member]="member"
+      [saving]="saving()"
+      [problem]="removalMessage()"
+      (confirmed)="confirmRemoval()"
+      (dismissed)="cancelRemoval()"
+    />
+  }
+</section>

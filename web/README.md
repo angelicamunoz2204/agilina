@@ -61,6 +61,12 @@ Dentro de `web/`, los scripts de `package.json` son los mismos que usa la CI:
   código ambos son el mismo rol interno `admin` (SM es su etiqueta visible en
   modo soporte, ver el [glosario](../docs/glossary.md)): la interfaz decide con
   el rol interno, nunca con la etiqueta.
+  El dashboard muestra el enlace a Configuración solo si `GET /v1/teams/{id}`
+  devuelve `role: admin`. La ruta `/:tenant/teams/:teamId/settings` no lleva guard de rol:
+  la pantalla pide los integrantes a la API y, si responde 403, muestra «sin
+  acceso» (un guard escondería esa respuesta). Las etiquetas de rol y los motivos
+  por los que un control queda deshabilitado (`last_admin`, `sprint_in_progress`)
+  también los manda la API; la pantalla solo los traduce.
 
 ## Estructura de carpetas
 
@@ -115,7 +121,7 @@ concepto se llame igual en todo el sistema:
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
-| `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05). El resto llega con sus historias |
+| `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar. El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
@@ -216,7 +222,7 @@ en inglés.
 
 ## Formularios
 
-Un solo estilo para todos los formularios (el de `/activate` y el de `/teams/new`):
+Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:tenant/teams/new` y el diálogo de invitar de `/:tenant/teams/:teamId/settings`):
 
 - **`FormsModule` con signals:** cada campo es un `signal` de la página, atado con
   `[ngModel]="name()"` y `(ngModelChange)="name.set($event)"`. No se usan `FormGroup` ni
@@ -401,11 +407,19 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
   o `CenteredLayout` (marca centrada sobre una sola tarjeta, para el selector de equipo y su
   formulario).
 - Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `aglButton`
-  (con `variant="primary" | "secondary"`), que va sobre un `<button>` o, si navega, sobre un
-  `<a routerLink>` (un enlace sigue siendo enlace), e `input[aglTextField]`: directivas sobre
-  el elemento nativo. Una contraseña va dentro de `<agl-password-field [toggleLabel]="…">`,
-  que agrega el botón para mostrarla u ocultarla (con `aria-pressed`) sin quitarle su
-  `<label for>`. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
+  (con `variant="primary" | "secondary" | "danger"`; `danger` para lo que no se deshace, como
+  eliminar a alguien del equipo), que va sobre un `<button>` o, si navega, sobre un
+  `<a routerLink>` (un enlace sigue siendo enlace), `input[aglTextField]` y
+  `select[aglSelect]`: directivas sobre el elemento nativo. Una contraseña va dentro de
+  `<agl-password-field [toggleLabel]="…">`, que agrega el botón para mostrarla u ocultarla (con
+  `aria-pressed`) sin quitarle su `<label for>`. El espacio y el ancho los pone quien coloca la
+  pieza (`class="mt-4 w-full"`).
+- Los diálogos usan `agl-dialog`, un componente sobre el `<dialog>` nativo (`showModal()`):
+  el navegador atrapa el foco, deja inerte el resto de la página y lo cierra con Escape, sin
+  dependencias. Se abre al colocarlo y se cierra al quitarlo, así que quien lo coloca decide
+  con un `@if`; `(dismissed)` avisa que la persona lo cerró, y al cerrarse el foco vuelve a
+  donde estaba. Lleva `labelledBy` con el id de su título, y `[dismissible]="false"` mientras
+  guarda, para que Escape no lo cierre antes de saber el resultado.
 - El orden de las clases lo decide Prettier (`make format`); no se discute en el review.
 - Nada de estilos en línea (`style="…"`). *(ESLint.)*
 - Un `.scss` de componente (`styleUrl`) es la excepción, solo para lo que las utilidades no
@@ -497,7 +511,8 @@ Estos puntos no están decididos; se preguntan antes de decidir:
   OpenTelemetry). Hoy solo consola.
 - Migrar las pruebas de Karma a Vitest (el valor por defecto desde Angular 21;
   Karma está archivado).
-- Librería de componentes (diálogos, tablas, menús) para `shared/ui`; si se adopta una,
-  que se apoye en Tailwind (AD-27).
+- Librería de componentes (tablas, menús…) para `shared/ui`; si se adopta una, que se apoye
+  en Tailwind (AD-27). Mientras tanto, los diálogos son `agl-dialog` sobre el `<dialog>`
+  nativo (HU-06).
 - Correr las pruebas de punta a punta (`make test-e2e`, Playwright) en la CI: hoy corren en
   local, contra el entorno levantado (AD-28).

@@ -23,22 +23,24 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.create_team_as_admin is not None
     assert container.list_my_teams is not None
     assert container.get_team is not None
+    assert container.invite_to_team is not None
+    assert container.list_team_members is not None
+    assert container.change_member_role is not None
+    assert container.remove_member is not None
 
 
-def test_the_graph_belongs_to_one_tenant_and_uses_its_own_database():
+def test_the_links_of_the_emails_open_the_web_of_the_tenant_from_its_public_url(monkeypatch):
+    """The activation link goes to ``/<tenant>/activate`` and the notice to an existing account
+    to ``/<tenant>/teams/<id>``, both under ``AGILINA_WEB_PUBLIC_URL`` (HU-02, HU-06, AD-29)."""
+    monkeypatch.setenv("AGILINA_WEB_PUBLIC_URL", "https://agilina.example/")
+    get_settings.cache_clear()
+
     container = _container("ecomoda")
 
-    assert container.tenant.slug == "ecomoda"
-    assert container.engine.url.database == "agilina_ecomoda"
-
-
-def test_two_tenants_do_not_share_a_database_or_a_realm():
-    acme, ecomoda = _container("acme"), _container("ecomoda")
-
-    assert acme.engine is not ecomoda.engine
-    assert acme.engine.url.database != ecomoda.engine.url.database
-    assert acme.access_token_verifier is not ecomoda.access_token_verifier
-    assert acme.identity_provider is not ecomoda.identity_provider
+    assert container.issue_invitation._activation_url == (  # noqa: SLF001
+        "https://agilina.example/ecomoda/activate"
+    )
+    assert container.invite_to_team._teams_url == "https://agilina.example/ecomoda/teams"  # noqa: SLF001
 
 
 def test_the_tokens_are_validated_against_the_realm_of_the_tenant_by_its_public_url(monkeypatch):

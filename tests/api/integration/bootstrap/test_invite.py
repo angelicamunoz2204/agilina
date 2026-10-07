@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import text
 
 from agilina_api.bootstrap.invite import invite
-from agilina_api.identity.domain.errors import PendingInvitationAlreadyExistsError
 from agilina_api.shared_kernel import DomainError
 from agilina_shared.enums import Language, TeamRole
 from tests.api.builders import next_id
@@ -85,7 +84,9 @@ async def test_an_unknown_team_id_is_refused(container):
         )
 
 
-async def test_inviting_the_same_person_twice_while_the_first_works_is_refused(container):
+async def test_inviting_the_same_person_twice_revokes_the_first_link_and_says_so(
+    container, engine, capsys
+):
     world, services = container
     team_id = await world.a_team()
     options = {
@@ -97,6 +98,15 @@ async def test_inviting_the_same_person_twice_while_the_first_works_is_refused(c
         "team_id": team_id,
     }
     await invite(services, **options)
+    assert "revoked" not in capsys.readouterr().out
 
-    with pytest.raises(PendingInvitationAlreadyExistsError):
-        await invite(services, **options)
+    await invite(services, **options)
+
+    assert "previous invitation to that email was revoked" in capsys.readouterr().out
+    async with engine.connect() as connection:
+        statuses = (
+            await connection.execute(
+                text("SELECT status::text FROM invitation ORDER BY created_at")
+            )
+        ).scalars()
+        assert sorted(statuses) == ["pending", "revoked"]

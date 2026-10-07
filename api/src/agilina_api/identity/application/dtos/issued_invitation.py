@@ -10,3 +10,5 @@ class IssuedInvitation:
 
     invitation_id: UUID
     expires_at: datetime
+    revoked_previous: bool = False
+    """Whether the person had a pending invitation whose link still worked, now revoked."""

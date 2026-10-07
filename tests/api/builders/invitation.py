@@ -27,6 +27,7 @@ class InvitationBuilder:
     issued_at: datetime = NOW
     accepted_by_user: UUID | None = None
     marked_expired: bool = False
+    marked_revoked: bool = False
     restored_status: InvitationStatus | None = None
 
     # ---------------------------------------------------------------- data --
@@ -76,9 +77,14 @@ class InvitationBuilder:
         """Past its deadline and already marked as expired."""
         return replace(self.past_its_deadline(), marked_expired=True)
 
+    def revoked(self) -> Self:
+        """Replaced by a newer invitation to the same person (one hour after it was
+        issued), through ``Invitation.revoke``."""
+        return replace(self, marked_revoked=True)
+
     def restored_as(self, status: InvitationStatus) -> Self:
-        """Rebuilt from storage in ``status``, for states the domain does not reach by
-        itself yet (for example revoked)."""
+        """Rebuilt from storage in ``status`` as is, without going through the domain's
+        rules: for a stored state no behavior reaches."""
         return replace(self, restored_status=status)
 
     # ---------------------------------------------------------------- build --
@@ -116,6 +122,8 @@ class InvitationBuilder:
             )
         if self.marked_expired:
             invitation.expire_if_due(NOW)
+        if self.marked_revoked:
+            invitation.revoke(self.issued_at + timedelta(hours=1))
         invitation.pull_events()
         return invitation
 

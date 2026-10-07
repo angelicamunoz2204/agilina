@@ -62,6 +62,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 404 | `tenant_not_found` | El tenant no existe, está suspendido o el nombre no es válido (la misma respuesta para los tres) | — |
 | 401 | `not_authenticated` | Falta el token, o no identifica a un usuario. Lleva `WWW-Authenticate: Bearer` | — |
 | 403 | `not_a_team_member` | El usuario no es miembro activo del equipo (ajeno, retirado o inexistente: la misma respuesta) | — |
+| 403 | `not_a_team_admin` | El usuario es miembro del equipo, pero no uno de sus admins (según el rol guardado) | — |
 | 422 | `validation_error` | El cuerpo, un parámetro o una cabecera no es válido | `fields[]`: `{field, reason}` |
 | 404 | `invitation_not_found` | El enlace se alteró o nunca existió | — |
 | 410 | `invitation_used` | La invitación ya se usó | — |
@@ -76,6 +77,14 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 502 | `mail_unavailable` | No se pudo enviar el correo | — |
 | 422 | `invalid_team_name` | El nombre del equipo está en blanco o es demasiado largo una vez recortado | — |
 | 404 | `team_not_found` | El equipo no existe | — |
+| 404 | `member_not_found` | La persona no es miembro activo del equipo: nunca lo fue o ya la retiraron | — |
+| 409 | `last_admin` | El cambio dejaría al equipo sin admin: a su único admin no se le baja el rol ni se le retira, tampoco por su propia mano | — |
+| 409 | `sprint_in_progress` | El equipo tiene un sprint en curso: los roles no cambian mientras dure | — |
+| 422 | `invalid_email` | El correo no es una dirección válida | — |
+| 422 | `invalid_full_name` | El nombre de la persona está en blanco | — |
+| 409 | `already_a_team_member` | La persona ya es miembro activo del equipo | — |
+| 409 | `account_disabled` | La persona tiene cuenta, pero está desactivada | — |
+| 409 | `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante | — |
 | 501 | `not_implemented` | La operación está definida pero aún no se implementa | — |
 
 ## Salud
@@ -196,6 +205,93 @@ Un equipo del usuario: nombre, modo, idioma y el rol de quien pregunta.
 | 401 | error `not_authenticated` | Sin token válido |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 422 | error `validation_error` | `team_id` no es un UUID |
+
+### `GET /v1/teams/{team_id}/members`
+
+Los miembros activos del equipo, para su pantalla de configuración (HU-06). Solo para los admins
+del equipo. Cada miembro trae `{user_id, full_name, email, role, label, role_change_blocked_by,
+removal_blocked_by}`, ordenados por nombre sin distinguir mayúsculas (y por correo si se repite).
+`label` es el código de la etiqueta visible del rol, que la web traduce: por ahora es el mismo
+rol (`admin` o `member`) y HU-04 lo derivará del rol y del modo del equipo. Los dos `…_blocked_by`
+dicen por qué no se puede cambiar el rol o retirar a esa persona ahora (`null` si se puede), con
+las mismas reglas que aplican los cambios: `sprint_in_progress` (solo el cambio de rol, y va
+primero) o `last_admin`. `roles` son los roles que un admin puede dar, con su etiqueta.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | `{roles: [{role, label}], members: [{user_id, full_name, email, role, label, role_change_blocked_by, removal_blocked_by}]}` | Quien pregunta es admin del equipo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 403 | error `not_a_team_admin` | Es miembro, pero no admin del equipo |
+| 422 | error `validation_error` | `team_id` no es un UUID |
+
+### `PATCH /v1/teams/{team_id}/members/{user_id}`
+
+Da otro rol interno a un miembro activo, que puede ser el mismo admin que lo pide. Solo para los
+admins del equipo. Cuerpo: `{role}` (`admin` o `member`; un campo desconocido se rechaza). Dar el
+rol que ya tiene no cambia nada. Queda en el registro quién cambió qué rol a quién.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 204 | — | Rol cambiado (o ya era ese) |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
+| 404 | error `member_not_found` | `user_id` no es miembro activo del equipo |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
+| 409 | error `sprint_in_progress` | El equipo tiene un sprint en curso; nada cambia |
+| 409 | error `last_admin` | Bajaría el rol al único admin, también si se lo pide a sí mismo; nada cambia |
+| 422 | error `validation_error` | `team_id` o `user_id` no es un UUID, falta `role`, el rol no existe o hay un campo desconocido |
+
+### `DELETE /v1/teams/{team_id}/members/{user_id}`
+
+Retira a un miembro activo del equipo, que puede ser el mismo admin que lo pide. Solo para los
+admins del equipo. Termina la membresía (queda como `removed`, con su fecha): la cuenta de la
+persona no se toca, porque puede estar en otros equipos, y se la puede volver a invitar. Un sprint
+en curso no lo impide. Queda en el registro quién retiró a quién.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 204 | — | Retirado |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
+| 404 | error `member_not_found` | `user_id` no es miembro activo del equipo |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
+| 409 | error `last_admin` | Es el único admin, también si se retira a sí mismo; nada cambia |
+| 422 | error `validation_error` | `team_id` o `user_id` no es un UUID |
+
+### `POST /v1/teams/{team_id}/invitations`
+
+Un admin invita a una persona a su equipo (HU-06). Solo para los admins del equipo. Cuerpo:
+`{full_name, email, role}`, con `role` `member` por defecto (un campo desconocido se rechaza).
+Qué pasa depende del correo:
+
+- **sin cuenta en el tenant:** se guarda una invitación y se envía su enlace de activación de
+  HU-02 (`/<tenant>/activate#t=…`, de un solo uso y válido siete días); al activarlo, la persona
+  entra con el rol elegido. Responde `invitation_sent`.
+- **con una cuenta activa:** entra al equipo de inmediato con el rol elegido (si la habían
+  retirado, vuelve) y recibe un aviso con el enlace al equipo (`/<tenant>/teams/<team_id>`), sin
+  enlace de activación. Responde `member_added`.
+
+En ambos casos, una invitación pendiente de ese correo al equipo deja de servir: se revoca (o se
+marca vencida si ya había vencido). El correo se envía antes de guardar nada, así que si el
+servidor de correo lo rechaza no cambia nada.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 201 | `{outcome: "invitation_sent" \| "member_added"}` | Invitación enviada o cuenta agregada al equipo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la invitación (solo una carrera) |
+| 409 | error `already_a_team_member` | La persona ya es miembro activo; nada se guarda ni se envía |
+| 409 | error `account_disabled` | La persona tiene una cuenta desactivada; nada se guarda ni se envía |
+| 409 | error `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante |
+| 422 | error `validation_error` | Falta `full_name` o `email`, el rol no existe, un texto es demasiado largo o hay un campo desconocido |
+| 422 | error `invalid_email` / `invalid_full_name` | El correo no es válido o el nombre está en blanco |
+| 502 | error `mail_unavailable` | No se pudo enviar el correo; nada se guarda |
 
 ## Ceremonias (contrato del worker)
 

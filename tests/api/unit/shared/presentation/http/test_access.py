@@ -1,5 +1,6 @@
-"""Who is calling (``current_user_id``) and whether they belong to the team of the route
-(``current_team_member``), on a minimal application mounted by the test."""
+"""Who is calling (``current_user_id``), whether they belong to the team of the route
+(``current_team_member``) and whether they are one of its admins (``current_team_admin``),
+on a minimal application mounted by the test."""
 
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 
 from agilina_api.shared.application.access import TeamContext
 from agilina_api.shared.presentation.http.access import (
+    current_team_admin,
     current_team_member,
     current_user_id,
     get_authenticated_users,
@@ -51,6 +53,10 @@ class Scenario:
         @app.get("/teams/{team_id}/thing")
         async def thing(team: TeamContext = Depends(current_team_member)) -> dict[str, str]:
             return {"team_id": str(team.team_id), "user_id": str(team.user_id), "role": team.role}
+
+        @app.get("/teams/{team_id}/admin-thing")
+        async def admin_thing(team: TeamContext = Depends(current_team_admin)) -> dict[str, str]:
+            return {"membership_id": str(team.membership_id), "role": team.role}
 
         self.app = app
 
@@ -139,3 +145,40 @@ async def test_the_role_comes_from_the_stored_membership_of_that_team(scenario):
     in_b = await scenario.get(f"/teams/{scenario.team_b}/thing", TOKEN_A)
 
     assert in_a.json()["role"] == "admin" and in_b.json()["role"] == "member"
+
+
+# ---------------------------------------------------------- current_team_admin --
+async def test_an_admin_of_the_team_gets_through_with_their_stored_membership(scenario):
+    membership_id = next_id()
+    scenario.access.membership_ids[(scenario.team_a, scenario.ana)] = membership_id
+
+    response = await scenario.get(f"/teams/{scenario.team_a}/admin-thing", TOKEN_A)
+
+    assert response.status_code == 200
+    assert response.json() == {"membership_id": str(membership_id), "role": "admin"}
+
+
+async def test_a_member_who_is_not_an_admin_gets_403_not_a_team_admin(scenario):
+    response = await scenario.get(f"/teams/{scenario.team_b}/admin-thing", TOKEN_B)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "not_a_team_admin"
+    assert response.headers["cache-control"] == "no-store"
+
+
+async def test_someone_outside_the_team_gets_403_not_a_team_member_before_the_role(scenario):
+    response = await scenario.get(f"/teams/{scenario.team_b}/admin-thing", TOKEN_A)
+
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
+
+
+async def test_without_a_token_an_admin_route_answers_401_first(scenario):
+    _assert_not_authenticated(await scenario.get(f"/teams/{scenario.team_a}/admin-thing"))
+
+
+async def test_being_admin_of_one_team_is_not_being_admin_of_another(scenario):
+    scenario.access.roles[(scenario.team_b, scenario.ana)] = TeamRole.MEMBER
+
+    response = await scenario.get(f"/teams/{scenario.team_b}/admin-thing", TOKEN_A)
+
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_admin"

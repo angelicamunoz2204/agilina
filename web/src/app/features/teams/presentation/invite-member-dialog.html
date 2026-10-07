@@ -1,0 +1,121 @@
+<agl-dialog
+  labelledBy="invite-member-title"
+  [dismissible]="!saving()"
+  (dismissed)="dismissed.emit()"
+>
+  <ng-container *transloco="let t; prefix: 'teams.settings'">
+    <h2 id="invite-member-title" class="font-display text-lg font-semibold">
+      {{ t('invite.title') }}
+    </h2>
+    <p class="mt-1 text-sm text-muted">{{ t('invite.subtitle') }}</p>
+
+    <form class="mt-6 flex flex-col" (submit)="submit(); $event.preventDefault()" novalidate>
+      <label for="invite-full-name" class="mb-1.5 text-sm font-medium">
+        {{ t('invite.full_name') }}
+      </label>
+      <input
+        aglTextField
+        id="invite-full-name"
+        name="fullName"
+        data-testid="invite-full-name"
+        type="text"
+        autocomplete="off"
+        aria-describedby="invite-full-name-problem"
+        [attr.aria-invalid]="nameProblem() !== null"
+        [ngModel]="fullName()"
+        (ngModelChange)="changeName($event)"
+        (blur)="nameTouched.set(true)"
+      />
+      <p
+        id="invite-full-name-problem"
+        class="mt-1 text-xs text-danger empty:hidden"
+        aria-live="polite"
+      >
+        @switch (nameProblem()) {
+          @case ('blank') {
+            {{ t('invite.errors.full_name.blank') }}
+          }
+          @case ('too_long') {
+            {{ t('invite.errors.full_name.too_long', { max: nameMaxLength }) }}
+          }
+        }
+      </p>
+
+      <label for="invite-email" class="mt-4 mb-1.5 text-sm font-medium">
+        {{ t('invite.email') }}
+      </label>
+      <input
+        aglTextField
+        id="invite-email"
+        name="email"
+        data-testid="invite-email"
+        type="email"
+        autocomplete="off"
+        aria-describedby="invite-email-problem"
+        [attr.aria-invalid]="emailProblem() !== null"
+        [ngModel]="email()"
+        (ngModelChange)="changeEmail($event)"
+        (blur)="emailTouched.set(true)"
+      />
+      <p id="invite-email-problem" class="mt-1 text-xs text-danger empty:hidden" aria-live="polite">
+        @switch (emailProblem()) {
+          @case ('blank') {
+            {{ t('invite.errors.email.blank') }}
+          }
+          @case ('invalid') {
+            {{ t('invite.errors.email.invalid') }}
+          }
+          @case ('too_long') {
+            {{ t('invite.errors.email.too_long', { max: emailMaxLength }) }}
+          }
+        }
+      </p>
+
+      <label for="invite-role" class="mt-4 mb-1.5 text-sm font-medium">
+        {{ t('invite.role') }}
+      </label>
+      <select
+        aglSelect
+        id="invite-role"
+        name="role"
+        data-testid="invite-role"
+        class="w-full"
+        aria-describedby="invite-role-hint"
+        [ngModel]="role()"
+        (ngModelChange)="changeRole($event)"
+      >
+        @for (option of roles(); track option.role) {
+          <option [value]="option.role">{{ t('roles.' + option.label) }}</option>
+        }
+      </select>
+      <p id="invite-role-hint" class="mt-1.5 text-xs text-muted">{{ t('invite.role_hint') }}</p>
+
+      @if (problemMessage(); as message) {
+        <p role="alert" class="mt-4 text-sm text-danger" data-testid="invite-problem">
+          {{ t('invite.' + message) }}
+        </p>
+      }
+
+      <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          aglButton
+          variant="secondary"
+          type="button"
+          data-testid="invite-cancel"
+          [disabled]="saving()"
+          (click)="dismissed.emit()"
+        >
+          {{ t('invite.cancel') }}
+        </button>
+        <button
+          aglButton
+          type="submit"
+          data-testid="invite-submit"
+          [disabled]="!canSend() || saving()"
+        >
+          {{ saving() ? t('invite.saving') : t('invite.submit') }}
+        </button>
+      </div>
+    </form>
+  </ng-container>
+</agl-dialog>

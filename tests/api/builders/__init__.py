@@ -20,11 +20,13 @@ from tests.api.builders.email_message import EmailMessageBuilder
 from tests.api.builders.identifiers import next_id, reset_ids
 from tests.api.builders.identity_commands import (
     ActivateAccountBuilder,
+    InviteToTeamBuilder,
     IssueInvitationBuilder,
     RequestNewInvitationBuilder,
 )
 from tests.api.builders.invitation import InvitationBuilder
 from tests.api.builders.team import TeamBuilder
+from tests.api.builders.team_commands import ChangeMemberRoleBuilder, RemoveMemberBuilder
 from tests.api.builders.tenant import TenantBuilder
 from tests.api.builders.user import AppUserBuilder
 
@@ -38,11 +40,14 @@ __all__ = [
     "AccessTokenBuilder",
     "ActivateAccountBuilder",
     "AppUserBuilder",
+    "ChangeMemberRoleBuilder",
     "ContactBuilder",
     "EmailMessageBuilder",
     "InvitationBuilder",
+    "InviteToTeamBuilder",
     "SigningKey",
     "IssueInvitationBuilder",
+    "RemoveMemberBuilder",
     "RequestNewInvitationBuilder",
     "TeamBuilder",
     "TeamContactsBuilder",

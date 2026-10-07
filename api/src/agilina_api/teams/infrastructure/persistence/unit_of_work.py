@@ -1,4 +1,5 @@
-"""Unit of work of the teams commands: a transaction with its repository."""
+"""Unit of work of the teams commands: a transaction with its repository and the sprint
+question, both on the transaction's session."""
 
 from collections.abc import Callable
 from typing import Self
@@ -6,12 +7,15 @@ from typing import Self
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+from agilina_api.teams.application.ports.outbound import ActiveSprints
 from agilina_api.teams.domain.repositories import TeamRepository
+from agilina_api.teams.infrastructure.persistence.sprint_queries import SqlActiveSprints
 from agilina_api.teams.infrastructure.persistence.team_repository import SqlAlchemyTeamRepository
 
 
 class SqlAlchemyTeamsUnitOfWork(SqlAlchemyUnitOfWork):
     teams: TeamRepository
+    sprints: ActiveSprints
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         super().__init__(session_factory)
@@ -19,6 +23,7 @@ class SqlAlchemyTeamsUnitOfWork(SqlAlchemyUnitOfWork):
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.teams = SqlAlchemyTeamRepository(self.session)
+        self.sprints = SqlActiveSprints(self.session)
         return self
 
 

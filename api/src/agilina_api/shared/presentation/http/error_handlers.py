@@ -15,7 +15,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from agilina_api.shared.application.access import NotATeamMemberError, NotAuthenticatedError
+from agilina_api.shared.application.access import (
+    NotATeamAdminError,
+    NotATeamMemberError,
+    NotAuthenticatedError,
+)
 from agilina_api.shared.application.ports import MailDeliveryError
 from agilina_api.shared.application.tenancy import TenantNotFoundError, TenantRequiredError
 from agilina_api.shared.presentation.http.api_error import ApiError, ApiException, SharedErrors
@@ -42,6 +46,7 @@ SHARED_ERRORS: tuple[ErrorMapping, ...] = (
     ErrorMapping(TenantNotFoundError, SharedErrors.TENANT_NOT_FOUND),
     ErrorMapping(NotAuthenticatedError, SharedErrors.NOT_AUTHENTICATED),
     ErrorMapping(NotATeamMemberError, SharedErrors.NOT_A_TEAM_MEMBER),
+    ErrorMapping(NotATeamAdminError, SharedErrors.NOT_A_TEAM_ADMIN),
     ErrorMapping(MailDeliveryError, SharedErrors.MAIL_UNAVAILABLE),
 )
 

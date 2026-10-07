@@ -1,7 +1,8 @@
-"""The migrations produce the schema the reference DDL defines (with AD-22), and the ORM
-models agree with it."""
+"""The migrations produce the schema the reference DDL defines (with AD-22 and the minimal
+sprint of HU-06), and the ORM models agree with it."""
 
 import uuid
+from datetime import date
 
 import pytest
 from alembic import command
@@ -35,7 +36,7 @@ async def test_every_table_the_story_needs_exists(engine: AsyncEngine):
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
 
-    assert {"app_user", "team", "team_member", "invitation", "alembic_version"} <= tables
+    assert {"app_user", "team", "team_member", "invitation", "sprint", "alembic_version"} <= tables
 
 
 async def test_citext_and_the_enums_exist(engine: AsyncEngine):
@@ -57,6 +58,7 @@ async def test_citext_and_the_enums_exist(engine: AsyncEngine):
         "team_role",
         "membership_status",
         "invitation_status",
+        "sprint_status",
     } <= enums
 
 
@@ -67,7 +69,7 @@ async def test_created_by_accepts_null_for_the_platform_operator_ad_22(
     assert (await _columns(engine, table))["created_by"] is True
 
 
-@pytest.mark.parametrize("table", ["app_user", "team", "team_member", "invitation"])
+@pytest.mark.parametrize("table", ["app_user", "team", "team_member", "invitation", "sprint"])
 async def test_every_orm_column_exists_in_the_database_with_the_same_nullability(
     engine: AsyncEngine, table: str
 ):
@@ -103,6 +105,106 @@ async def test_the_database_rejects_a_team_name_longer_than_80(engine: AsyncEngi
             await connection.execute(insert, {"name": "x" * 81})
 
 
+async def test_the_sprint_statuses_are_the_glossarys(engine: AsyncEngine):
+    async with engine.connect() as connection:
+        labels = (
+            await connection.execute(text("SELECT unnest(enum_range(NULL::sprint_status))::text"))
+        ).scalars()
+
+    assert list(labels) == ["planned", "active", "closed"]
+
+
+async def _a_team(engine: AsyncEngine) -> str:
+    async with engine.begin() as connection:
+        return str(
+            (
+                await connection.execute(
+                    text("INSERT INTO team (name) VALUES ('Atlas') RETURNING id")
+                )
+            ).scalar_one()
+        )
+
+
+_SPRINT = text(
+    "INSERT INTO sprint (team_id, start_date, end_date, status) "
+    "VALUES (:team, :start, :end, CAST(:status AS sprint_status))"
+)
+
+
+async def test_a_new_sprint_is_planned_and_cannot_end_before_it_starts(engine: AsyncEngine):
+    team = await _a_team(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO sprint (team_id, start_date, end_date) VALUES (:t, :d, :d)"),
+            {"t": team, "d": date(2026, 10, 5)},
+        )
+        status = (await connection.execute(text("SELECT status::text FROM sprint"))).scalar_one()
+    assert status == "planned"
+
+    with pytest.raises(IntegrityError, match="sprint_dates_ordered"):
+        async with engine.begin() as connection:
+            await connection.execute(
+                _SPRINT,
+                {
+                    "team": team,
+                    "start": date(2026, 10, 5),
+                    "end": date(2026, 10, 4),
+                    "status": "planned",
+                },
+            )
+
+
+async def test_a_team_has_at_most_one_active_sprint_but_any_number_of_closed_ones(
+    engine: AsyncEngine,
+):
+    team = await _a_team(engine)
+    dates = {"start": date(2026, 10, 5), "end": date(2026, 10, 16)}
+    async with engine.begin() as connection:
+        for status in ("closed", "closed", "active"):
+            await connection.execute(_SPRINT, {"team": team, "status": status, **dates})
+
+    with pytest.raises(IntegrityError, match="sprint_one_active_per_team"):
+        async with engine.begin() as connection:
+            await connection.execute(_SPRINT, {"team": team, "status": "active", **dates})
+
+
+async def test_deleting_a_team_deletes_its_sprints(engine: AsyncEngine):
+    team = await _a_team(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            _SPRINT,
+            {
+                "team": team,
+                "start": date(2026, 10, 5),
+                "end": date(2026, 10, 16),
+                "status": "active",
+            },
+        )
+        await connection.execute(text("DELETE FROM team WHERE id = :id"), {"id": team})
+        remaining = (await connection.execute(text("SELECT count(*) FROM sprint"))).scalar_one()
+
+    assert remaining == 0
+
+
+async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
+    """The ``set_updated_at`` trigger of every table also runs on ``sprint``."""
+    team = await _a_team(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO sprint (team_id, start_date, end_date, updated_at) "
+                "VALUES (:t, :d, :d, '2000-01-01')"
+            ),
+            {"t": team, "d": date(2026, 10, 5)},
+        )
+        await connection.execute(text("UPDATE sprint SET status = 'active'"))
+        updated = (
+            await connection.execute(text("SELECT updated_at > '2000-01-02' FROM sprint"))
+        ).scalar_one()
+
+    assert updated is True
+
+
 def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
     """Downgrading removes everything the migration created, and upgrading restores it."""
     name = f"agilina_it_{uuid.uuid4().hex[:12]}"
@@ -120,8 +222,8 @@ def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
                 for r in connection.execute(text("SELECT typname FROM pg_type WHERE typtype='e'"))
             }
         engine.dispose()
-        assert not {"app_user", "team", "team_member", "invitation"} & tables
-        assert not {"team_role", "invitation_status"} & enums
+        assert not {"app_user", "team", "team_member", "invitation", "sprint"} & tables
+        assert not {"team_role", "invitation_status", "sprint_status"} & enums
 
         command.upgrade(alembic_config("tenant", url), "head")
     finally:

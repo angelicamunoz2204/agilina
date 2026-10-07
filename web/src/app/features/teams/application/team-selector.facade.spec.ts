@@ -42,15 +42,15 @@ describe('TeamSelectorFacade', () => {
 
   it('exposes the teams of the user once the API answers', async () => {
     port.mine = of([
-      { id: 'a', name: 'Atlas' },
-      { id: 'b', name: 'Boreal' },
+      { id: 'a', name: 'Atlas', role: 'admin' },
+      { id: 'b', name: 'Boreal', role: 'admin' },
     ]);
 
     const facade = await settled();
 
     expect(facade.teams()).toEqual([
-      { id: 'a', name: 'Atlas' },
-      { id: 'b', name: 'Boreal' },
+      { id: 'a', name: 'Atlas', role: 'admin' },
+      { id: 'b', name: 'Boreal', role: 'admin' },
     ]);
     expect(facade.loading()).toBeFalse();
     expect(facade.failed()).toBeFalse();

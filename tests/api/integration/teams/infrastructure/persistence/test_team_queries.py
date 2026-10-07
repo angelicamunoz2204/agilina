@@ -1,13 +1,18 @@
-"""The read side of teams against a real PostgreSQL: the teams of a user, one team and the
-role of a user in it."""
+"""The read side of teams against a real PostgreSQL: the teams of a user, one team, the
+membership of a user in it and the members of a team (HU-06)."""
+
+from uuid import UUID
 
 import pytest
 
-from agilina_api.teams.application.dtos import TeamView, UserTeamView
+from agilina_api.shared.application.access import MembershipRef
+from agilina_api.teams.application.dtos import MemberRecord, TeamView, UserTeamView
+from agilina_api.teams.domain.sprint import SprintStatus
+from agilina_api.teams.domain.team import Team
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_shared.enums import Language, OperationMode, TeamRole
-from tests.api.builders import TeamBuilder, next_id
-from tests.api.integration.support import removed_from_team, stored_team, stored_user
+from tests.api.builders import NOW, TeamBuilder, next_id
+from tests.api.integration.support import stored_sprint, stored_team, stored_user
 
 pytestmark = pytest.mark.integration
 
@@ -32,8 +37,7 @@ async def test_a_user_with_several_teams_receives_them_all(session_factory):
 async def test_teams_where_the_user_was_removed_are_not_listed(session_factory):
     ana = await stored_user(session_factory)
     kept = await stored_team(session_factory, TeamBuilder().named("Atlas").with_admin(ana.id))
-    left = await stored_team(session_factory, TeamBuilder().named("Boreal").with_member(ana.id))
-    await removed_from_team(session_factory, left.id, ana.id)
+    await stored_team(session_factory, TeamBuilder().named("Boreal").with_removed_member(ana.id))
 
     teams = await SqlTeamQueries(session_factory).list_for_user(ana.id)
 
@@ -70,34 +74,45 @@ async def test_a_user_without_teams_receives_an_empty_list(session_factory):
     assert await SqlTeamQueries(session_factory).list_for_user(ana.id) == ()
 
 
-# --------------------------------------------------------------------- role_of --
-async def test_role_of_returns_the_stored_role_of_an_active_member(session_factory):
+# --------------------------------------------------------------- membership_of --
+async def test_membership_of_returns_the_stored_membership_of_an_active_member(session_factory):
     ana, bruno = await stored_user(session_factory), await stored_user(session_factory)
     team = await stored_team(
         session_factory, TeamBuilder().created_with_admin(ana.id).with_member(bruno.id)
     )
     queries = SqlTeamQueries(session_factory)
 
-    assert await queries.role_of(team_id=team.id, user_id=ana.id) is TeamRole.ADMIN
-    assert await queries.role_of(team_id=team.id, user_id=bruno.id) is TeamRole.MEMBER
+    of_ana = await queries.membership_of(team_id=team.id, user_id=ana.id)
+    of_bruno = await queries.membership_of(team_id=team.id, user_id=bruno.id)
+
+    assert of_ana == MembershipRef(membership_id=_membership_id(team, ana.id), role=TeamRole.ADMIN)
+    assert of_bruno == MembershipRef(
+        membership_id=_membership_id(team, bruno.id), role=TeamRole.MEMBER
+    )
 
 
-async def test_role_of_ignores_removed_members(session_factory):
+async def test_membership_of_ignores_removed_members(session_factory):
     ana = await stored_user(session_factory)
-    team = await stored_team(session_factory, TeamBuilder().with_member(ana.id))
-    await removed_from_team(session_factory, team.id, ana.id)
+    team = await stored_team(session_factory, TeamBuilder().with_removed_member(ana.id))
 
-    assert await SqlTeamQueries(session_factory).role_of(team_id=team.id, user_id=ana.id) is None
+    queries = SqlTeamQueries(session_factory)
+    assert await queries.membership_of(team_id=team.id, user_id=ana.id) is None
 
 
-async def test_role_of_is_none_for_another_team(session_factory):
+async def test_membership_of_is_none_for_another_team(session_factory):
     ana = await stored_user(session_factory)
     await stored_team(session_factory, TeamBuilder().created_with_admin(ana.id))
     other = await stored_team(session_factory)
     queries = SqlTeamQueries(session_factory)
 
-    assert await queries.role_of(team_id=other.id, user_id=ana.id) is None
-    assert await queries.role_of(team_id=next_id(), user_id=ana.id) is None
+    assert await queries.membership_of(team_id=other.id, user_id=ana.id) is None
+    assert await queries.membership_of(team_id=next_id(), user_id=ana.id) is None
+
+
+def _membership_id(team: Team, user_id: UUID) -> UUID:
+    membership = team.membership_of(user_id)
+    assert membership is not None
+    return membership.id
 
 
 # -------------------------------------------------------------------- get_team --
@@ -122,3 +137,45 @@ async def test_get_team_returns_mode_and_language(session_factory):
 
 async def test_get_team_is_none_for_a_team_that_does_not_exist(session_factory):
     assert await SqlTeamQueries(session_factory).get_team(next_id()) is None
+
+
+# ---------------------------------------------------------------- list_members --
+async def test_list_members_returns_the_active_members_with_their_role_in_joining_order(
+    session_factory,
+):
+    carla, ana, bruno = (
+        await stored_user(session_factory),
+        await stored_user(session_factory),
+        await stored_user(session_factory),
+    )
+    team = await stored_team(
+        session_factory,
+        TeamBuilder().with_member(carla.id).with_admin(ana.id).with_removed_member(bruno.id),
+    )
+    await stored_team(session_factory, TeamBuilder().with_admin(bruno.id))  # someone else's
+
+    listed = await SqlTeamQueries(session_factory).list_members(team.id)
+
+    assert listed.members == (
+        MemberRecord(user_id=carla.id, role=TeamRole.MEMBER, joined_at=NOW),
+        MemberRecord(user_id=ana.id, role=TeamRole.ADMIN, joined_at=NOW),
+    )
+    assert listed.has_active_sprint is False
+
+
+async def test_list_members_says_whether_the_team_has_a_sprint_in_progress(session_factory):
+    ana = await stored_user(session_factory)
+    with_sprint = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    with_closed = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    await stored_sprint(session_factory, with_sprint.id, SprintStatus.ACTIVE)
+    await stored_sprint(session_factory, with_closed.id, SprintStatus.CLOSED)
+    queries = SqlTeamQueries(session_factory)
+
+    assert (await queries.list_members(with_sprint.id)).has_active_sprint is True
+    assert (await queries.list_members(with_closed.id)).has_active_sprint is False
+
+
+async def test_list_members_of_a_team_that_does_not_exist_is_empty(session_factory):
+    listed = await SqlTeamQueries(session_factory).list_members(next_id())
+
+    assert listed.members == () and listed.has_active_sprint is False

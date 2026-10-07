@@ -5,6 +5,7 @@ import { catchError, map, type Observable, throwError } from 'rxjs';
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 import { readApiError } from '@core/http/api-error';
 
+import { toTeamRole } from './team-role';
 import { type TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
 import { TeamFailure, type TeamFailureKind } from '../domain/team-failure';
@@ -71,10 +72,10 @@ export class HttpTeamsApi implements TeamsPort {
 
 /**
  * The API contract stays in this file; the rest of the app sees the domain model.
- * The role, mode and language are not shown yet, so they do not reach the domain.
+ * The mode and language are not shown yet, so they do not reach the domain.
  */
 function toTeam(response: MyTeamResponse | TeamResponse): Team {
-  return { id: response.id, name: response.name };
+  return { id: response.id, name: response.name, role: toTeamRole(response.role) };
 }
 
 /** The API's error codes stay in this file: the rest of the app only sees `TeamFailure`. */

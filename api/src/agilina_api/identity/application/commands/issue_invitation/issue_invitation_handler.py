@@ -1,22 +1,26 @@
 from collections.abc import Callable
-from datetime import datetime
 from uuid import UUID, uuid4
 
 from agilina_api.identity.application.commands.issue_invitation.issue_invitation import (
     IssueInvitation,
+)
+from agilina_api.identity.application.commands.release_pending_invitation import (
+    release_pending_invitation,
 )
 from agilina_api.identity.application.dtos import IssuedInvitation
 from agilina_api.identity.application.ports.outbound import (
     ActivationTokenGenerator,
     IdentityUnitOfWork,
 )
-from agilina_api.identity.domain.errors import PendingInvitationAlreadyExistsError
 from agilina_api.identity.domain.invitation import Invitation
 from agilina_api.identity.domain.value_objects import Email
 from agilina_api.shared.application.ports import Clock, EmailMessage, EmailRenderer, Mailer
 
 
 class IssueInvitationHandler:
+    """Issuing an invitation to someone who already has a pending one in the team replaces
+    it: the previous link stops working (HU-06). ``make invite`` behaves the same."""
+
     def __init__(  # noqa: PLR0913
         self,
         uow_factory: Callable[[], IdentityUnitOfWork],
@@ -41,7 +45,7 @@ class IssueInvitationHandler:
         token = self._tokens.generate()
 
         async with self._uow_factory() as uow:
-            await self._release_an_overdue_invitation(uow, command.team_id, email, now)
+            revoked_previous = await release_pending_invitation(uow, command.team_id, email, now)
 
             invitation = Invitation.issue(
                 invitation_id=self._new_id(),
@@ -76,20 +80,8 @@ class IssueInvitationHandler:
             )
             await uow.commit()
 
-        return IssuedInvitation(invitation_id=invitation.id, expires_at=invitation.expires_at)
-
-    @staticmethod
-    async def _release_an_overdue_invitation(
-        uow: IdentityUnitOfWork, team_id: UUID, email: Email, now: datetime
-    ) -> None:
-        """A pending invitation past its deadline still blocks a new one (the index only
-        allows one pending per email and team): store its expiry first. One that still
-        works is an error."""
-        existing = await uow.invitations.find_pending(team_id, email)
-        if existing is None:
-            return
-        if not existing.expire_if_due(now):
-            raise PendingInvitationAlreadyExistsError(
-                f"Team {team_id} already has a valid invitation for {email}"
-            )
-        await uow.invitations.save(existing)
+        return IssuedInvitation(
+            invitation_id=invitation.id,
+            expires_at=invitation.expires_at,
+            revoked_previous=revoked_previous,
+        )

@@ -26,3 +26,15 @@ class SqlUserContacts:
         async with self._session_factory() as session:
             rows = (await session.execute(statement)).all()
         return [Contact(email=Email(row.email), full_name=row.full_name) for row in rows]
+
+    async def contacts_by_id(self, user_ids: Collection[UUID]) -> dict[UUID, Contact]:
+        """The contact of each of those users, by id, whether or not their account is active:
+        a team lists its members even if one of them can no longer sign in (HU-06)."""
+        if not user_ids:
+            return {}
+        statement = select(AppUserRow.id, AppUserRow.email, AppUserRow.full_name).where(
+            AppUserRow.id.in_(user_ids)
+        )
+        async with self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+        return {row.id: Contact(email=Email(row.email), full_name=row.full_name) for row in rows}

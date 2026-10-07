@@ -2,8 +2,17 @@ from datetime import datetime
 from uuid import UUID
 
 from agilina_api.shared_kernel import AggregateRoot
-from agilina_api.teams.domain.errors import AlreadyMemberError
-from agilina_api.teams.domain.events import MemberJoinedTeam
+from agilina_api.teams.domain.errors import (
+    AlreadyMemberError,
+    LastAdminError,
+    MemberNotFoundError,
+)
+from agilina_api.teams.domain.events import (
+    MemberJoinedTeam,
+    MemberRemovedFromTeam,
+    MemberRoleChanged,
+)
+from agilina_api.teams.domain.member_rules import is_last_admin
 from agilina_api.teams.domain.team.membership import Membership
 from agilina_api.teams.domain.team.membership_status import MembershipStatus
 from agilina_api.teams.domain.team_name import TeamName
@@ -137,4 +146,47 @@ class Team(AggregateRoot[UUID]):
             self._memberships[user_id] = membership
 
         self._record(MemberJoinedTeam(occurred_at=now, team_id=self.id, user_id=user_id, role=role))
+        return membership
+
+    def change_member_role(self, *, user_id: UUID, role: TeamRole, now: datetime) -> None:
+        """Give an active member another role (HU-06). The same role changes nothing.
+
+        The team's only admin cannot be demoted, also when they ask it themselves: the team
+        would be left without an admin.
+        """
+        membership = self._active_membership(user_id)
+        previous = membership.role
+        if previous is role:
+            return
+        self._ensure_not_last_admin(membership)
+        membership.change_role(role)
+        self._record(
+            MemberRoleChanged(
+                occurred_at=now, team_id=self.id, user_id=user_id, previous_role=previous, role=role
+            )
+        )
+
+    def remove_member(self, *, user_id: UUID, now: datetime) -> None:
+        """Take an active member out of the team (HU-06). Only the membership ends: the
+        person's account belongs to identity and may be in other teams.
+
+        The team's only admin cannot be removed, also when they ask it themselves.
+        """
+        membership = self._active_membership(user_id)
+        self._ensure_not_last_admin(membership)
+        membership.remove(now)
+        self._record(
+            MemberRemovedFromTeam(
+                occurred_at=now, team_id=self.id, user_id=user_id, role=membership.role
+            )
+        )
+
+    def _ensure_not_last_admin(self, membership: Membership) -> None:
+        if is_last_admin(membership.role, self.admin_count):
+            raise LastAdminError(f"User {membership.user_id} is the only admin of team {self.id}")
+
+    def _active_membership(self, user_id: UUID) -> Membership:
+        membership = self._memberships.get(user_id)
+        if membership is None or not membership.is_active:
+            raise MemberNotFoundError(f"User {user_id} is not an active member of team {self.id}")
         return membership

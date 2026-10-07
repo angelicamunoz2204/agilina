@@ -109,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(ceremonies_router.router)
     app.include_router(identity_router.router)
     app.include_router(teams_router.router)
+    app.include_router(identity_router.team_invitations_router)
     register_error_handlers(app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS))
 
     # Wiring: presentation declares what it needs, this is where it is provided.
@@ -134,6 +135,9 @@ def create_app() -> FastAPI:
         identity_dependencies.get_request_new_invitation_handler: from_container(
             lambda container: container.request_new_invitation
         ),
+        identity_dependencies.get_invite_to_team_handler: from_container(
+            lambda container: container.invite_to_team
+        ),
         teams_dependencies.get_create_team_as_admin_handler: from_container(
             lambda container: container.create_team_as_admin
         ),
@@ -142,6 +146,15 @@ def create_app() -> FastAPI:
         ),
         teams_dependencies.get_get_team_handler: from_container(
             lambda container: container.get_team
+        ),
+        teams_dependencies.get_list_team_members_handler: from_container(
+            lambda container: container.list_team_members
+        ),
+        teams_dependencies.get_change_member_role_handler: from_container(
+            lambda container: container.change_member_role
+        ),
+        teams_dependencies.get_remove_member_handler: from_container(
+            lambda container: container.remove_member
         ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_team_access: from_container(lambda container: container.team_access),

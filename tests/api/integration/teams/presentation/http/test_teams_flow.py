@@ -4,8 +4,8 @@ The story as the criteria tell it: a user creates a team and becomes its admin, 
 mode and English; a blank name stores nothing; a user with several teams sees them all; and
 nobody reaches a team they do not belong to (DoD).
 
-Login does not exist yet (HU-03), so ``FakeAuthenticatedUsers`` stands for it: each token
-is one stored user. Everything else is the real wiring: handlers, queries and the
+The Keycloak token check (HU-03) is doubled by ``FakeAuthenticatedUsers``: each token is
+one stored user. Everything else is the real wiring: handlers, queries and the
 membership check against ``team_member``.
 """
 
@@ -23,7 +23,7 @@ from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit
 from agilina_api.teams.presentation.http import dependencies as deps
 from tests.api.builders import TeamBuilder, next_id
 from tests.api.doubles import FakeAuthenticatedUsers, FakeClock
-from tests.api.integration.support import removed_from_team, stored_team, stored_user
+from tests.api.integration.support import stored_team, stored_user
 
 pytestmark = pytest.mark.integration
 
@@ -188,10 +188,11 @@ async def test_a_team_that_does_not_exist_answers_like_someone_elses(teams):
 
 
 async def test_a_removed_member_gets_403(teams, session_factory):
-    team_id = await teams.create("Atlas")
-    await removed_from_team(session_factory, team_id, teams.ana)
+    team = await stored_team(
+        session_factory, TeamBuilder().with_admin(teams.bruno).with_removed_member(teams.ana)
+    )
 
-    response = await teams.request("GET", f"/{team_id}", TOKEN_A)
+    response = await teams.request("GET", f"/{team.id}", TOKEN_A)
     listed = await teams.request("GET", "", TOKEN_A)
 
     assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"

@@ -5,6 +5,7 @@ from typing import Self
 from uuid import UUID
 
 from agilina_api.identity.application.commands.activate_account import ActivateAccount
+from agilina_api.identity.application.commands.invite_to_team import InviteToTeam
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitation
 from agilina_api.identity.application.commands.request_new_invitation import RequestNewInvitation
 from agilina_shared.enums import Language, TeamRole
@@ -56,6 +57,44 @@ class IssueInvitationBuilder:
             language=self.language,
             created_by=self.created_by,
             inviter_name=self.inviter_name,
+        )
+
+
+@dataclass(frozen=True)
+class InviteToTeamBuilder:
+    """An admin of Atlas invites Julián Torres as a member (the role the form proposes)."""
+
+    team_id: UUID = field(default_factory=next_id)
+    inviter_user_id: UUID = field(default_factory=next_id)
+    inviter_membership_id: UUID = field(default_factory=next_id)
+    email: str = EMAIL
+    full_name: str = FULL_NAME
+    role: TeamRole = TeamRole.MEMBER
+
+    def for_team(self, team_id: UUID) -> Self:
+        return replace(self, team_id=team_id)
+
+    def by_admin(self, user_id: UUID, membership_id: UUID) -> Self:
+        """The admin behind the access token and their membership in the team."""
+        return replace(self, inviter_user_id=user_id, inviter_membership_id=membership_id)
+
+    def with_email(self, email: str) -> Self:
+        return replace(self, email=email)
+
+    def named(self, full_name: str) -> Self:
+        return replace(self, full_name=full_name)
+
+    def as_admin(self) -> Self:
+        return replace(self, role=TeamRole.ADMIN)
+
+    def build(self) -> InviteToTeam:
+        return InviteToTeam(
+            team_id=self.team_id,
+            inviter_user_id=self.inviter_user_id,
+            inviter_membership_id=self.inviter_membership_id,
+            email=self.email,
+            full_name=self.full_name,
+            role=self.role,
         )
 
 

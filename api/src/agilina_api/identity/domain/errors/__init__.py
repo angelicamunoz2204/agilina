@@ -4,6 +4,8 @@ Each one is a business rule that was broken; the presentation layer turns them i
 HTTP responses and i18n keys, the domain knows nothing about status codes.
 """
 
+from agilina_api.identity.domain.errors.account_disabled_error import AccountDisabledError
+from agilina_api.identity.domain.errors.already_team_member_error import AlreadyTeamMemberError
 from agilina_api.identity.domain.errors.invalid_activation_token_error import (
     InvalidActivationTokenError,
 )
@@ -25,6 +27,8 @@ from agilina_api.identity.domain.errors.unknown_team_error import UnknownTeamErr
 from agilina_api.identity.domain.errors.user_already_exists_error import UserAlreadyExistsError
 
 __all__ = [
+    "AccountDisabledError",
+    "AlreadyTeamMemberError",
     "InvalidActivationTokenError",
     "InvalidEmailError",
     "InvalidFullNameError",

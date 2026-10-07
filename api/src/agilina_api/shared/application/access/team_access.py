@@ -1,7 +1,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from agilina_shared.enums import TeamRole
+from agilina_api.shared.application.access.membership_ref import MembershipRef
 
 
 class TeamAccess(Protocol):
@@ -11,7 +11,7 @@ class TeamAccess(Protocol):
     tenant, so the ``team_id`` is part of the signature and cannot be forgotten.
     """
 
-    async def role_of(self, *, team_id: UUID, user_id: UUID) -> TeamRole | None:
-        """The user's role in the team while their membership is active; ``None`` when
-        they were never a member, were removed, or the team does not exist."""
+    async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:
+        """The user's membership in the team while it is active; ``None`` when they were
+        never a member, were removed, or the team does not exist."""
         ...

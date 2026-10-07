@@ -201,6 +201,9 @@ test-e2e: env ## End-to-end tests in a real browser against the running environm
 		$(MAKE) --no-print-directory invite tenant=$$tenant team="E2E $$run $$tenant" \
 			email="$$email" name="Eva Prueba" >/dev/null || exit 1; \
 	done; \
+	echo "Inviting the admin of the members story (HU-06) to a new team of acme..."; \
+	$(MAKE) --no-print-directory invite tenant=acme team="E2E Integrantes $$run" \
+		email="e2e-admin-$$run@example.test" name="Ada Prueba" lang=es >/dev/null || exit 1; \
 	E2E_RUN="$$run" $(COMPOSE) --profile tools run --rm --build e2e
 
 coverage: env ## Unit + integration coverage of the API and the contract; fails below 100 %

@@ -1,0 +1,48 @@
+<agl-dialog
+  labelledBy="remove-member-title"
+  [dismissible]="!saving()"
+  (dismissed)="dismissed.emit()"
+>
+  <ng-container *transloco="let t; prefix: 'teams.settings.remove'">
+    <h2
+      id="remove-member-title"
+      class="font-display text-lg font-semibold break-words"
+      data-testid="remove-title"
+    >
+      {{ t('title', { name: member().fullName }) }}
+    </h2>
+    <p class="mt-3 text-sm" data-testid="remove-warning">
+      {{ t('warning', { name: member().fullName }) }}
+    </p>
+    <p class="mt-2 text-sm text-muted">{{ t('account_kept') }}</p>
+
+    @if (problem(); as message) {
+      <p role="alert" class="mt-4 text-sm text-danger" data-testid="remove-problem">
+        {{ t(message) }}
+      </p>
+    }
+
+    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <button
+        aglButton
+        variant="secondary"
+        type="button"
+        data-testid="remove-cancel"
+        [disabled]="saving()"
+        (click)="dismissed.emit()"
+      >
+        {{ t('cancel') }}
+      </button>
+      <button
+        aglButton
+        variant="danger"
+        type="button"
+        data-testid="remove-confirm"
+        [disabled]="saving()"
+        (click)="confirmed.emit()"
+      >
+        {{ saving() ? t('saving') : t('confirm') }}
+      </button>
+    </div>
+  </ng-container>
+</agl-dialog>

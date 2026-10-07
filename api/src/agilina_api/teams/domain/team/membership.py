@@ -56,3 +56,12 @@ class Membership(Entity[UUID]):
         self._status = MembershipStatus.ACTIVE
         self._joined_at = now
         self._removed_at = None
+
+    def change_role(self, role: TeamRole) -> None:
+        self._role = role
+
+    def remove(self, now: datetime) -> None:
+        """The person leaves the team. The row stays (``removed`` with its date), so they
+        can come back through ``rejoin``."""
+        self._status = MembershipStatus.REMOVED
+        self._removed_at = now

@@ -72,8 +72,8 @@ describe('TeamSelectorPage', () => {
   it('shows the name of each team of the user with a link to its dashboard', async () => {
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'admin' },
       ]),
     );
 
@@ -86,11 +86,11 @@ describe('TeamSelectorPage', () => {
   });
 
   it('enters the dashboard of the team the user clicks', async () => {
-    port.known = [{ id: 'b', name: 'Boreal' }];
+    port.known = [{ id: 'b', name: 'Boreal', role: 'admin' }];
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'admin' },
       ]),
     );
 
@@ -112,9 +112,9 @@ describe('TeamSelectorPage', () => {
   });
 
   it('goes straight into the only team: there is nothing to choose', async () => {
-    port.known = [{ id: 'a', name: 'Atlas' }];
+    port.known = [{ id: 'a', name: 'Atlas', role: 'admin' }];
 
-    await open(of([{ id: 'a', name: 'Atlas' }]));
+    await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
 
     expect(TestBed.inject(Router).url).toBe('/acme/teams/a');
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Atlas');
@@ -123,8 +123,8 @@ describe('TeamSelectorPage', () => {
   it('always offers to create a team', async () => {
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'member' },
       ]),
     );
 
@@ -146,8 +146,8 @@ describe('TeamSelectorPage', () => {
   it('does not show the role of the user in each team', async () => {
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas' },
-        { id: 'b', name: 'Boreal' },
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'member' },
       ]),
     );
 

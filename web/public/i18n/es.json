@@ -46,9 +46,110 @@
     "dashboard": {
       "loading": "Cargando el equipo…",
       "failed": "No se pudo abrir este equipo.",
+      "settings": "Configuración",
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
         "not_a_member": "Este equipo no existe o no perteneces a él."
+      }
+    },
+    "settings": {
+      "title": "Equipo",
+      "subtitle": "Las personas que participan en las ceremonias del equipo y su rol.",
+      "back": "Volver al equipo",
+      "members": "Integrantes",
+      "loading": "Cargando a los integrantes…",
+      "failed": "No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.",
+      "saving": "Guardando…",
+      "role_of": "Rol de {{ name }}",
+      "roles": {
+        "admin": "Administrador",
+        "member": "Miembro"
+      },
+      "blocked": {
+        "role_change": {
+          "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo.",
+          "last_admin": "Es el único Administrador: el equipo no puede quedarse sin Administrador."
+        },
+        "removal": {
+          "last_admin": "Es el único Administrador: no se puede eliminar del equipo."
+        }
+      },
+      "forbidden": {
+        "title": "No tienes acceso a esta pantalla",
+        "text": "Solo los Administradores del equipo pueden gestionar a sus integrantes."
+      },
+      "lost_access": {
+        "title": "Ya no administras este equipo",
+        "role_change": "Tu cambio quedó guardado: ahora eres Miembro, y solo los Administradores gestionan a los integrantes.",
+        "removal": "Tu cambio quedó guardado: ya no perteneces a este equipo ni recibirás sus convocatorias.",
+        "to_teams": "Ir a mis equipos"
+      },
+      "problems": {
+        "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo."
+      },
+      "role_change": {
+        "failed": "No se pudo cambiar el rol. Inténtalo de nuevo.",
+        "problems": {
+          "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+          "forbidden": "Ya no eres Administrador de este equipo.",
+          "not_found": "Esta persona ya no está en el equipo.",
+          "last_admin": "No se puede cambiar el rol: el equipo no puede quedarse sin Administrador.",
+          "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo."
+        }
+      },
+      "invite": {
+        "open": "Invitar miembro",
+        "title": "Invitar miembro",
+        "subtitle": "Le enviaremos un correo. Si ya tiene cuenta en Agilina, entrará al equipo de inmediato.",
+        "full_name": "Nombre",
+        "email": "Correo electrónico",
+        "role": "Rol",
+        "role_hint": "Podrás cambiarlo después, mientras no haya un sprint activo.",
+        "errors": {
+          "full_name": {
+            "blank": "Escribe el nombre de la persona.",
+            "too_long": "El nombre no puede pasar de {{ max }} caracteres."
+          },
+          "email": {
+            "blank": "Escribe el correo de la persona.",
+            "invalid": "Escribe un correo válido, como nombre@ejemplo.com.",
+            "too_long": "El correo no puede pasar de {{ max }} caracteres."
+          }
+        },
+        "submit": "Enviar invitación",
+        "saving": "Enviando…",
+        "cancel": "Cancelar",
+        "failed": "No se pudo enviar la invitación. Inténtalo de nuevo.",
+        "problems": {
+          "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+          "forbidden": "Ya no eres Administrador de este equipo.",
+          "already_member": "Esta persona ya es integrante del equipo.",
+          "account_disabled": "La cuenta de esta persona está desactivada, así que no se puede agregar al equipo.",
+          "invalid_email": "El correo no es válido. Revísalo y vuelve a intentarlo.",
+          "invalid_name": "Escribe el nombre de la persona.",
+          "mail_unavailable": "No se pudo enviar el correo. Inténtalo de nuevo en unos minutos."
+        },
+        "outcomes": {
+          "invitation_sent": "Enviamos la invitación por correo. El enlace de activación vale 7 días.",
+          "member_added": "Esta persona ya tenía cuenta en Agilina: quedó en el equipo y le avisamos por correo."
+        }
+      },
+      "remove": {
+        "open": "Eliminar",
+        "open_label": "Eliminar a {{ name }} del equipo",
+        "title": "¿Eliminar a {{ name }} del equipo?",
+        "warning": "{{ name }} dejará de pertenecer al equipo y de recibir sus convocatorias.",
+        "account_kept": "Su cuenta de Agilina no se borra: puede seguir en sus otros equipos.",
+        "confirm": "Eliminar del equipo",
+        "saving": "Eliminando…",
+        "cancel": "Cancelar",
+        "failed": "No se pudo eliminar a esta persona. Inténtalo de nuevo.",
+        "problems": {
+          "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+          "forbidden": "Ya no eres Administrador de este equipo.",
+          "not_found": "Esta persona ya no está en el equipo.",
+          "last_admin": "No se puede eliminar: el equipo no puede quedarse sin Administrador."
+        }
       }
     }
   },
