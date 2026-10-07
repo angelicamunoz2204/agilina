@@ -83,19 +83,68 @@ pgAdmin viene con el entorno: <http://localhost:5051>. Escucha solo en tu máqui
   volumen `agilina_pgadmin-data`).
 - Si `make credentials` no muestra `PGADMIN_*`, `make env` las agrega a un `.env` anterior.
 
+## Tenants: las organizaciones ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md))
+
+Un **tenant** es una organización que usa Agilina y contiene equipos. Cada uno tiene **su propia
+base de datos, su propio realm de Keycloak y su propio login**: una misma persona en dos tenants
+tiene dos cuentas. `make up` deja dos de desarrollo:
+
+| Tenant (*slug*) | Organización | Idioma | Base de datos | Realm | Dirección de la web |
+| --- | --- | --- | --- | --- | --- |
+| `acme` | ACME Corporation | inglés | `agilina_acme` | `agilina-acme` | <http://localhost:4200/acme> |
+| `ecomoda` | Ecomoda | español | `agilina_ecomoda` | `agilina-ecomoda` | <http://localhost:4200/ecomoda> |
+
+El tenant es el **primer segmento de la dirección** de la web (`/acme/teams`) y el encabezado
+`X-Agilina-Tenant` de cada llamada a la API. Sin él, la API responde `400 tenant_required`; con un
+tenant que no existe, que está suspendido o que ni siquiera es un nombre válido, responde siempre el
+mismo `404 tenant_not_found`; y `http://localhost:4200/` no nombra ninguna organización y se ve como
+«no encontrada». Solo `/health` y la documentación no piden tenant. Un token de un tenant no vale en
+otro (`401`): su emisor es el de su realm.
+
+```bash
+curl -i localhost:8000/v1/teams                                  # 400 tenant_required
+curl -i -H 'X-Agilina-Tenant: acme' localhost:8000/v1/tenant     # 200: slug, nombre e idioma
+curl -i -H 'X-Agilina-Tenant: nadie' localhost:8000/v1/tenant    # 404 tenant_not_found
+```
+
+Dónde está cada cosa: el catálogo de tenants es la base `agilina_platform` (tabla `tenant`, y los
+trabajos programados); `pgAdmin` ve todas. Los nombres salen del *slug* (prefijos
+`AGILINA_TENANT_DB_PREFIX` y `AGILINA_TENANT_REALM_PREFIX`), y el secreto del cliente `agilina-api` de
+cada realm está en el `.env` como `AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET` (uno por tenant).
+
+**Agregar un tenant** lo hace el administrador (hoy, quien desarrolla), con un comando; no hay panel:
+
+```bash
+make tenant-add slug=wonka name="Wonka Industries" lang=en
+```
+
+Crea y migra su base, crea su realm desde `infra/keycloak/realm-template.json`, genera su secreto en el
+`.env` (y reinicia la API para que lo lea) y lo escribe en el catálogo. Se puede repetir sin problema.
+`slug`: letras minúsculas y dígitos, de 2 a 31 caracteres, empieza con letra (`platform`, `admin` y `api`
+están reservados). **Suspender, reactivar o renombrar** es un `UPDATE` directo en el catálogo:
+
+```sql
+UPDATE tenant SET status = 'suspended' WHERE slug = 'wonka';   -- tarda hasta 30 s en notarse
+```
+
+`make migrate` crea y migra el catálogo y la base de **todos** los tenants (suspendidos incluidos);
+`make migration m="…"` crea una migración vacía del esquema de los tenants y
+`make migration-platform m="…"` una del catálogo.
+
 ## Invitar a alguien y activar su cuenta (HU-02)
 
 No hay registro público: la primera persona de un equipo la invita el operador de la
 plataforma (AD-22), con el entorno levantado (`make up`):
 
 ```bash
-make invite team="Atlas" email=julian@example.com name="Julián Torres" lang=es
-make invite team_id=<uuid> email=laura@example.com name="Laura Méndez" role=member   # a un equipo que ya existe
+make invite tenant=acme team="Atlas" email=julian@example.com name="Julián Torres"
+make invite tenant=ecomoda team_id=<uuid> email=laura@example.com name="Laura Méndez" role=member   # a un equipo que ya existe
 ```
 
-Crea el equipo (sin autor: lo creó el operador) y la invitación, y envía el correo; con
-Mailpit lo ves en <http://localhost:8025>. El enlace (`…/activate#t=<token>`) abre la pantalla
-de activación de la web (<http://localhost:4200/activate>): comprueba el enlace, pide la
+Crea el equipo en ese tenant (sin autor: lo creó el operador) y la invitación, y envía el correo, en
+el idioma del tenant salvo que des `lang=`; con Mailpit lo ves en <http://localhost:8025>. El enlace
+(`…/acme/activate#t=<token>`) lleva el tenant y abre la pantalla de activación de la web
+(<http://localhost:4200/acme/activate>): comprueba el enlace, pide la
 contraseña con su confirmación y, al activar, lleva a Keycloak con el correo ya escrito. La
 web lee el token del fragmento, lo quita de la barra de direcciones y llama a la API:
 
@@ -111,18 +160,23 @@ responden `{"code": …}` con un código estable (`invitation_expired`, `passwor
 
 La política de contraseñas es la de Keycloak: mínimo 12 caracteres, distinta del correo
 (AD-24); la pantalla muestra esa misma regla y los motivos que la API devuelve. Al terminar,
-la web envía a la página de inicio de sesión de Keycloak, pero **todavía no se inicia sesión
-en la aplicación**: ese paso es HU-03. La API crea la cuenta con su propia cuenta de servicio, `agilina-api`, cuyo secreto
-(`AGILINA_KEYCLOAK_API_SECRET`) genera `make env`.
+la web lleva a iniciar sesión (HU-03) en el realm de ese tenant. La API crea la cuenta con su propia
+cuenta de servicio, `agilina-api`, en el realm del tenant, con el secreto de ese tenant que genera
+`make env` o `make tenant-add`.
 
 ### Si cambias el realm de Keycloak
 
-`infra/keycloak/realm-agilina.json` solo se importa cuando Keycloak arranca con su volumen
-vacío. Para aplicar un cambio (por ejemplo, el cliente `agilina-api` o la política de
-contraseñas) en un entorno que ya existía:
+Mientras el desarrollo sea local, ni los realms ni las migraciones se parchean con *scripts* de
+actualización: se cambia la plantilla (o la migración inicial) y se reconstruye desde cero. Para
+empezar todo de nuevo, `make clean` y `make up` (borra las bases, los usuarios de Keycloak y las
+imágenes locales); para empezar solo Keycloak de nuevo, `make keycloak-reset`.
+
+Los realms salen de la plantilla `infra/keycloak/realm-template.json` cuando se crea el tenant
+(`make tenant-add`): un cambio de la plantilla no llega a un realm que ya existe. Para aplicarlo en
+un entorno que ya existía:
 
 ```bash
-make keycloak-reset    # borra los datos de Keycloak (no los de Postgres) y reimporta el realm
+make keycloak-reset    # borra los datos de Keycloak (no los de Postgres) y recrea el realm de cada tenant
 ```
 
 `make test-keycloak` ejecuta las pruebas contra ese Keycloak real.
@@ -151,9 +205,10 @@ Un cuerpo mal formado (sin `name`, o con un campo desconocido como `created_by`)
 `team_id` que no es un UUID también responden `422`, pero con el formato de validación de
 FastAPI, sin `code`.
 
-La web tiene tres pantallas: `/teams` (el selector: la lista de tus equipos y «Crear
-equipo»), `/teams/new` (el formulario) y `/teams/:teamId` (el dashboard del equipo, que por
-ahora solo muestra su nombre; el real llega con HU-12).
+Todas piden además el encabezado `X-Agilina-Tenant`. La web tiene tres pantallas dentro de cada
+tenant: `/acme/teams` (el selector: la lista de tus equipos y «Crear equipo»; con un solo equipo, entra
+directo a él), `/acme/teams/new` (el formulario) y `/acme/teams/:teamId` (el dashboard del equipo, que
+por ahora solo muestra su nombre; el real llega con HU-12).
 
 ### Valores por defecto de un equipo nuevo
 
@@ -170,49 +225,37 @@ Estos valores también aparecen en la descripción de la operación en
 <http://localhost:8000/docs>, y el formulario de la web avisa que el equipo se crea en modo
 soporte e idioma inglés.
 
-El equipo que crea el **operador** con `make invite team=…` es distinto: también nace en
-`support`, pero su idioma es el de `lang=` o, si no lo das, el de `AGILINA_DEFAULT_LANGUAGE`
-(`es` en `.env.example`). No tiene autor ni integrantes: la primera persona entra cuando
+El equipo que crea el **operador** con `make invite tenant=… team=…` es distinto: también nace en
+`support`, pero su idioma es el de `lang=` o, si no lo das, el del tenant. No tiene autor ni integrantes: la primera persona entra cuando
 activa su invitación, con el rol de esa invitación (AD-22).
 
 ### Cómo probarlo
 
-**Hoy, sin login.** La API todavía no valida los tokens de Keycloak, porque eso llega con
-HU-03. Mientras tanto, el adaptador de `api/.../bootstrap/authentication.py` no confía en
-ningún token. En el entorno levantado, toda ruta de equipos responde `401`, y la web en
-`/teams` muestra «No se pudieron cargar tus equipos». Es deliberado: sin validar un token,
-no se puede aceptar ninguno.
+Con el entorno levantado (`make up`), este es el camino desde cero:
 
-- **Pruebas automatizadas.** Cambian ese adaptador por un doble que conoce sus tokens y
-  ejercitan el flujo completo:
-  - `make test-integration` corre la API real contra PostgreSQL (`tests/api/integration/teams/`).
-    Comprueba que el equipo se crea en `support`/`en` con su creador como `admin`, que un
-    usuario recibe todos sus equipos, que un nombre vacío se rechaza sin guardar nada, que
-    pedir un equipo ajeno da `403` y que sin token da `401`.
-  - `make test-web` prueba los componentes con el Router real y un puerto falso: guardar
-    queda deshabilitado con un nombre inválido, al crear se entra al dashboard y el
-    selector lista los equipos o queda vacío con el botón.
-- **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra el contrato, los
-  valores por defecto y el esquema de seguridad `HTTPBearer`. Con cualquier token, hoy la
-  respuesta es `401`.
+1. `make invite tenant=acme team="Atlas" email=ana@example.com name="Ana Ruiz"` crea el equipo del
+   operador en `acme` y la invitación de su primera Administradora.
+2. En Mailpit (<http://localhost:8025>) abre el correo y pulsa el botón: llegas a
+   `/acme/activate`.
+3. Elige una contraseña de 12 o más caracteres. Esto crea a la vez la cuenta en el realm de `acme` y el
+   usuario de Agilina en la base de `acme` (`app_user`), y la deja como `admin` de «Atlas». La web te
+   lleva a iniciar sesión.
+4. Entras a `/acme/teams/<id>`: con un solo equipo, el selector entra directo. Con «Crear equipo» (desde
+   `/acme/teams/new`) tendrás dos, y `/acme/teams` mostrará el selector.
+5. Para ver el aislamiento entre equipos, invita y activa a otra persona en otro equipo: si pide
+   `GET /v1/teams/<id de Atlas>` con su token, recibe `403 not_a_team_member`. Y entre tenants: la misma
+   dirección con `ecomoda` en lugar de `acme` pide iniciar sesión en el realm de Ecomoda, donde esa
+   persona no tiene cuenta.
 
-**Cuando exista el login (HU-03).** Este es el camino desde cero, con el entorno levantado:
-
-1. `make invite team="Atlas" email=ana@example.com name="Ana Ruiz"` crea el equipo del
-   operador y la invitación de su primera Administradora.
-2. En Mailpit (<http://localhost:8025>) abre el correo y copia el token del enlace
-   (lo que va después de `#t=`).
-3. En Swagger, llama a `POST /v1/invitations/activate` con `token`, `password` y
-   `confirmation`. La contraseña la eliges tú, con un mínimo de 12 caracteres. Esto crea a
-   la vez la cuenta de Keycloak y el usuario de Agilina (`app_user`), y la deja como `admin`
-   de «Atlas».
-4. Inicia sesión en la web y entra a `/teams`: aparece «Atlas». Con «Crear equipo» llegas a
-   `/teams/new`, y al guardar entras al dashboard del equipo nuevo. De vuelta en `/teams`,
-   ves los dos.
-5. Para ver el aislamiento, invita y activa a otra persona en otro equipo: si pide
-   `GET /v1/teams/<id de Atlas>` con su token, recibe `403 not_a_team_member`.
-
-Los cinco pasos funcionan hoy (HU-02, HU-05 y HU-03). El login lo ves en «Iniciar sesión».
+- **Pruebas automatizadas.**
+  - `make test-integration` corre la API real contra PostgreSQL: los equipos
+    (`tests/api/integration/teams/`) y el aislamiento entre tenants contra dos bases reales
+    (`tests/api/integration/shared/presentation/http/test_multitenancy_flow.py`).
+  - `make test-web` prueba los componentes con el Router real y un puerto falso.
+  - `make test-e2e` recorre todo en un navegador, en los dos tenants.
+- **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra el contrato, los valores por
+  defecto y el esquema de seguridad `HTTPBearer`. El encabezado de tenant está explicado en la
+  descripción de la API.
 
 ### Iniciar sesión (HU-03)
 
@@ -220,21 +263,23 @@ La web lleva al login de **Keycloak** (<http://localhost:8080>), con su tema pro
 escrito si vienes de la activación. La contraseña solo la ve Keycloak: nunca la web ni la API. Entra
 cualquier persona activada:
 
-- <http://localhost:4200/> manda a iniciar sesión (o, con sesión, a tus equipos; con un solo equipo,
-  directo a él).
-- Una página que pide sesión (por ejemplo `/teams/<id>`) te lleva a iniciar sesión y te devuelve a
-  ella.
+- <http://localhost:4200/acme> manda a iniciar sesión en el realm de `acme` (o, con sesión, a tus
+  equipos; con un solo equipo, directo a él). <http://localhost:4200/> no nombra ninguna organización.
+- Una página que pide sesión (por ejemplo `/acme/teams/<id>`) te lleva a iniciar sesión y te devuelve
+  a ella.
+- La sesión es **por tenant**: estar dentro de `acme` no te mete en `ecomoda`.
 - Un correo o una contraseña incorrectos dan **el mismo mensaje**, exista o no el correo, y tras
   varios intentos fallidos Keycloak bloquea la cuenta un rato.
-- El idioma de la página de login es el de la web (el del navegador).
-- Son públicas, sin sesión: `/activate` (el enlace de la invitación) y `/status`.
+- El idioma de la página de login es el de la web (el del navegador); si se abre sin eso, es el del
+  tenant (`acme` en inglés, `ecomoda` en español).
+- Son públicas, sin sesión: `/acme/activate` (el enlace de la invitación) y `/acme/status`.
 
 La API valida el token de Keycloak en cada petición protegida (firma, emisor, audiencia y vigencia) y
 responde `401 not_authenticated` si no sirve. Para probarla con un token real, ver `make test-keycloak`.
 
-Tras un cambio del realm hay que correr `make keycloak-reset`, **que borra los usuarios de Keycloak
-de desarrollo**: las cuentas activadas antes quedan sin su usuario en Keycloak y hay que volver a
-invitar con `make invite`.
+Tras un cambio de la plantilla del realm hay que correr `make keycloak-reset`, **que borra los usuarios
+de Keycloak de desarrollo (de todos los realms)**: las cuentas activadas antes quedan sin su usuario en
+Keycloak y hay que volver a invitar con `make invite`.
 
 #### El tema del login
 
@@ -251,15 +296,16 @@ make keycloak-theme    # reconstruye la imagen y reinicia solo Keycloak (conserv
 
 ```bash
 make up           # el entorno tiene que estar levantado
-make test-e2e     # invita a una persona nueva y recorre, en un navegador real (Playwright), invitar →
-                  # activar → iniciar sesión → entrar al equipo → volver a la página pedida
+make test-e2e     # invita a una persona nueva a un equipo nuevo de cada tenant y recorre, en un navegador
+                  # real (Playwright), invitar → activar → iniciar sesión → entrar al equipo → volver a la
+                  # página pedida, y que los tenants no se mezclan
 ```
 
 Corren en un contenedor sobre la red del anfitrión (Linux), con el entorno de `make up`.
 
 ### El usuario de desarrollo
 
-El realm versionado no trae ninguna persona, y no se le agrega: AD-22 descarta sembrar una
+La plantilla del realm no trae ninguna persona, y no se le agrega: AD-22 descarta sembrar una
 cuenta con credenciales en el repositorio. Además, una cuenta que existe solo en Keycloak
 no sirve, porque Agilina necesita también su `app_user` y su membresía. El camino
 `make invite` → Mailpit → activación crea las dos cosas, se repite cuando haga falta y no
@@ -291,12 +337,12 @@ solo la contraseña:
 grep '^KEYCLOAK_ADMIN_PASSWORD=' .env | cut -d= -f2
 ```
 
-Entras al realm `master`, que es el de administración; el de Agilina es
-`agilina` y se elige en el menú de arriba a la izquierda. Este usuario administra
-Keycloak, no es una persona de Agilina. El realm `agilina` no tiene ninguna persona:
-solo los clientes `agilina-web`, `agilina-worker` y `agilina-api`, y las cuentas de
-servicio de los dos últimos (la del worker y la que usa la API para crear cuentas). Las
-personas llegan con las invitaciones (HU-02; ver «El usuario de desarrollo»).
+Entras al realm `master`, que es el de administración; los de Agilina son uno por tenant
+(`agilina-acme`, `agilina-ecomoda`…) y se eligen en el menú de arriba a la izquierda. Este usuario
+administra Keycloak, no es una persona de Agilina. Los realms de los tenants no tienen ninguna persona:
+solo los clientes `agilina-web`, `agilina-worker` y `agilina-api`, y las cuentas de servicio de los dos
+últimos (la del worker y la que usa la API para crear cuentas). Las personas llegan con las
+invitaciones (HU-02; ver «El usuario de desarrollo»).
 
 La contraseña solo se aplica cuando Keycloak se crea por primera vez, con su
 volumen de datos vacío. Si cambias `KEYCLOAK_ADMIN_PASSWORD` después, Keycloak
@@ -385,12 +431,12 @@ Para **volver a Mailpit**, restaura esas variables a los valores de `.env.exampl
 
 ## El secreto del worker
 
-El realm de Keycloak se importa desde `infra/keycloak/realm-agilina.json` y el
-secreto del cliente `agilina-worker` lo genera Keycloak: no está en el
-repositorio. Para obtenerlo:
+Los realms de los tenants se crean desde `infra/keycloak/realm-template.json` y el
+secreto del cliente `agilina-worker` de cada uno lo genera Keycloak: no está en el
+repositorio. (Cómo el worker elige su tenant se define con HU-55.) Para obtenerlo:
 
 1. Entra a la consola de Keycloak (ver la sección anterior).
-2. Realm `agilina` → Clients → `agilina-worker` → pestaña Credentials.
+2. Realm `agilina-acme` (o el del tenant) → Clients → `agilina-worker` → pestaña Credentials.
 3. Copia el secreto en `AGILINA_KEYCLOAK_WORKER_SECRET` de tu `.env` y ejecuta `make agent`.
 
 ## Trabajar sin GPU
@@ -412,16 +458,20 @@ make down           # detiene los contenedores sin borrar datos
 make credentials    # URLs y credenciales de Postgres, pgAdmin y Keycloak
 make logs s=api     # logs de un servicio (sin s=, de todos)
 make ps             # qué está corriendo
-make migrate        # aplica las migraciones pendientes
+make migrate        # crea y migra el catálogo y la base de cada tenant
 make mail-test to=a@b.com   # envía un correo de prueba con el SMTP configurado
-make migration m="crear tabla equipos"   # migración vacía de Alembic: se escribe a mano, en SQL
+make migration m="crear tabla equipos"   # migración vacía del esquema de los tenants: se escribe a mano, en SQL
+make migration-platform m="…"            # lo mismo, del catálogo de tenants
+make tenant-add slug=wonka name="Wonka Industries" lang=en   # agrega un tenant (base, realm y catálogo)
+make tenants-dev                         # asegura los tenants de desarrollo (acme y ecomoda); se repite sin problema
+make tenant-realms                       # crea el realm de cada tenant del catálogo que no lo tenga
 make test           # pruebas de Python, de integración (PostgreSQL real) y de la web
 make test-integration   # solo las de integración: levanta Postgres y usa una base temporal
 make test-keycloak      # pruebas contra el Keycloak real (levanta Keycloak y lo espera)
 make test-e2e           # pruebas de punta a punta en un navegador real (con el entorno levantado)
-make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos y sus usuarios)
+make keycloak-reset     # Keycloak desde cero y el realm de cada tenant (borra sus datos y sus usuarios)
 make keycloak-theme     # reconstruye el tema de login de Keycloak y reinicia solo Keycloak
-make invite team=… email=… name=…   # crea un equipo e invita a su primer administrador
+make invite tenant=… team=… email=… name=…   # crea un equipo en un tenant e invita a su primer administrador
 make lint           # ruff y ESLint
 make format         # ruff format y Prettier (la web)
 make typecheck      # mypy en modo estricto
@@ -439,6 +489,6 @@ make clean          # borra contenedores, volúmenes, imágenes y cachés
 | `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs s=postgres` y reintenta |
 | `make agent` pide completar el `.env` | Faltan `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET`: el worker no arranca sin ellos |
 | La web muestra «No disponible» | La API no está corriendo: `make logs s=api` |
-| Keycloak no importa el realm | El volumen ya tenía datos: `make clean` y `make up` |
+| Un tenant no tiene realm en Keycloak | Keycloak perdió sus datos o el tenant se agregó sin él: `make tenant-realms` |
 | Cambié `package.json` o `pyproject.toml` y la imagen no se construye ("lockfile needs to be updated" o `npm ci` falla) | Ejecuta `make lock`, commitea los dos locks y repite `make up` |
 | Los archivos que crea un contenedor son de `root` | El compose usa tu usuario (`HOST_UID`/`HOST_GID`); ejecuta siempre con `make`, no con `docker compose` a mano |

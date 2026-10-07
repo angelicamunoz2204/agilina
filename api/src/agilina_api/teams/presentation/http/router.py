@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, Response, status
 
 from agilina_api.shared.application.access import TeamContext
 from agilina_api.shared.presentation.http.access import current_team_member, current_user_id
-from agilina_api.shared.presentation.http.errors import ErrorResponse
+from agilina_api.shared.presentation.http.api_error import SharedErrors
+from agilina_api.shared.presentation.http.error_schema import errors_of
 from agilina_api.teams.application.commands.create_team_as_admin import (
     CreateTeamAsAdmin,
     CreateTeamAsAdminHandler,
@@ -23,6 +24,7 @@ from agilina_api.teams.presentation.http.dependencies import (
     get_get_team_handler,
     get_list_my_teams_handler,
 )
+from agilina_api.teams.presentation.http.errors import TeamsErrors
 from agilina_api.teams.presentation.http.presenters import (
     present_created,
     present_my_team,
@@ -38,16 +40,11 @@ from agilina_shared.enums import Language, OperationMode, TeamRole
 
 router = APIRouter(prefix="/v1/teams", tags=["teams"])
 
-NOT_AUTHENTICATED = {
-    "model": ErrorResponse,
-    "description": "No access token, or one that does not identify a user (`not_authenticated`)",
-}
-
-NOT_A_TEAM_MEMBER = {
-    "model": ErrorResponse,
-    "description": "The user is not an active member of the team: it is someone else's, "
-    "they were removed from it, or it does not exist (`not_a_team_member`)",
-}
+SIGNED_IN = (
+    SharedErrors.TENANT_REQUIRED,
+    SharedErrors.TENANT_NOT_FOUND,
+    SharedErrors.NOT_AUTHENTICATED,
+)
 
 CREATE_TEAM_DESCRIPTION = f"""
 Creates a team in a single transaction, with these defaults:
@@ -68,13 +65,7 @@ If anything fails, neither the team nor the membership is stored.
     description=CREATE_TEAM_DESCRIPTION,
     responses={
         201: {"description": "Created; `Location` points to the new team"},
-        401: NOT_AUTHENTICATED,
-        422: {
-            "model": ErrorResponse,
-            "description": "The name is blank or too long once trimmed (`invalid_team_name`). "
-            "A malformed body (no name, an unknown field) answers with FastAPI's validation "
-            "format instead",
-        },
+        **errors_of(*SIGNED_IN, SharedErrors.VALIDATION, TeamsErrors.INVALID_TEAM_NAME),
     },
 )
 async def create_team(
@@ -96,7 +87,7 @@ async def create_team(
         "Every team where the user is an active member, with their role in it, ordered by "
         "name ignoring case. Empty when the user has no team."
     ),
-    responses={401: NOT_AUTHENTICATED},
+    responses=errors_of(*SIGNED_IN),
 )
 async def list_my_teams(
     user_id: UUID = Depends(current_user_id),
@@ -113,10 +104,9 @@ async def list_my_teams(
     description=(
         "The team's name, mode and language, and the user's role in it. Only an active "
         "member gets it: any other user receives `403 not_a_team_member`, whether the team "
-        "exists or not. A `team_id` that is not a UUID answers `422` with FastAPI's "
-        "validation format."
+        "exists or not. A `team_id` that is not a UUID answers `422 validation_error`."
     ),
-    responses={401: NOT_AUTHENTICATED, 403: NOT_A_TEAM_MEMBER},
+    responses=errors_of(*SIGNED_IN, SharedErrors.VALIDATION, SharedErrors.NOT_A_TEAM_MEMBER),
 )
 async def get_team(
     team: TeamContext = Depends(current_team_member),

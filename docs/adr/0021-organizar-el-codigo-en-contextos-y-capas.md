@@ -1,6 +1,6 @@
 # AD-21: organizar el código en contextos y capas con arquitectura limpia
 
-- **Estado:** propuesta (pasa a aceptada al integrarse este PR)
+- **Estado:** propuesta (pasa a aceptada al integrarse este PR); en lo de «el equipo es el tenant», supersedida en parte por [AD-29](0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)
 - **Fecha:** 2026-10-03
 - **Deciden:** Diego, Angélica
 - **Historia:** HU-02

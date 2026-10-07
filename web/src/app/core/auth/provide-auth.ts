@@ -10,20 +10,20 @@ import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 import { Logger } from '@core/logging/logger';
 
 import { AuthSession } from './auth-session';
-import { KEYCLOAK_CLIENT, KeycloakAuthSession } from './keycloak-auth-session';
+import { KEYCLOAK_CLIENT_FACTORY, KeycloakAuthSession } from './keycloak-auth-session';
 
 /**
- * The session of the person, with Keycloak as the identity provider. When the application
- * starts on the way back from signing in, Keycloak's answer is read before the first
- * navigation, so that it never stays in the address bar.
+ * The session of the person, with Keycloak as the identity provider (one realm per tenant).
+ * When the application starts on the way back from signing in, Keycloak's answer is read
+ * before the first navigation, so that it never stays in the address bar.
  */
 export function provideAuth(): EnvironmentProviders {
   return makeEnvironmentProviders([
     {
-      provide: KEYCLOAK_CLIENT,
+      provide: KEYCLOAK_CLIENT_FACTORY,
       useFactory: () => {
-        const { url, realm, clientId } = inject(RUNTIME_CONFIG).keycloak;
-        return new Keycloak({ url, realm, clientId });
+        const { url, clientId } = inject(RUNTIME_CONFIG).keycloak;
+        return (realm: string) => new Keycloak({ url, realm, clientId });
       },
     },
     KeycloakAuthSession,

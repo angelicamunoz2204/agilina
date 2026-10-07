@@ -9,6 +9,7 @@ export class FakeAuthSession extends AuthSession {
   readonly ensured: (string | undefined)[] = [];
   readonly signIns: SignInOptions[] = [];
   token: string | null = null;
+  tokenRequests = 0;
 
   constructor(signedIn = false) {
     super();
@@ -21,6 +22,7 @@ export class FakeAuthSession extends AuthSession {
   }
 
   accessToken(): Promise<string | null> {
+    this.tokenRequests++;
     return Promise.resolve(this.token);
   }
 

@@ -43,7 +43,7 @@
     <button aglButton type="submit" class="mt-6 w-full" [disabled]="problem() !== null || saving()">
       {{ saving() ? t('saving') : t('submit') }}
     </button>
-    <a aglButton variant="secondary" routerLink="/teams" class="mt-3 w-full">
+    <a aglButton variant="secondary" [routerLink]="tenant.path('teams')" class="mt-3 w-full">
       {{ t('cancel') }}
     </a>
   </form>

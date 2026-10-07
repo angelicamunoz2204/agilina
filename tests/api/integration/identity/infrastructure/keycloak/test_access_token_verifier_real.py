@@ -37,16 +37,17 @@ class Realm:
     """Signs people in the way the web application does: authorization code flow with PKCE,
     but speaking to Keycloak by its internal address (the page it serves names the public one)."""
 
-    def __init__(self, settings) -> None:
+    def __init__(self, settings, tenant: str) -> None:
         self.settings = settings
+        self.realm_name = settings.tenant_realm(tenant)
         self.internal = settings.keycloak_url.rstrip("/")
         self.public = settings.keycloak_public_url.rstrip("/")
-        self.base = f"{self.internal}/realms/{settings.keycloak_realm}/protocol/openid-connect"
+        self.base = f"{self.internal}/realms/{self.realm_name}/protocol/openid-connect"
 
     def verifier(self) -> KeycloakAccessTokenVerifier:
         return KeycloakAccessTokenVerifier(
             jwks_url=f"{self.base}/certs",
-            issuer=f"{self.public}/realms/{self.settings.keycloak_realm}",
+            issuer=f"{self.public}/realms/{self.realm_name}",
             audience=self.settings.keycloak_api_client,
             clock=SystemClock(),
         )
@@ -109,8 +110,8 @@ class Realm:
 
 
 @pytest.fixture
-def realm(settings) -> Realm:
-    return Realm(settings)
+def realm(settings, tenant) -> Realm:
+    return Realm(settings, tenant)
 
 
 @pytest.fixture
@@ -169,3 +170,28 @@ async def test_a_refused_login_says_the_same_whether_or_not_the_email_exists(rea
 
     assert wrong_password == unknown_email
     assert email not in wrong_password
+
+
+async def test_a_token_of_one_tenant_is_not_valid_in_another(settings, provider, created, tenant):
+    """The realm of a tenant signs for its own people only: its issuer and its keys are its own."""
+    other = "ecomoda" if tenant == "acme" else "acme"
+    email = Email(f"it-{uuid.uuid4().hex[:10]}@example.test")
+    created.append(
+        await provider.create_user(email=email, full_name="Julián Torres", password=PASSWORD)
+    )
+    access_token = (await Realm(settings, tenant).sign_in(email.value, PASSWORD))["access_token"]
+    own, foreign = Realm(settings, tenant).verifier(), Realm(settings, other).verifier()
+
+    assert await own.verified_subject(access_token) is not None
+    assert await foreign.verified_subject(access_token) is None
+    await own.aclose()
+    await foreign.aclose()
+
+
+async def test_the_login_of_each_tenant_speaks_the_language_of_the_tenant(settings, tenant):
+    challenge = _base64url(hashlib.sha256(b"x").digest())
+    async with httpx.AsyncClient(follow_redirects=False) as client:
+        page = await Realm(settings, tenant).login_page(client, challenge)
+
+    expected = {"acme": "en", "ecomoda": "es"}[tenant]
+    assert f'lang="{expected}"' in page.text

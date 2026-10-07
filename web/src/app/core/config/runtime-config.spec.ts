@@ -3,7 +3,7 @@ import { parseRuntimeConfig, RuntimeConfigError } from './runtime-config';
 describe('parseRuntimeConfig', () => {
   const valid = {
     apiUrl: 'http://localhost:8000/',
-    keycloak: { url: 'http://localhost:8080', realm: 'agilina', clientId: 'agilina-web' },
+    keycloak: { url: 'http://localhost:8080', realmPrefix: 'agilina-', clientId: 'agilina-web' },
     logLevel: 'INFO',
   };
 
@@ -11,7 +11,7 @@ describe('parseRuntimeConfig', () => {
     const config = parseRuntimeConfig(valid);
 
     expect(config.apiUrl).toBe('http://localhost:8000');
-    expect(config.keycloak.realm).toBe('agilina');
+    expect(config.keycloak.realmPrefix).toBe('agilina-');
     expect(config.logLevel).toBe('info');
   });
 

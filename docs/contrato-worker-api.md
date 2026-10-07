@@ -9,7 +9,7 @@ LiveKit.
 | `GET /v1/ceremonies/{id}/context` | Antes de entrar a la sala | `CeremonyContext` |
 | `POST /v1/ceremonies/{id}/result` | Al cerrar la ceremonia | `CeremonyResult` |
 
-Los tipos viven en `shared/src/agilina_shared/contract.py` y los importan los
+Los tipos viven en `shared/src/agilina_shared/contract/` y los importan los
 dos desplegables: el contrato es código compartido, no documentación que se
 desactualiza. Esta página explica el porqué; la forma exacta está en el tipo.
 

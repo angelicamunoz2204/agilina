@@ -8,6 +8,8 @@ import { RUNTIME_CONFIG, type RuntimeConfig } from '@core/config/runtime-config'
 import { httpErrorLoggingInterceptor } from '@core/http/http-error-logging.interceptor';
 import { provideI18n } from '@core/i18n/provide-i18n';
 import { provideLogging } from '@core/logging/provide-logging';
+import { HttpTenantApi } from '@core/tenant/http-tenant.api';
+import { TenantPort } from '@core/tenant/tenant.port';
 import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HttpInvitationApi } from '@features/identity/infrastructure/http-invitation.api';
@@ -32,6 +34,8 @@ export function createAppConfig(runtimeConfig: RuntimeConfig): ApplicationConfig
       provideHttpClient(withInterceptors([authInterceptor, httpErrorLoggingInterceptor])),
       provideI18n(),
       provideAuth(),
+
+      { provide: TenantPort, useClass: HttpTenantApi },
 
       // Ports of the features, bound to their adapters.
       { provide: HealthPort, useClass: HttpHealthApi },

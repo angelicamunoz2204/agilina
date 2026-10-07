@@ -36,6 +36,7 @@ Este apartado no es opcional: sin él, revisar obliga a adivinar.
 - [ ] Ninguna credencial quedó en el código ni en la configuración versionada.
 - [ ] Los textos dirigidos al usuario existen en español y en inglés.
 - [ ] La documentación técnica quedó actualizada si cambió la arquitectura o un contrato.
+- [ ] `docs/api.md` lista cada endpoint nuevo o cambiado con todas sus respuestas.
 - [ ] La rama está al día con `main` y sin conflictos.
 
 ### Para quien revisa

@@ -4,6 +4,7 @@ Everything is read from environment variables: the repository stores no real
 value, only the example file with the expected keys (Avance 1, 7.1).
 """
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -45,25 +46,36 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:4200"
 
     # ------------------------------------------------------------ postgres --
-    db_url: str | None = None
+    # One PostgreSQL server, several databases (AD-29): the platform's catalog of tenants
+    # and one database per tenant. ``POSTGRES_DB`` is only the database the server always
+    # has, the one that is connected to in order to create the others.
     postgres_user: str = Field(default="agilina", validation_alias="POSTGRES_USER")
     postgres_password: str = Field(default="agilina", validation_alias="POSTGRES_PASSWORD")
     postgres_db: str = Field(default="agilina", validation_alias="POSTGRES_DB")
     postgres_host: str = Field(default="localhost", validation_alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, validation_alias="POSTGRES_PORT")
+    platform_db: str = "agilina_platform"
+    """The catalog: which tenants exist, and the scheduler's jobs."""
+    tenant_db_prefix: str = "agilina_"
+    """The database of a tenant is this prefix and its slug (``agilina_acme``)."""
 
     # ------------------------------------------------------------ keycloak --
     keycloak_url: str = "http://localhost:8080"
+    tenant_realm_prefix: str = "agilina-"
+    """The realm of a tenant is this prefix and its slug (``agilina-acme``)."""
     keycloak_public_url: str = "http://localhost:8080"
     """The URL the browser reaches Keycloak at: the issuer of every token it signs. It can
     differ from ``keycloak_url``, which is the one the API itself uses (inside Compose,
     ``http://keycloak:8080``)."""
-    keycloak_realm: str = "agilina"
+    keycloak_admin_user: str = Field(default="admin", validation_alias="KEYCLOAK_ADMIN")
+    keycloak_admin_password: SecretStr = Field(
+        default=SecretStr(""), validation_alias="KEYCLOAK_ADMIN_PASSWORD"
+    )
+    """Keycloak's own administrator: only the operator's tools use it, to create realms."""
     keycloak_web_client: str = "agilina-web"
     keycloak_worker_client: str = "agilina-worker"
     keycloak_worker_secret: str = ""
     keycloak_api_client: str = "agilina-api"
-    keycloak_api_secret: SecretStr = SecretStr("")
 
     # ---------------------------------------------------------------- email --
     # Which server delivers the email is only configuration (AD-23). The defaults point
@@ -86,20 +98,37 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash"
     elevenlabs_api_key: str = ""
 
-    @property
-    def dsn(self) -> str:
-        """Postgres connection URL.
+    def server_dsn(self, database: str) -> str:
+        """Connection URL of ``database`` on the PostgreSQL server.
 
         ``psycopg`` serves both uses of the project with the same string:
         asynchronous for the API and synchronous for Alembic and the scheduler
         store.
         """
-        if self.db_url:
-            return self.db_url
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"@{self.postgres_host}:{self.postgres_port}/{database}"
         )
+
+    @property
+    def platform_dsn(self) -> str:
+        return self.server_dsn(self.platform_db)
+
+    @property
+    def admin_dsn(self) -> str:
+        """The database the server always has: where the others are created from."""
+        return self.server_dsn(self.postgres_db)
+
+    def tenant_dsn(self, slug: str) -> str:
+        return self.server_dsn(f"{self.tenant_db_prefix}{slug}")
+
+    def tenant_realm(self, slug: str) -> str:
+        return f"{self.tenant_realm_prefix}{slug}"
+
+    def tenant_api_secret(self, slug: str) -> SecretStr:
+        """The secret of the ``agilina-api`` client of the tenant's realm: one per tenant,
+        in ``AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET``. Never in the repository."""
+        return SecretStr(os.environ.get(f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_API_SECRET", ""))
 
     @property
     def origins(self) -> list[str]:

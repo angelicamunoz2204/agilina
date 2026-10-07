@@ -39,6 +39,25 @@ describe('httpErrorLoggingInterceptor', () => {
     expect(logger.entries[0]?.context).toEqual({ method: 'GET', url: '/teams', status: 503 });
   });
 
+  it('adds the code and the request id when the API sent its error body', () => {
+    http.get('/teams').subscribe({ error: () => undefined });
+
+    backend
+      .expectOne('/teams')
+      .flush(
+        { error: { code: 'not_a_team_member', message: 'x', request_id: 'c1b9f0a2e47d4c1f' } },
+        { status: 403, statusText: 'Forbidden' },
+      );
+
+    expect(logger.entries[0]?.context).toEqual({
+      method: 'GET',
+      url: '/teams',
+      status: 403,
+      code: 'not_a_team_member',
+      requestId: 'c1b9f0a2e47d4c1f',
+    });
+  });
+
   it('logs nothing when the request succeeds', () => {
     http.get('/teams').subscribe();
 

@@ -1,12 +1,9 @@
-"""Engine and async session.
+"""Engines and async sessions.
 
-The engine is created lazily so that importing the application does not
-require a running database: the smoke tests and the OpenAPI schema generation
-run without Postgres.
+Every database has its own engine (and so its own pool): the catalog and each tenant's. They
+are created when first needed, so importing the application does not require a running
+database: the smoke tests and the OpenAPI schema generation run without PostgreSQL.
 """
-
-from collections.abc import AsyncIterator
-from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -15,25 +12,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from agilina_api.shared.infrastructure.settings import get_settings
+
+def create_engine_for(dsn: str, *, echo: bool = False) -> AsyncEngine:
+    """An engine for the database at ``dsn``. Nothing connects until it is used."""
+    return create_async_engine(dsn, pool_pre_ping=True, echo=echo)
 
 
-@lru_cache
-def get_engine() -> AsyncEngine:
-    settings = get_settings()
-    return create_async_engine(
-        settings.dsn,
-        pool_pre_ping=True,
-        echo=settings.log_level.upper() == "DEBUG",
-    )
-
-
-@lru_cache
-def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    return async_sessionmaker(get_engine(), expire_on_commit=False)
-
-
-async def get_session() -> AsyncIterator[AsyncSession]:
-    """One session per request, always closed."""
-    async with get_session_factory()() as session:
-        yield session
+def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False)

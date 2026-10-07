@@ -13,7 +13,8 @@ export interface RuntimeConfig {
   readonly apiUrl: string;
   readonly keycloak: {
     readonly url: string;
-    readonly realm: string;
+    /** A tenant's realm is this prefix and its name: `agilina-` and `acme` give `agilina-acme`. */
+    readonly realmPrefix: string;
     readonly clientId: string;
   };
   /** Minimum level the logger writes. */
@@ -37,7 +38,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
 
   const apiUrl = requiredText(source['apiUrl'], 'apiUrl', problems);
   const keycloakUrl = requiredText(keycloak['url'], 'keycloak.url', problems);
-  const realm = requiredText(keycloak['realm'], 'keycloak.realm', problems);
+  const realmPrefix = requiredText(keycloak['realmPrefix'], 'keycloak.realmPrefix', problems);
   const clientId = requiredText(keycloak['clientId'], 'keycloak.clientId', problems);
   const logLevel = parseLogLevel(source['logLevel'], problems);
 
@@ -46,7 +47,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   }
   return {
     apiUrl: withoutTrailingSlash(apiUrl),
-    keycloak: { url: withoutTrailingSlash(keycloakUrl), realm, clientId },
+    keycloak: { url: withoutTrailingSlash(keycloakUrl), realmPrefix, clientId },
     logLevel,
   };
 }

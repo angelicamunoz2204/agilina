@@ -14,7 +14,10 @@ from agilina_api.shared.presentation.http.access import (
     get_authenticated_users,
     get_team_access,
 )
-from agilina_api.shared.presentation.http.errors import SHARED_ERRORS, register_error_handlers
+from agilina_api.shared.presentation.http.error_handlers import (
+    SHARED_ERRORS,
+    register_error_handlers,
+)
 from agilina_shared.enums import TeamRole
 from tests.api.builders import next_id
 from tests.api.doubles import FakeAuthenticatedUsers, FakeTeamAccess
@@ -66,7 +69,7 @@ def scenario() -> Scenario:
 
 def _assert_not_authenticated(response) -> None:
     assert response.status_code == 401
-    assert response.json() == {"code": "not_authenticated", "detail": "not authenticated"}
+    assert response.json()["error"]["code"] == "not_authenticated"
     assert response.headers["www-authenticate"] == "Bearer"
     assert response.headers["cache-control"] == "no-store"
 
@@ -106,7 +109,7 @@ async def test_a_user_of_another_team_gets_403_not_a_team_member(scenario):
     response = await scenario.get(f"/teams/{scenario.team_b}/thing", TOKEN_A)
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_member", "detail": "not a team member"}
+    assert response.json()["error"]["code"] == "not_a_team_member"
     assert response.headers["cache-control"] == "no-store"
 
 

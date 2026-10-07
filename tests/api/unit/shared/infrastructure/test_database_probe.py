@@ -1,6 +1,5 @@
 """The readiness probe says whether the database answers, without ever raising."""
 
-from agilina_api.shared.infrastructure import database_probe
 from agilina_api.shared.infrastructure.database_probe import SqlDatabaseProbe
 
 
@@ -19,14 +18,10 @@ class _Session:
             raise ConnectionError("connection refused")
 
 
-async def test_a_database_that_answers_is_available(monkeypatch):
-    monkeypatch.setattr(database_probe, "get_session_factory", lambda: lambda: _Session(False))
-
-    assert await SqlDatabaseProbe().is_available() is True
+async def test_a_database_that_answers_is_available():
+    assert await SqlDatabaseProbe(lambda: _Session(False)).is_available() is True
 
 
-async def test_a_database_that_does_not_answer_is_unavailable_and_it_is_logged(monkeypatch, caplog):
-    monkeypatch.setattr(database_probe, "get_session_factory", lambda: lambda: _Session(True))
-
-    assert await SqlDatabaseProbe().is_available() is False
+async def test_a_database_that_does_not_answer_is_unavailable_and_it_is_logged(caplog):
+    assert await SqlDatabaseProbe(lambda: _Session(True)).is_available() is False
     assert "connection refused" in caplog.text

@@ -73,6 +73,8 @@ known-first-party = ["agilina_agent", "agilina_api", "agilina_shared", "agilina_
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106"]
+# A re-export is a module path that cannot be wrapped.
+"**/__init__.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
