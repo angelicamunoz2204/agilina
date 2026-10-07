@@ -78,6 +78,12 @@
         "title": "You do not have access to this screen",
         "text": "Only the team's Administrators can manage its members."
       },
+      "lost_access": {
+        "title": "You no longer administer this team",
+        "role_change": "Your change was saved: you are now a Member, and only Administrators manage the members.",
+        "removal": "Your change was saved: you no longer belong to this team nor receive its meetings.",
+        "to_teams": "Go to my teams"
+      },
       "problems": {
         "not_authenticated": "Your session is not valid or has expired. Sign in again."
       },

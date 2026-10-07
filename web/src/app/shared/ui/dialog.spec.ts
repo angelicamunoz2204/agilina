@@ -8,7 +8,11 @@ import { Dialog } from './dialog';
   template: `
     <button type="button" id="opener" (click)="open.set(true)">Open</button>
     @if (open()) {
-      <agl-dialog labelledBy="dialog-title" (dismissed)="dismissals = dismissals + 1">
+      <agl-dialog
+        labelledBy="dialog-title"
+        [dismissible]="dismissible()"
+        (dismissed)="dismissals = dismissals + 1"
+      >
         <h2 id="dialog-title">Title</h2>
         <button type="button" id="inside">Inside</button>
       </agl-dialog>
@@ -17,6 +21,7 @@ import { Dialog } from './dialog';
 })
 class Host {
   readonly open = signal(false);
+  readonly dismissible = signal(true);
   dismissals = 0;
 }
 
@@ -77,6 +82,40 @@ describe('Dialog', () => {
     await closed; // the browser fires close as a task of its own
 
     expect(fixture.componentInstance.dismissals).toBe(1);
+  });
+
+  it('refuses Escape while it is not dismissible', async () => {
+    fixture.componentInstance.dismissible.set(false);
+    await openFromTheButton();
+
+    const cancel = new Event('cancel', { cancelable: true });
+    dialog()!.dispatchEvent(cancel);
+
+    expect(cancel.defaultPrevented).toBeTrue();
+    expect(dialog()?.open).toBeTrue();
+  });
+
+  it('lets Escape through when it is dismissible', async () => {
+    await openFromTheButton();
+
+    const cancel = new Event('cancel', { cancelable: true });
+    dialog()!.dispatchEvent(cancel);
+
+    expect(cancel.defaultPrevented).toBeFalse();
+  });
+
+  it('opens again if the browser closes it while it is not dismissible', async () => {
+    fixture.componentInstance.dismissible.set(false);
+    await openFromTheButton();
+
+    const closed = new Promise((resolve) => {
+      dialog()!.addEventListener('close', resolve, { once: true });
+    });
+    dialog()!.close();
+    await closed;
+
+    expect(dialog()?.open).toBeTrue();
+    expect(fixture.componentInstance.dismissals).toBe(0);
   });
 
   it('is not shown while it is not placed', () => {

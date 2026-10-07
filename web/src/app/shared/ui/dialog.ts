@@ -21,8 +21,9 @@ import {
  * }
  * ```
  *
- * `dismissed` tells that the person closed it (Escape). When it goes away, the focus goes back
- * to the element that had it when it opened.
+ * `dismissed` tells that the person closed it (Escape). With `[dismissible]="false"` (for
+ * instance while what it sends is on its way) Escape does nothing. When it goes away, the focus
+ * goes back to the element that had it when it opened.
  */
 @Component({
   selector: 'agl-dialog',
@@ -31,6 +32,8 @@ import {
 export class Dialog implements OnDestroy {
   /** Id of the element that names the dialog, usually its title. */
   readonly labelledBy = input.required<string>();
+  /** Whether Escape closes it; false while the dialog is busy. */
+  readonly dismissible = input(true);
   readonly dismissed = output();
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
@@ -46,8 +49,20 @@ export class Dialog implements OnDestroy {
     }
   }
 
-  /** The browser already closed it (Escape): whoever placed it takes it away. */
+  /** Escape asks to close it: refused while it is not dismissible. */
+  protected onCancel(event: Event): void {
+    if (!this.dismissible()) {
+      event.preventDefault();
+    }
+  }
+
+  /** The browser already closed it (Escape): whoever placed it takes it away. A browser may
+   * close it despite the refusal (a second Escape in a row): then it opens again. */
   protected onClose(): void {
-    this.dismissed.emit();
+    if (this.dismissible()) {
+      this.dismissed.emit();
+    } else {
+      this.dialog().nativeElement.showModal();
+    }
   }
 }

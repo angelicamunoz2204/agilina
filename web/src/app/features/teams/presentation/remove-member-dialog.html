@@ -1,4 +1,8 @@
-<agl-dialog labelledBy="remove-member-title" (dismissed)="dismissed.emit()">
+<agl-dialog
+  labelledBy="remove-member-title"
+  [dismissible]="!saving()"
+  (dismissed)="dismissed.emit()"
+>
   <ng-container *transloco="let t; prefix: 'teams.settings.remove'">
     <h2 id="remove-member-title" class="font-display text-lg font-semibold break-words">
       {{ t('title', { name: member().fullName }) }}
@@ -11,7 +15,13 @@
     }
 
     <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-      <button aglButton variant="secondary" type="button" (click)="dismissed.emit()">
+      <button
+        aglButton
+        variant="secondary"
+        type="button"
+        [disabled]="saving()"
+        (click)="dismissed.emit()"
+      >
         {{ t('cancel') }}
       </button>
       <button

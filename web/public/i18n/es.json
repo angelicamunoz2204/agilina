@@ -78,6 +78,12 @@
         "title": "No tienes acceso a esta pantalla",
         "text": "Solo los Administradores del equipo pueden gestionar a sus integrantes."
       },
+      "lost_access": {
+        "title": "Ya no administras este equipo",
+        "role_change": "Tu cambio quedó guardado: ahora eres Miembro, y solo los Administradores gestionan a los integrantes.",
+        "removal": "Tu cambio quedó guardado: ya no perteneces a este equipo ni recibirás sus convocatorias.",
+        "to_teams": "Ir a mis equipos"
+      },
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo."
       },

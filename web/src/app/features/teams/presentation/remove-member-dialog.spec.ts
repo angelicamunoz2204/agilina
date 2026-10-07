@@ -87,6 +87,16 @@ describe('RemoveMemberDialog', () => {
     expect(button('Eliminando…').disabled).toBeTrue();
   });
 
+  it('cannot be cancelled while the removal is saving', async () => {
+    fixture.componentInstance.saving.set(true);
+    await fixture.whenStable();
+    const escape = new Event('cancel', { cancelable: true });
+    root.querySelector('dialog')!.dispatchEvent(escape);
+
+    expect(button('Cancelar').disabled).toBeTrue();
+    expect(escape.defaultPrevented).toBeTrue();
+  });
+
   it('announces the problem of the last attempt', async () => {
     fixture.componentInstance.problem.set('problems.last_admin');
     await fixture.whenStable();

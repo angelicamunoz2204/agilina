@@ -189,6 +189,26 @@ describe('InviteMemberDialog', () => {
     expect(port.invitations.length).toBe(1);
   });
 
+  it('cannot be cancelled while it is sending, so the page always learns the outcome', async () => {
+    await fillIn();
+
+    await send();
+    await fixture.whenStable();
+    const cancel = Array.from(root.querySelectorAll('button')).find(
+      (button) => button.textContent.trim() === 'Cancelar',
+    )!;
+    const escape = new Event('cancel', { cancelable: true });
+    root.querySelector('dialog')!.dispatchEvent(escape);
+
+    expect(cancel.disabled).toBeTrue();
+    expect(escape.defaultPrevented).toBeTrue();
+    port.pending.next('invitation_sent');
+    port.pending.complete();
+    await settled();
+    expect(fixture.componentInstance.outcomes).toEqual(['invitation_sent']);
+    expect(fixture.componentInstance.dismissals).toBe(0);
+  });
+
   it('announces why the API refused the invitation and stays open', async () => {
     await fillIn();
 

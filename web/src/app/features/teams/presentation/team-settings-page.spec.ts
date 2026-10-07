@@ -379,6 +379,43 @@ describe('TeamSettingsPage', () => {
     expect(page.querySelector('a[href="/teams/atlas"]')).not.toBeNull();
   });
 
+  it('says the admin lost the access by their own role change, and leads back to the team', async () => {
+    port.answer = {
+      ...(port.answer as TeamMembers),
+      members: [{ ...ANA, roleChangeBlockedBy: null }, BRUNO],
+    };
+    await open();
+
+    roleControl('ana').value = 'member';
+    roleControl('ana').dispatchEvent(new Event('change'));
+    port.answer = new MemberFailure('forbidden');
+    port.accept();
+    await settled();
+
+    expect(page.querySelector('h1')?.textContent).toBe('Ya no administras este equipo');
+    expect(text(page)).toContain('Tu cambio quedó guardado: ahora eres Miembro');
+    expect(page.querySelector('a[href="/teams/atlas"]')).not.toBeNull();
+  });
+
+  it('says the admin left the team by their own removal, and leads to their teams', async () => {
+    port.answer = {
+      ...(port.answer as TeamMembers),
+      members: [{ ...ANA, removalBlockedBy: null }, BRUNO],
+    };
+    await open();
+
+    removeButtonOf('Ana Gil').click();
+    await harness.fixture.whenStable();
+    button('Eliminar del equipo', dialog()!).click();
+    port.answer = new MemberFailure('forbidden');
+    port.accept();
+    await settled();
+
+    expect(page.querySelector('h1')?.textContent).toBe('Ya no administras este equipo');
+    expect(text(page)).toContain('ya no perteneces a este equipo');
+    expect(page.querySelector('a[href="/teams"]')).not.toBeNull();
+  });
+
   it('asks to sign in again when the API does not recognise the session', async () => {
     port.answer = new MemberFailure('not_authenticated');
     await open();

@@ -4,6 +4,7 @@ import { catchError, map, type Observable, throwError } from 'rxjs';
 
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 
+import { toTeamRole } from './team-role';
 import { type TeamMembersPort } from '../application/team-members.port';
 import { MemberFailure, type MemberFailureKind } from '../domain/member-failure';
 import {
@@ -133,7 +134,7 @@ function toTeamMembers(response: TeamMembersResponse): TeamMembers {
 }
 
 function toRoleOption(response: RoleOptionResponse): RoleOption {
-  return { role: toRole(response.role), label: toLabel(response.label) };
+  return { role: toTeamRole(response.role), label: toLabel(response.label) };
 }
 
 function toTeamMember(response: TeamMemberResponse): TeamMember {
@@ -141,16 +142,11 @@ function toTeamMember(response: TeamMemberResponse): TeamMember {
     userId: response.user_id,
     fullName: response.full_name,
     email: response.email,
-    role: toRole(response.role),
+    role: toTeamRole(response.role),
     label: toLabel(response.label),
     roleChangeBlockedBy: response.role_change_blocked_by,
     removalBlockedBy: response.removal_blocked_by,
   };
-}
-
-/** A role this screen does not know offers the least: it reads as `member`. */
-function toRole(role: string): TeamRole {
-  return role === 'admin' ? 'admin' : 'member';
 }
 
 /** Until HU-04 the label is the role's own code, so it reads the same way. */

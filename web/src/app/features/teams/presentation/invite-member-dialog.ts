@@ -20,7 +20,8 @@ import { type InvitationOutcome, type RoleOption, type TeamRole } from '../domai
 /**
  * Dialog to invite a person to the team: their name, their email and the role they get,
  * Member unless the admin picks another. The API decides whether the email gets an
- * activation link or joins right away; the dialog tells the page which one happened.
+ * activation link or joins right away; the dialog tells the page which one happened. While the
+ * invitation is on its way the dialog stays open, so that the page always learns the outcome.
  */
 @Component({
   selector: 'agl-invite-member-dialog',

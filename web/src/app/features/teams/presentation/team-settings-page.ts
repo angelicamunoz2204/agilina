@@ -15,7 +15,8 @@ import { type InvitationOutcome, type TeamMember } from '../domain/team-member';
  * Settings → Team: the members of the team with their name, email and role, and what an admin
  * does with them (invite, change a role, remove). The screen does not decide who may open it
  * nor what may change: it shows what the API answers, disables what the API marks as blocked
- * with the API's reason, and shows "no access" when the API refuses the team.
+ * with the API's reason, and shows "no access" when the API refuses the team. When that refusal
+ * follows a change made here (an admin demoted or removed themself), it says so instead.
  */
 @Component({
   selector: 'agl-team-settings-page',
@@ -36,6 +37,9 @@ export class TeamSettingsPage implements OnInit {
   protected readonly savingMember = this.facade.savingMember;
   /** The API refused the team to this user: not an admin of it, or not a member at all. */
   protected readonly forbidden = computed(() => this.facade.problem() === 'forbidden');
+  /** The last change saved here, if any: a refusal after it means it took the access away. */
+  private readonly lastChange = signal<'role_change' | 'removal' | null>(null);
+  protected readonly lostAccess = computed(() => (this.forbidden() ? this.lastChange() : null));
   protected readonly problemMessage = computed(() =>
     this.forbidden() ? null : problemMessageKey(this.facade.problem()),
   );
@@ -71,7 +75,9 @@ export class TeamSettingsPage implements OnInit {
       return;
     }
     const changed = await this.facade.changeRole(member.userId, role);
-    if (!changed) {
+    if (changed) {
+      this.lastChange.set('role_change');
+    } else {
       // The API kept the old role: the control shows it again.
       control.value = member.role;
     }
@@ -93,6 +99,7 @@ export class TeamSettingsPage implements OnInit {
       return;
     }
     if (await this.facade.remove(member.userId)) {
+      this.lastChange.set('removal');
       this.removing.set(null);
     }
   }
