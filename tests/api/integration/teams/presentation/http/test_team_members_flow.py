@@ -7,7 +7,7 @@ is disabled (3); removes someone, who stops being a member while their account s
 the team never loses its last admin, not even by their own hand (5); and a member who calls
 any of the routes directly gets 403 (6). The authorization is the backend's (DoD).
 
-Login does not exist yet (HU-03), so ``FakeAuthenticatedUsers`` stands for it; the
+The Keycloak token check (HU-03) is doubled by ``FakeAuthenticatedUsers``; the
 membership and the role are checked against ``team_member`` (``SqlTeamQueries``).
 """
 

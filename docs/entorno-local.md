@@ -179,14 +179,11 @@ activa su invitación, con el rol de esa invitación (AD-22).
 
 ### Cómo probarlo
 
-**Hoy, sin login.** La API todavía no valida los tokens de Keycloak, porque eso llega con
-HU-03. Mientras tanto, el adaptador de `api/.../bootstrap/authentication.py` no confía en
-ningún token. En el entorno levantado, toda ruta de equipos responde `401`, y la web en
-`/teams` muestra «No se pudieron cargar tus equipos». Es deliberado: sin validar un token,
-no se puede aceptar ninguno.
+La API valida el token de Keycloak en cada petición (HU-03), así que en el entorno
+levantado se prueba con la sesión real, como en los pasos de más abajo. Además:
 
-- **Pruebas automatizadas.** Cambian ese adaptador por un doble que conoce sus tokens y
-  ejercitan el flujo completo:
+- **Pruebas automatizadas.** Cambian la validación del token por un doble que conoce sus
+  tokens y ejercitan el flujo completo:
   - `make test-integration` corre la API real contra PostgreSQL (`tests/api/integration/teams/`).
     Comprueba que el equipo se crea en `support`/`en` con su creador como `admin`, que un
     usuario recibe todos sus equipos, que un nombre vacío se rechaza sin guardar nada, que
@@ -195,10 +192,10 @@ no se puede aceptar ninguno.
     queda deshabilitado con un nombre inválido, al crear se entra al dashboard y el
     selector lista los equipos o queda vacío con el botón.
 - **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra el contrato, los
-  valores por defecto y el esquema de seguridad `HTTPBearer`. Con cualquier token, hoy la
-  respuesta es `401`.
+  valores por defecto y el esquema de seguridad `HTTPBearer`. Sin un token válido, la
+  respuesta es `401 not_authenticated`.
 
-**Cuando exista el login (HU-03).** Este es el camino desde cero, con el entorno levantado:
+**Con el login (HU-03).** Este es el camino desde cero, con el entorno levantado:
 
 1. `make invite team="Atlas" email=ana@example.com name="Ana Ruiz"` crea el equipo del
    operador y la invitación de su primera Administradora.
@@ -319,12 +316,33 @@ sin ninguno: el cambio bloquea la fila del equipo hasta terminar, y el segundo r
 
 ### Cómo probarlo
 
-**Hoy, sin login.** Igual que con los equipos (HU-05), en el entorno levantado estas cuatro
-rutas responden `401`, porque la API todavía no valida tokens de Keycloak (HU-03). Por eso
-la historia se demuestra así:
+**En el entorno levantado, con el login (HU-03).** Con una Administradora activada como en
+los pasos 1 a 3 de «Cómo probarlo» de *Crear equipos*, que inicia sesión en la web:
 
-- **Pruebas automatizadas** (`make test-integration`). Corren la API real contra
-  PostgreSQL, con `FakeAuthenticatedUsers` en lugar del login y el correo simulado:
+1. En el dashboard del equipo aparece **Configuración**, que lleva a
+   `/teams/<id>/settings`: la lista de integrantes con su nombre, correo y rol.
+2. **Invitar miembro** con el nombre y el correo de otra persona (Miembro por defecto). En
+   Mailpit (<http://localhost:8025>) llega la invitación; al activarla, la persona aparece
+   en la lista con el rol elegido.
+3. Invítala de nuevo: el diálogo avisa que ya es integrante (`409 already_a_team_member`).
+   Si invitas a alguien que ya tiene cuenta y no está en el equipo, entra de inmediato y en
+   Mailpit llega el aviso `member_added`, sin enlace de activación.
+4. Cámbiale el rol y luego elimínala del equipo: deja de aparecer en la lista, pero su
+   cuenta sigue existiendo y sirve en sus otros equipos, si los tiene.
+5. Si queda un solo Administrador, su control de rol y su botón Eliminar aparecen
+   deshabilitados con el motivo; un `PATCH` o un `DELETE` directo responde `409 last_admin`.
+6. Con la sesión de un Miembro, abrir `/teams/<id>/settings` por URL muestra «sin acceso»,
+   y cualquiera de las cuatro rutas responde `403 not_a_team_admin`.
+
+El cambio de rol con un sprint activo todavía no se puede ver en la pantalla, porque no hay
+API para crear sprints (HU-07); lo cubren las pruebas automatizadas. Swagger
+(<http://localhost:8000/docs>) muestra las cuatro operaciones en la sección *teams* con
+sus códigos de error; sin un token válido responden `401 not_authenticated`.
+
+**Pruebas automatizadas.**
+
+- `make test-integration` corre la API real contra PostgreSQL, con la validación del token
+  doblada (`FakeAuthenticatedUsers`) y el correo simulado:
   - `tests/api/integration/teams/presentation/http/test_team_members_flow.py`: el listado
     con nombre y correo, el cambio de rol con y sin sprint activo, la eliminación sin tocar
     `app_user`, el último Administrador y el `403` de un Miembro en cada una de las cuatro
@@ -333,32 +351,12 @@ la historia se demuestra así:
     invitar un correo nuevo (el enlace `…/activate#t=<token>` y la activación con el rol
     elegido), una cuenta existente, un integrante actual, reinvitar (el enlace anterior
     responde `410 invitation_revoked`) y el fallo del correo.
-- **El correo, en Mailpit** (<http://localhost:8025>). `make invite` envía la invitación con
-  la misma plantilla. Si repites `make invite team_id=<uuid> …` con el mismo correo, el
-  comando avisa que revocó la anterior y el primer enlace deja de servir. El aviso
-  `member_added` se revisa como se explica en [Plantillas de correo](#plantillas-de-correo).
-- **Swagger** (<http://localhost:8000/docs>). La sección *teams* muestra las cuatro
-  operaciones con sus códigos de error. Con cualquier token, hoy la respuesta es `401`.
-- **La pantalla Configuración → Equipo** (<http://localhost:4200/teams/<id>/settings>).
-  Como la API responde `401`, hoy la pantalla solo muestra el aviso de que la sesión no es
-  válida. Lo que ve un Administrador (la lista, el control de rol deshabilitado con su
-  motivo, los diálogos de invitar y de eliminar) y la vista «sin acceso» ante un `403` se
-  comprueban con las pruebas de la web (`make test-web`), que montan la página real con
-  un puerto falso y los textos en español.
-
-**Cuando exista el login (HU-03).** Con el entorno levantado y una Administradora activada
-como en los pasos 1 a 3 de «Cómo probarlo» de *Crear equipos*:
-
-1. En el dashboard del equipo aparece **Configuración**, que lleva a
-   `/teams/<id>/settings`; desde ahí se hace lo mismo que en los pasos siguientes. Por la
-   API: con su token, `POST /v1/teams/<id>/invitations` con el nombre y el correo de otra
-   persona. En Mailpit llega la invitación; al activarla, la persona aparece en
-   `GET /v1/teams/<id>/members` con el rol elegido.
-2. Invita de nuevo a esa misma persona: la respuesta es `409 already_a_team_member`.
-3. Cámbiale el rol con `PATCH` y luego sácala con `DELETE`: deja de aparecer en el listado,
-   pero su cuenta sigue existiendo y sirve en sus otros equipos, si los tiene.
-4. Con el token de un Miembro, cualquiera de las cuatro rutas responde
-   `403 not_a_team_admin`, y abrir `/teams/<id>/settings` por URL muestra «sin acceso».
+- `make test-web` monta la página real con un puerto falso y los textos en español: la
+  lista, el control de rol deshabilitado con su motivo, los diálogos de invitar y de
+  eliminar, y la vista «sin acceso» ante un `403`.
+- `make invite` envía la invitación con la misma plantilla. Si repites
+  `make invite team_id=<uuid> …` con el mismo correo, el comando avisa que revocó la
+  anterior y el primer enlace deja de servir.
 
 ## Entrar a Keycloak
 
@@ -441,10 +439,9 @@ equipo):
 | `member_added` | Al invitar a alguien que **ya tiene cuenta** (HU-06) | Un aviso de que entró al equipo y un enlace a `…/teams/<id>`; sin enlace de activación |
 | `new_invitation_request` | Cuando alguien con un enlace vencido pide uno nuevo | A los administradores del equipo, el motivo |
 
-Para ver el aviso `member_added` en Mailpit (<http://localhost:8025>) hace falta invitar,
-desde `POST /v1/teams/{team_id}/invitations`, el correo de alguien que ya activó su
-cuenta. En local esa ruta responde 401 hasta que exista el inicio de sesión (HU-03); el
-envío lo comprueban las pruebas automáticas con el renderizador real y un envío simulado.
+Para ver el aviso `member_added` en Mailpit (<http://localhost:8025>), invita desde
+Configuración → Equipo (o con `POST /v1/teams/{team_id}/invitations`) el correo de alguien
+que ya activó su cuenta y no está en el equipo.
 
 Para ver un cambio de diseño: edita la plantilla, ejecuta `make mail-test to=...` y
 abre Mailpit (la API recarga sola, y el comando renderiza la plantilla en cada

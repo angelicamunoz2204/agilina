@@ -4,8 +4,8 @@ real PostgreSQL, the real email templates and the mailer doubled.
 Someone without an account receives the activation link of HU-02 and, activating it, joins
 with the chosen role; an existing account joins at once and receives a notice without a
 link; a current member is refused; inviting again invalidates the previous link; and if the
-email cannot be sent nothing is stored. Login does not exist yet (HU-03):
-``FakeAuthenticatedUsers`` stands for it.
+email cannot be sent nothing is stored. The Keycloak token check (HU-03) is doubled by
+``FakeAuthenticatedUsers``.
 """
 
 import re

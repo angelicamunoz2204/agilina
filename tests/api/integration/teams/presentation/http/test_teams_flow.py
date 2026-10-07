@@ -4,8 +4,8 @@ The story as the criteria tell it: a user creates a team and becomes its admin, 
 mode and English; a blank name stores nothing; a user with several teams sees them all; and
 nobody reaches a team they do not belong to (DoD).
 
-Login does not exist yet (HU-03), so ``FakeAuthenticatedUsers`` stands for it: each token
-is one stored user. Everything else is the real wiring: handlers, queries and the
+The Keycloak token check (HU-03) is doubled by ``FakeAuthenticatedUsers``: each token is
+one stored user. Everything else is the real wiring: handlers, queries and the
 membership check against ``team_member``.
 """
 

@@ -90,17 +90,17 @@ En `tests/api/doubles/`, uno por puerto, en memoria. Los que más se usan:
 | `FakeMailer`, `FakeRenderer` | `Mailer`, `EmailRenderer` | Ver lo enviado (`sent`), hacer fallar el envío (`fail = True`) y leer la plantilla y sus parámetros en el cuerpo |
 | `FakeTokenGenerator` | `ActivationTokenGenerator` | Entrega los tokens que le das, en orden |
 | `FakeIdentityProvider` | `IdentityProvider` (Keycloak) | Crea o borra cuentas, rechaza una contraseña o se cae |
-| `FakeAuthenticatedUsers` | `AuthenticatedUsers` | Hace de inicio de sesión mientras no exista HU-03: cada token es un usuario |
+| `FakeAuthenticatedUsers` | `AuthenticatedUsers` | Reemplaza la validación del token de Keycloak (HU-03): cada token es un usuario |
 | `FakeTeamAccess`, `FakeTeamQueries` | `TeamAccess`, `TeamQueries` | La membresía y el rol de cada usuario, y lo que leen las consultas |
 | `FakeActiveSprints` | `ActiveSprints` | Los equipos que tienen un sprint en curso |
 | `FakeMemberContacts` | `MemberContactsDirectory` | El nombre y el correo de cada integrante; los demás no tienen cuenta |
 
 ### Flujos de punta a punta
 
-Una historia se prueba completa por HTTP contra PostgreSQL real, sin inicio de sesión, con
+Una historia se prueba completa por HTTP contra PostgreSQL real, sin Keycloak, con
 el patrón de `tests/api/integration/teams/presentation/http/test_teams_flow.py`:
 `create_app()` con `dependency_overrides` hacia los *handlers* reales, `FakeAuthenticatedUsers`
-en lugar del login, `SqlTeamQueries` como `TeamAccess` (la membresía se comprueba contra la
+en lugar de la validación del token, `SqlTeamQueries` como `TeamAccess` (la membresía se comprueba contra la
 tabla) y solo el correo, los tokens y el reloj doblados.
 
 Para los casos de uso que cruzan identity y teams sin pasar por HTTP,
