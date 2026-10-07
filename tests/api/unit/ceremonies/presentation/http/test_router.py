@@ -16,7 +16,7 @@ async def test_the_operations_declare_they_are_not_implemented_yet(client: Async
     response = await client.get("/v1/ceremonies/8f2f0d7e-0e4c-4a2e-9a0e-0b3b1a4a1c11/context")
 
     assert response.status_code == 501
-    assert "HU-56" in response.json()["detail"]
+    assert response.json()["error"]["code"] == "not_implemented"
 
 
 async def test_delivering_a_result_is_not_implemented_either(client: AsyncClient):
@@ -33,4 +33,4 @@ async def test_delivering_a_result_is_not_implemented_either(client: AsyncClient
     response = await client.post(f"/v1/ceremonies/{ceremony_id}/result", json=result)
 
     assert response.status_code == 501
-    assert "HU-56" in response.json()["detail"]
+    assert response.json()["error"]["code"] == "not_implemented"

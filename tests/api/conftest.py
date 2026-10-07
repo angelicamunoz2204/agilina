@@ -8,11 +8,14 @@ depend on infrastructure to go green.
 import logging
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from agilina_api.bootstrap.app import create_app
 from agilina_api.shared.infrastructure.settings import get_settings
-from tests.api.builders import reset_ids
+from agilina_api.shared.presentation.http.tenancy import get_tenant_directory
+from tests.api.builders import TenantBuilder, reset_ids
+from tests.api.doubles import FakeTenantDirectory
 
 
 @pytest.fixture(autouse=True)
@@ -31,10 +34,28 @@ def test_environment(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
-    """HTTP client against the application, without starting a server or the lifespan."""
-    transport = ASGITransport(app=create_app())
-    async with AsyncClient(transport=transport, base_url="http://tests") as client:
+def tenants() -> FakeTenantDirectory:
+    """The catalog the application is given: acme and ecomoda active, and initech suspended."""
+    return FakeTenantDirectory(
+        TenantBuilder().build(),
+        TenantBuilder().ecomoda().build(),
+        TenantBuilder().with_slug("initech").named("Initech").suspended().build(),
+    )
+
+
+@pytest.fixture
+def app(tenants: FakeTenantDirectory) -> FastAPI:
+    """The application with its real wiring, given the catalog of ``tenants``."""
+    application = create_app()
+    application.dependency_overrides[get_tenant_directory] = lambda: tenants
+    return application
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncClient:
+    """HTTP client against the real wiring of the application, without starting a server or
+    the lifespan and without a tenant header: each test names the tenant it is about."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://tests") as client:
         yield client
 
 

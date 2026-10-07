@@ -5,7 +5,6 @@ what authorizes them. Nothing here is cached (it carries tokens and passwords).
 """
 
 from fastapi import APIRouter, Depends, Response, status
-from fastapi.responses import JSONResponse
 
 from agilina_api.identity.application.commands.activate_account import (
     ActivateAccount,
@@ -25,6 +24,7 @@ from agilina_api.identity.presentation.http.dependencies import (
     get_invitation_status_handler,
     get_request_new_invitation_handler,
 )
+from agilina_api.identity.presentation.http.errors import IdentityErrors
 from agilina_api.identity.presentation.http.presenters import present_activated, present_status
 from agilina_api.identity.presentation.http.schemas import (
     ActivatedAccountResponse,
@@ -33,7 +33,8 @@ from agilina_api.identity.presentation.http.schemas import (
     RequestedResponse,
     TokenRequest,
 )
-from agilina_api.shared.presentation.http.errors import ErrorResponse, error_response
+from agilina_api.shared.presentation.http.api_error import ApiException, SharedErrors
+from agilina_api.shared.presentation.http.error_schema import errors_of
 
 
 def _no_store(response: Response) -> None:
@@ -45,29 +46,34 @@ router = APIRouter(
 )
 
 GONE = {
-    InvitationStatus.ACCEPTED: "invitation_used",
-    InvitationStatus.EXPIRED: "invitation_expired",
-    InvitationStatus.REVOKED: "invitation_revoked",
+    InvitationStatus.ACCEPTED: IdentityErrors.INVITATION_USED,
+    InvitationStatus.EXPIRED: IdentityErrors.INVITATION_EXPIRED,
+    InvitationStatus.REVOKED: IdentityErrors.INVITATION_REVOKED,
 }
+
+TENANT = (SharedErrors.TENANT_REQUIRED, SharedErrors.TENANT_NOT_FOUND)
+LINK_GONE = (
+    IdentityErrors.INVITATION_USED,
+    IdentityErrors.INVITATION_EXPIRED,
+    IdentityErrors.INVITATION_REVOKED,
+)
 
 
 @router.post(
     "/status",
     response_model=InvitationStatusResponse,
     summary="What the activation page shows about a link",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        410: {"model": ErrorResponse, "description": "The link was used, expired or revoked"},
-    },
+    responses=errors_of(
+        *TENANT, SharedErrors.VALIDATION, IdentityErrors.INVITATION_NOT_FOUND, *LINK_GONE
+    ),
 )
 async def invitation_status(
     request: TokenRequest,
     handler: GetInvitationStatusHandler = Depends(get_invitation_status_handler),
-) -> InvitationStatusResponse | JSONResponse:
+) -> InvitationStatusResponse:
     view = await handler.handle(GetInvitationStatus(token=request.token))
     if view.status is not InvitationStatus.PENDING:
-        code = GONE[view.status]
-        return error_response(status.HTTP_410_GONE, code, code.replace("_", " "))
+        raise ApiException(GONE[view.status])
     return present_status(view)
 
 
@@ -76,23 +82,23 @@ async def invitation_status(
     response_model=ActivatedAccountResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Choose a password and activate the account",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        409: {"model": ErrorResponse, "description": "That email already has an account"},
-        410: {"model": ErrorResponse, "description": "The link was used, expired or revoked"},
-        422: {
-            "model": ErrorResponse,
-            "description": "The password does not match or breaks the policy",
-        },
-        503: {"model": ErrorResponse, "description": "The identity provider is unavailable"},
-    },
+    responses=errors_of(
+        *TENANT,
+        SharedErrors.VALIDATION,
+        IdentityErrors.INVITATION_NOT_FOUND,
+        IdentityErrors.ACCOUNT_ALREADY_EXISTS,
+        *LINK_GONE,
+        IdentityErrors.PASSWORD_MISMATCH,
+        IdentityErrors.PASSWORD_POLICY,
+        IdentityErrors.IDENTITY_PROVIDER_UNAVAILABLE,
+    ),
 )
 async def activate_account(
     request: ActivateRequest,
     handler: ActivateAccountHandler = Depends(get_activate_account_handler),
-) -> ActivatedAccountResponse | JSONResponse:
+) -> ActivatedAccountResponse:
     if request.password != request.confirmation:
-        return error_response(422, "password_mismatch", "password mismatch")
+        raise ApiException(IdentityErrors.PASSWORD_MISMATCH)
     account = await handler.handle(ActivateAccount(token=request.token, password=request.password))
     return present_activated(account)
 
@@ -102,11 +108,14 @@ async def activate_account(
     response_model=RequestedResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Ask the team's admins for a new invitation",
-    responses={
-        404: {"model": ErrorResponse, "description": "The link was altered or never existed"},
-        409: {"model": ErrorResponse, "description": "The link still works, or nobody can be told"},
-        502: {"model": ErrorResponse, "description": "The email could not be sent"},
-    },
+    responses=errors_of(
+        *TENANT,
+        SharedErrors.VALIDATION,
+        IdentityErrors.INVITATION_NOT_FOUND,
+        IdentityErrors.INVITATION_STILL_VALID,
+        IdentityErrors.NO_ADMINS_TO_NOTIFY,
+        SharedErrors.MAIL_UNAVAILABLE,
+    ),
 )
 async def request_new_invitation(
     request: TokenRequest,

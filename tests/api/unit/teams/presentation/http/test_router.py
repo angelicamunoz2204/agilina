@@ -133,7 +133,7 @@ async def test_a_blank_name_answers_422_invalid_team_name(api, name):
     response = await api.request("POST", "", TOKEN_BRUNO, json={"name": name})
 
     assert response.status_code == 422
-    assert response.json() == {"code": "invalid_team_name", "detail": "invalid team name"}
+    assert response.json()["error"]["code"] == "invalid_team_name"
     assert response.headers["cache-control"] == "no-store"
     assert api.uow.teams.teams == {} and api.uow.committed is False
 
@@ -141,7 +141,7 @@ async def test_a_blank_name_answers_422_invalid_team_name(api, name):
 async def test_a_name_longer_than_80_answers_422_invalid_team_name(api):
     response = await api.request("POST", "", TOKEN_BRUNO, json={"name": "x" * 81})
 
-    assert response.status_code == 422 and response.json()["code"] == "invalid_team_name"
+    assert response.status_code == 422 and response.json()["error"]["code"] == "invalid_team_name"
     assert api.uow.teams.teams == {}
 
 
@@ -195,14 +195,14 @@ async def test_a_non_member_gets_403_when_reading_a_team(api):
     response = await api.request("GET", f"/{api.atlas}", TOKEN_BRUNO)
 
     assert response.status_code == 403
-    assert response.json() == {"code": "not_a_team_member", "detail": "not a team member"}
+    assert response.json()["error"]["code"] == "not_a_team_member"
     assert "Atlas" not in response.text
 
 
 async def test_a_team_that_does_not_exist_answers_403_like_a_foreign_one(api):
     response = await api.request("GET", f"/{next_id()}", TOKEN_ANA)
 
-    assert response.status_code == 403 and response.json()["code"] == "not_a_team_member"
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
 
 
 async def test_a_member_of_a_team_that_vanished_gets_404_team_not_found(api):
@@ -211,7 +211,7 @@ async def test_a_member_of_a_team_that_vanished_gets_404_team_not_found(api):
 
     response = await api.request("GET", f"/{api.atlas}", TOKEN_ANA)
 
-    assert response.status_code == 404 and response.json()["code"] == "team_not_found"
+    assert response.status_code == 404 and response.json()["error"]["code"] == "team_not_found"
 
 
 async def test_a_malformed_team_id_answers_422(api):
@@ -229,7 +229,7 @@ async def test_without_a_token_the_team_routes_answer_401(api, method, path, kwa
     response = await api.request(method, path.format(atlas=api.atlas), **kwargs)
 
     assert response.status_code == 401
-    assert response.json()["code"] == "not_authenticated"
+    assert response.json()["error"]["code"] == "not_authenticated"
     assert response.headers["www-authenticate"] == "Bearer"
     assert api.uow.teams.teams == {}
 
@@ -238,7 +238,7 @@ async def test_without_a_token_the_team_routes_answer_401(api, method, path, kwa
 async def test_an_invalid_token_answers_401(api, method, path, kwargs):
     response = await api.request(method, path.format(atlas=api.atlas), "forged-token", **kwargs)
 
-    assert response.status_code == 401 and response.json()["code"] == "not_authenticated"
+    assert response.status_code == 401 and response.json()["error"]["code"] == "not_authenticated"
     assert api.uow.teams.teams == {}
 
 
@@ -272,4 +272,4 @@ async def test_the_openapi_documents_support_and_en_as_defaults_and_the_401_422_
     assert "`en`" in team["language"]["description"]
 
     assert spec["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
-    assert "ErrorResponse" in spec["components"]["schemas"]
+    assert "ErrorEnvelope" in spec["components"]["schemas"]

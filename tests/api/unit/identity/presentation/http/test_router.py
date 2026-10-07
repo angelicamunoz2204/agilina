@@ -104,7 +104,7 @@ async def test_a_used_link_is_gone_with_its_own_code(api):
 
     response = await post(api, "status", token=TOKEN)
 
-    assert response.status_code == 410 and response.json()["code"] == "invitation_used"
+    assert response.status_code == 410 and response.json()["error"]["code"] == "invitation_used"
 
 
 async def test_an_expired_link_is_gone_with_its_own_code(api):
@@ -112,7 +112,7 @@ async def test_an_expired_link_is_gone_with_its_own_code(api):
 
     response = await post(api, "status", token=TOKEN)
 
-    assert response.status_code == 410 and response.json()["code"] == "invitation_expired"
+    assert response.status_code == 410 and response.json()["error"]["code"] == "invitation_expired"
 
 
 @pytest.mark.parametrize("token", ["", "short", "Z" * 43, "x" * 300])
@@ -121,7 +121,7 @@ async def test_an_altered_or_unknown_link_is_not_found(api, token):
 
     assert response.status_code in (404, 422)  # 422: too long for the schema, still not a link
     if response.status_code == 404:
-        assert response.json()["code"] == "invitation_not_found"
+        assert response.json()["error"]["code"] == "invitation_not_found"
 
 
 # -------------------------------------------------------------------- activate --
@@ -143,7 +143,7 @@ async def test_a_confirmation_that_does_not_match_is_refused_before_anything_is_
         api, "activate", token=TOKEN, password=PASSWORD, confirmation="something else"
     )
 
-    assert response.status_code == 422 and response.json()["code"] == "password_mismatch"
+    assert response.status_code == 422 and response.json()["error"]["code"] == "password_mismatch"
     assert api.provider.created == []
 
 
@@ -153,11 +153,8 @@ async def test_a_password_the_policy_refuses_says_why_and_the_link_stays_valid(a
     response = await post(api, "activate", token=TOKEN, password="short", confirmation="short")
 
     assert response.status_code == 422
-    assert response.json() == {
-        "code": "password_policy",
-        "detail": "password policy",
-        "reasons": ["min_length"],
-    }
+    assert response.json()["error"]["code"] == "password_policy"
+    assert response.json()["error"]["details"] == {"reasons": ["min_length"]}
     assert (await post(api, "status", token=TOKEN)).status_code == 200
 
 
@@ -166,7 +163,7 @@ async def test_a_link_cannot_be_activated_twice(api):
 
     response = await post(api, "activate", token=TOKEN, password=PASSWORD, confirmation=PASSWORD)
 
-    assert response.status_code == 410 and response.json()["code"] == "invitation_used"
+    assert response.status_code == 410 and response.json()["error"]["code"] == "invitation_used"
     assert len(api.provider.created) == 1
 
 
@@ -175,13 +172,15 @@ async def test_an_expired_link_cannot_be_activated(api):
 
     response = await post(api, "activate", token=TOKEN, password=PASSWORD, confirmation=PASSWORD)
 
-    assert response.status_code == 410 and response.json()["code"] == "invitation_expired"
+    assert response.status_code == 410 and response.json()["error"]["code"] == "invitation_expired"
 
 
 async def test_an_unknown_link_cannot_be_activated(api):
     response = await post(api, "activate", token="Z" * 43, password=PASSWORD, confirmation=PASSWORD)
 
-    assert response.status_code == 404 and response.json()["code"] == "invitation_not_found"
+    assert (
+        response.status_code == 404 and response.json()["error"]["code"] == "invitation_not_found"
+    )
 
 
 async def test_an_email_that_already_has_an_account_is_a_conflict(api):
@@ -189,7 +188,9 @@ async def test_an_email_that_already_has_an_account_is_a_conflict(api):
 
     response = await post(api, "activate", token=TOKEN, password=PASSWORD, confirmation=PASSWORD)
 
-    assert response.status_code == 409 and response.json()["code"] == "account_already_exists"
+    assert (
+        response.status_code == 409 and response.json()["error"]["code"] == "account_already_exists"
+    )
 
 
 async def test_when_keycloak_is_down_the_answer_says_so(api):
@@ -198,7 +199,8 @@ async def test_when_keycloak_is_down_the_answer_says_so(api):
     response = await post(api, "activate", token=TOKEN, password=PASSWORD, confirmation=PASSWORD)
 
     assert (
-        response.status_code == 503 and response.json()["code"] == "identity_provider_unavailable"
+        response.status_code == 503
+        and response.json()["error"]["code"] == "identity_provider_unavailable"
     )
 
 
@@ -229,7 +231,9 @@ async def test_asking_for_a_new_invitation_tells_the_admins(api):
 async def test_there_is_nothing_to_request_while_the_link_works(api):
     response = await post(api, "request-new", token=TOKEN)
 
-    assert response.status_code == 409 and response.json()["code"] == "invitation_still_valid"
+    assert (
+        response.status_code == 409 and response.json()["error"]["code"] == "invitation_still_valid"
+    )
     assert api.mailer.sent == []
 
 
@@ -245,7 +249,7 @@ async def test_if_the_admins_cannot_be_emailed_the_answer_says_so(api):
 
     response = await post(api, "request-new", token=TOKEN)
 
-    assert response.status_code == 502 and response.json()["code"] == "mail_unavailable"
+    assert response.status_code == 502 and response.json()["error"]["code"] == "mail_unavailable"
 
 
 # ---------------------------------------------------------------------- contract --
@@ -260,4 +264,4 @@ async def test_the_specification_documents_the_three_operations_and_their_errors
     }.items():
         operation = spec["paths"][path]["post"]
         assert errors <= set(operation["responses"]), path
-    assert "ErrorResponse" in spec["components"]["schemas"]
+    assert "ErrorEnvelope" in spec["components"]["schemas"]

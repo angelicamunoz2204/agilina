@@ -1,14 +1,19 @@
-"""The composition root builds the whole object graph without connecting to anything."""
+"""The composition root builds the whole object graph of a tenant without connecting to anything."""
 
 from agilina_api.bootstrap.container import build_container
 from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
     KeycloakAuthenticatedUsers,
 )
 from agilina_api.shared.infrastructure.settings import get_settings
+from tests.api.builders import TenantBuilder
+
+
+def _container(tenant_slug: str = "acme"):
+    return build_container(get_settings(), TenantBuilder().with_slug(tenant_slug).build())
 
 
 def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
-    container = build_container(get_settings())
+    container = _container()
 
     assert container.activate_account is not None
     assert container.issue_invitation is not None
@@ -20,31 +25,62 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.get_team is not None
 
 
-def test_the_tokens_are_validated_against_the_realm_by_its_public_url(monkeypatch):
+def test_the_graph_belongs_to_one_tenant_and_uses_its_own_database():
+    container = _container("ecomoda")
+
+    assert container.tenant.slug == "ecomoda"
+    assert container.engine.url.database == "agilina_ecomoda"
+
+
+def test_two_tenants_do_not_share_a_database_or_a_realm():
+    acme, ecomoda = _container("acme"), _container("ecomoda")
+
+    assert acme.engine is not ecomoda.engine
+    assert acme.engine.url.database != ecomoda.engine.url.database
+    assert acme.access_token_verifier is not ecomoda.access_token_verifier
+    assert acme.identity_provider is not ecomoda.identity_provider
+
+
+def test_the_tokens_are_validated_against_the_realm_of_the_tenant_by_its_public_url(monkeypatch):
     monkeypatch.setenv("AGILINA_KEYCLOAK_URL", "http://keycloak:8080")
     monkeypatch.setenv("AGILINA_KEYCLOAK_PUBLIC_URL", "http://localhost:8080/")
     get_settings.cache_clear()
 
-    container = build_container(get_settings())
+    container = _container("ecomoda")
 
     assert isinstance(container.authenticated_users, KeycloakAuthenticatedUsers)
     verifier = container.access_token_verifier
     # The issuer a token carries is the public one; the keys are read through the internal one.
-    assert verifier._issuer == "http://localhost:8080/realms/agilina"  # noqa: SLF001
+    assert verifier._issuer == "http://localhost:8080/realms/agilina-ecomoda"  # noqa: SLF001
     assert verifier._audience == "agilina-api"  # noqa: SLF001
     assert verifier._jwks_url == (  # noqa: SLF001
-        "http://keycloak:8080/realms/agilina/protocol/openid-connect/certs"
+        "http://keycloak:8080/realms/agilina-ecomoda/protocol/openid-connect/certs"
     )
 
 
+def test_the_api_client_uses_the_secret_of_its_tenant(monkeypatch):
+    monkeypatch.setenv("AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET", "acme-secret")
+    monkeypatch.setenv("AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET", "ecomoda-secret")
+
+    assert _container("acme").identity_provider._client_secret == "acme-secret"  # noqa: SLF001
+    assert _container("ecomoda").identity_provider._client_secret == "ecomoda-secret"  # noqa: SLF001
+
+
+def test_the_invitation_link_names_the_tenant():
+    # The link of the email: the web needs the tenant to know which login to open.
+    container = _container("ecomoda")
+
+    assert container.issue_invitation._activation_url.endswith("/ecomoda/activate")  # noqa: SLF001
+
+
 def test_the_membership_is_checked_against_the_stored_teams():
-    container = build_container(get_settings())
+    container = _container()
 
     assert container.team_access is container.team_queries
 
 
-async def test_closing_the_container_closes_the_keycloak_client():
-    container = build_container(get_settings())
+async def test_closing_the_container_closes_what_it_opened():
+    container = _container()
 
     await container.aclose()
 
