@@ -18,6 +18,15 @@ export const KEYCLOAK_CLIENT = new InjectionToken<KeycloakClient>('KEYCLOAK_CLIE
 const MIN_TOKEN_VALIDITY_SECONDS = 30;
 
 /**
+ * Whether the fragment of the address is Keycloak's answer to a sign-in (`#state=…&code=…`,
+ * or `#state=…&error=…`). The activation link (`#t=…`) is not.
+ */
+export function isSignInAnswer(fragment: string): boolean {
+  const params = new URLSearchParams(fragment.replace(/^#/, ''));
+  return params.has('state') && (params.has('code') || params.has('error'));
+}
+
+/**
  * Keycloak adapter of the session (authorization code flow with PKCE, which the realm's
  * `agilina-web` client requires). The tokens live in memory only: never in localStorage.
  */
@@ -59,6 +68,19 @@ export class KeycloakAuthSession implements AuthSession {
   async signIn(options: SignInOptions = {}): Promise<void> {
     await this.start();
     await this.redirectToSignIn(options);
+  }
+
+  /**
+   * Reads Keycloak's answer to a sign-in that has just come back, when the address carries
+   * one, so that it happens before the router reads the address (provide-auth.ts runs it while
+   * the application starts). keycloak-js takes the answer out of the address; read later, from
+   * the guard, the router would write the address it started with back, answer included.
+   * Without an answer it does nothing: the public screens never start keycloak-js.
+   */
+  async readSignInAnswer(): Promise<void> {
+    if (isSignInAnswer(this.document.location.hash)) {
+      await this.start();
+    }
   }
 
   /**

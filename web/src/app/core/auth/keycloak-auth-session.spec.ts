@@ -4,7 +4,12 @@ import { TranslocoService } from '@jsverse/transloco';
 
 import { provideTestI18n } from '@testing/i18n';
 
-import { KEYCLOAK_CLIENT, KeycloakAuthSession, type KeycloakClient } from './keycloak-auth-session';
+import {
+  isSignInAnswer,
+  KEYCLOAK_CLIENT,
+  KeycloakAuthSession,
+  type KeycloakClient,
+} from './keycloak-auth-session';
 
 /** keycloak-js double: records what the adapter asks of it. */
 class FakeKeycloak {
@@ -44,7 +49,9 @@ describe('KeycloakAuthSession', () => {
         { provide: KEYCLOAK_CLIENT, useValue: keycloak as unknown as KeycloakClient },
         {
           provide: DOCUMENT,
-          useValue: { location: { href: 'http://app.test/teams/a', origin: 'http://app.test' } },
+          useValue: {
+            location: { href: 'http://app.test/teams/a', origin: 'http://app.test', hash: '' },
+          },
         },
       ],
     });
@@ -61,6 +68,57 @@ describe('KeycloakAuthSession', () => {
 
   it('is not signed in until something has asked', () => {
     expect(session.authenticated()).toBeFalse();
+  });
+
+  describe('readSignInAnswer', () => {
+    function arriveWith(hash: string): void {
+      (TestBed.inject(DOCUMENT).location as { hash: string }).hash = hash;
+    }
+
+    it("reads Keycloak's answer right away when the address carries one", async () => {
+      keycloak.authenticated = true;
+      arriveWith('#state=s-1&session_state=x&iss=http%3A%2F%2Fkc&code=c-1');
+
+      await session.readSignInAnswer();
+
+      expect(keycloak.inits).toEqual([{ pkceMethod: 'S256', checkLoginIframe: false }]);
+      expect(session.authenticated()).toBeTrue();
+    });
+
+    it('starts keycloak-js only once: the guard that asks later reuses that start', async () => {
+      keycloak.authenticated = true;
+      arriveWith('#state=s-1&code=c-1');
+
+      await session.readSignInAnswer();
+      expect(await session.ensureSignedIn('/teams/a')).toBeTrue();
+
+      expect(keycloak.inits.length).toBe(1);
+      expect(keycloak.logins).toEqual([]);
+    });
+
+    it('does nothing on a page without an answer, such as the activation link', async () => {
+      arriveWith('#t=activation-token');
+      await session.readSignInAnswer();
+      arriveWith('');
+      await session.readSignInAnswer();
+
+      expect(keycloak.inits).toEqual([]);
+    });
+  });
+
+  describe('isSignInAnswer', () => {
+    it('recognises a code or an error that comes with its state', () => {
+      expect(isSignInAnswer('#state=s&code=c')).toBeTrue();
+      expect(isSignInAnswer('#state=s&error=access_denied')).toBeTrue();
+      expect(isSignInAnswer('state=s&code=c')).toBeTrue();
+    });
+
+    it('ignores anything else', () => {
+      expect(isSignInAnswer('')).toBeFalse();
+      expect(isSignInAnswer('#t=token')).toBeFalse();
+      expect(isSignInAnswer('#code=c')).toBeFalse();
+      expect(isSignInAnswer('#state=s')).toBeFalse();
+    });
   });
 
   describe('ensureSignedIn', () => {

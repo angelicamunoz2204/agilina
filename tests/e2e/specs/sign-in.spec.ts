@@ -99,8 +99,10 @@ test('a page opened without a session asks to sign in and comes back to it', asy
   await expect(page).toHaveURL(KEYCLOAK_LOGIN);
   await signInOnKeycloak(page, PASSWORD);
 
-  await expect(page).toHaveURL(teamUrl);
   await expect(page.getByRole('heading', { name: TEAM })).toBeVisible();
+  // Read once the team shows, not polled: Keycloak's answer (#state=…&code=…) must not come
+  // back to the address bar after a first moment without it.
+  expect(page.url()).toBe(teamUrl);
   await context.close();
 });
 
