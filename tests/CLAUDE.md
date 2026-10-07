@@ -1,6 +1,6 @@
 ## Para agentes que escriben pruebas de Python
 
-Estas son las pruebas de `api/`, `agent/`, `stt/` y `shared/`. La guía práctica es
+Estas son las pruebas de `api/`, `agent/`, `stt/` y `shared/`, y las de punta a punta (`tests/e2e`, Playwright, `make test-e2e`). La guía práctica es
 [docs/testing.md](../docs/testing.md) y la decisión, [AD-25](../docs/adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 Si algo no está decidido ahí, **pregunta antes de decidir**. Las pruebas de la web no están
 aquí: viven junto a su código, en `web/src`, y se rigen por [web/CLAUDE.md](../web/CLAUDE.md).

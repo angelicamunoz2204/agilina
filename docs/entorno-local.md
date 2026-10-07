@@ -212,7 +212,50 @@ no se puede aceptar ninguno.
 5. Para ver el aislamiento, invita y activa a otra persona en otro equipo: si pide
    `GET /v1/teams/<id de Atlas>` con su token, recibe `403 not_a_team_member`.
 
-Los pasos 1 a 3 ya funcionan hoy (son de HU-02). Solo el 4 y el 5 esperan el login.
+Los cinco pasos funcionan hoy (HU-02, HU-05 y HU-03). El login lo ves en «Iniciar sesión».
+
+### Iniciar sesión (HU-03)
+
+La web lleva al login de **Keycloak** (<http://localhost:8080>), con su tema propio y el correo ya
+escrito si vienes de la activación. La contraseña solo la ve Keycloak: nunca la web ni la API. Entra
+cualquier persona activada:
+
+- <http://localhost:4200/> manda a iniciar sesión (o, con sesión, a tus equipos; con un solo equipo,
+  directo a él).
+- Una página que pide sesión (por ejemplo `/teams/<id>`) te lleva a iniciar sesión y te devuelve a
+  ella.
+- Un correo o una contraseña incorrectos dan **el mismo mensaje**, exista o no el correo, y tras
+  varios intentos fallidos Keycloak bloquea la cuenta un rato.
+- El idioma de la página de login es el de la web (el del navegador).
+- Son públicas, sin sesión: `/activate` (el enlace de la invitación) y `/status`.
+
+La API valida el token de Keycloak en cada petición protegida (firma, emisor, audiencia y vigencia) y
+responde `401 not_authenticated` si no sirve. Para probarla con un token real, ver `make test-keycloak`.
+
+Tras un cambio del realm hay que correr `make keycloak-reset`, **que borra los usuarios de Keycloak
+de desarrollo**: las cuentas activadas antes quedan sin su usuario en Keycloak y hay que volver a
+invitar con `make invite`.
+
+#### El tema del login
+
+El aspecto de esa página está en `infra/keycloak/themes/agilina/login/` (plantillas FreeMarker con
+clases de Tailwind y los textos en `messages_es.properties` / `messages_en.properties`). Usa los mismos
+tokens de diseño que la web (`web/src/tokens.css`) y se compila al construir la imagen de Keycloak
+(`infra/docker/keycloak.Dockerfile`). Tras cambiarlo:
+
+```bash
+make keycloak-theme    # reconstruye la imagen y reinicia solo Keycloak (conserva sus datos)
+```
+
+#### Pruebas de punta a punta
+
+```bash
+make up           # el entorno tiene que estar levantado
+make test-e2e     # invita a una persona nueva y recorre, en un navegador real (Playwright), invitar →
+                  # activar → iniciar sesión → entrar al equipo → volver a la página pedida
+```
+
+Corren en un contenedor sobre la red del anfitrión (Linux), con el entorno de `make up`.
 
 ### El usuario de desarrollo
 
@@ -375,7 +418,9 @@ make migration m="crear tabla equipos"   # migración vacía de Alembic: se escr
 make test           # pruebas de Python, de integración (PostgreSQL real) y de la web
 make test-integration   # solo las de integración: levanta Postgres y usa una base temporal
 make test-keycloak      # pruebas contra el Keycloak real (levanta Keycloak y lo espera)
-make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos)
+make test-e2e           # pruebas de punta a punta en un navegador real (con el entorno levantado)
+make keycloak-reset     # reimporta el realm de Keycloak (borra solo sus datos y sus usuarios)
+make keycloak-theme     # reconstruye el tema de login de Keycloak y reinicia solo Keycloak
 make invite team=… email=… name=…   # crea un equipo e invita a su primer administrador
 make lint           # ruff y ESLint
 make format         # ruff format y Prettier (la web)

@@ -3,8 +3,13 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, type Observable } from 'rxjs';
 
+import { InvitationPort } from '@features/identity/application/invitation.port';
+import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
+import { HealthPort } from '@features/status/application/health.port';
 import { TeamsPort } from '@features/teams/application/teams.port';
 import { type Team } from '@features/teams/domain/team';
+import { FakeAuthSession, provideFakeAuthSession } from '@testing/auth';
+import { provideFakeLogger } from '@testing/fake-logger';
 import { provideTestI18n } from '@testing/i18n';
 
 import { routes } from './app.routes';
@@ -29,15 +34,18 @@ class SilentTeamsPort extends TeamsPort {
 
 describe('routes', () => {
   let port: SilentTeamsPort;
+  let session: FakeAuthSession;
   let harness: RouterTestingHarness;
 
   beforeEach(async () => {
     port = new SilentTeamsPort();
+    session = new FakeAuthSession(true);
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
         provideRouter(routes, withComponentInputBinding()),
         { provide: TeamsPort, useValue: port },
+        provideFakeAuthSession(session),
       ],
     });
     harness = await RouterTestingHarness.create();
@@ -66,5 +74,72 @@ describe('routes', () => {
 
     expect(port.requested).toEqual(['team-1']);
     expect(TestBed.inject(Router).url).toBe('/teams/team-1');
+  });
+
+  it('sends a signed-in person from the entrance to their teams', async () => {
+    await harness.navigateByUrl('/');
+
+    expect(TestBed.inject(Router).url).toBe('/teams');
+  });
+
+  it('asks a person who is not signed in to sign in from the entrance, to land on their teams', async () => {
+    session = new FakeAuthSession(false);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideTestI18n(),
+        provideRouter(routes, withComponentInputBinding()),
+        { provide: TeamsPort, useValue: port },
+        provideFakeAuthSession(session),
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/');
+
+    expect(session.ensured).toEqual(['/teams']);
+    expect(TestBed.inject(Router).url).not.toBe('/teams');
+  });
+
+  it('asks the routes of the teams for a session, and remembers the page asked for', async () => {
+    session = new FakeAuthSession(false);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideTestI18n(),
+        provideRouter(routes, withComponentInputBinding()),
+        { provide: TeamsPort, useValue: port },
+        provideFakeAuthSession(session),
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/teams/team-9');
+
+    expect(session.ensured).toEqual(['/teams/team-9']);
+    expect(port.requested).toEqual([]);
+  });
+
+  it('keeps the activation and the status public: they never ask for a session', async () => {
+    session = new FakeAuthSession(false);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideTestI18n(),
+        provideRouter(routes, withComponentInputBinding()),
+        { provide: TeamsPort, useValue: port },
+        { provide: InvitationPort, useValue: { status: () => NEVER } },
+        { provide: LoginRedirectPort, useValue: {} },
+        { provide: HealthPort, useValue: { check: () => NEVER } },
+        provideFakeLogger(),
+        provideFakeAuthSession(session),
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/activate');
+    await harness.navigateByUrl('/status');
+
+    expect(session.ensured).toEqual([]);
   });
 });

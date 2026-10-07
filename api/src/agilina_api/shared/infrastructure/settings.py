@@ -54,6 +54,10 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------ keycloak --
     keycloak_url: str = "http://localhost:8080"
+    keycloak_public_url: str = "http://localhost:8080"
+    """The URL the browser reaches Keycloak at: the issuer of every token it signs. It can
+    differ from ``keycloak_url``, which is the one the API itself uses (inside Compose,
+    ``http://keycloak:8080``)."""
     keycloak_realm: str = "agilina"
     keycloak_web_client: str = "agilina-web"
     keycloak_worker_client: str = "agilina-worker"

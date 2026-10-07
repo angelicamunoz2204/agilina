@@ -21,6 +21,12 @@ export class TeamSelectorFacade {
   readonly teams = computed<readonly Team[] | null>(() =>
     this.mine.hasValue() ? this.mine.value() : null,
   );
+  /** The team to enter straight away: when the user belongs to exactly one there is nothing to
+   * choose (HU-03). Null while the list is loading, and with none or several teams. */
+  readonly onlyTeam = computed<Team | null>(() => {
+    const teams = this.teams();
+    return teams?.length === 1 ? (teams[0] ?? null) : null;
+  });
   readonly loading = this.mine.isLoading;
   readonly failed = computed(() => this.mine.status() === 'error');
   /** What went wrong, when the list could not be loaded. */

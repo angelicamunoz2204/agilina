@@ -1,0 +1,33 @@
+/* Entry of the Agilina login theme's stylesheet. It is compiled with the Tailwind CLI when
+   the Keycloak image is built (infra/docker/keycloak.Dockerfile), from the same tokens as the
+   web (web/src/tokens.css), so the login and the application cannot drift apart. The output
+   is css/agilina.css of the theme: it is not versioned. */
+@import 'tailwindcss';
+@import './src/tokens.css';
+
+/* The classes the templates use are found in them. */
+@source "../infra/keycloak/themes/agilina/login";
+
+/* Self-hosted fonts, copied next to the stylesheet at build time: no request leaves Keycloak. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('../fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@layer base {
+  html,
+  body {
+    @apply min-h-full bg-background font-sans text-foreground antialiased;
+  }
+}

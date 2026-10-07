@@ -1,0 +1,13 @@
+{
+  "name": "agilina-e2e",
+  "version": "0.1.0",
+  "description": "Pruebas de punta a punta de Agilina en un navegador real",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.0.0"
+  }
+}
