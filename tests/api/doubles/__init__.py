@@ -12,6 +12,7 @@ from tests.api.doubles.identity import (
     InMemoryInvitationRepository,
     InMemoryUserRepository,
 )
+from tests.api.doubles.keycloak import JWKS_URL, FakeRealmKeys
 from tests.api.doubles.mail import FakeMailer, FakeRenderer
 from tests.api.doubles.teams import (
     FakeActiveSprints,
@@ -24,12 +25,14 @@ from tests.api.doubles.teams import (
 __all__ = [
     "FakeActiveSprints",
     "FakeAuthenticatedUsers",
+    "JWKS_URL",
     "FakeClock",
     "FakeIdentityProvider",
     "FakeIdentityUnitOfWork",
     "FakeInvitationQueries",
     "FakeMailer",
     "FakeMemberContacts",
+    "FakeRealmKeys",
     "FakeRenderer",
     "FakeTeamAccess",
     "FakeTeamContactsDirectory",

@@ -109,8 +109,22 @@ describe('TeamSelectorPage', () => {
     expect(create?.getAttribute('href')).toBe('/teams/new');
   });
 
+  it('goes straight into the only team: there is nothing to choose', async () => {
+    port.known = [{ id: 'a', name: 'Atlas', role: 'admin' }];
+
+    await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
+
+    expect(TestBed.inject(Router).url).toBe('/teams/a');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('Atlas');
+  });
+
   it('always offers to create a team', async () => {
-    const page = await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
+    const page = await open(
+      of([
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'member' },
+      ]),
+    );
 
     expect(page.querySelector('a[href="/teams/new"]')?.getAttribute('href')).toBe('/teams/new');
   });
@@ -126,7 +140,12 @@ describe('TeamSelectorPage', () => {
   });
 
   it('does not show the role of the user in each team', async () => {
-    const page = await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
+    const page = await open(
+      of([
+        { id: 'a', name: 'Atlas', role: 'admin' },
+        { id: 'b', name: 'Boreal', role: 'member' },
+      ]),
+    );
 
     expect(page.textContent).not.toMatch(/admin|member|miembro/i);
   });

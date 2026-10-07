@@ -94,7 +94,7 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | Contexto | Responsabilidad | Estado |
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
-| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas: en el servidor, dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; en la web, la pantalla `/activate`. HU-06 agrega la invitación de un Administrador a su equipo (`InviteToTeam`, `POST /v1/teams/{team_id}/invitations`): a un correo sin cuenta le llega el enlace de activación y una cuenta existente entra directo al equipo con un aviso; invitar de nuevo revoca la invitación pendiente (`Invitation.revoke`), también en `make invite`. HU-03 y HU-04 después |
+| `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas: en el servidor, dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; en la web, la pantalla `/activate`; el inicio de sesión (HU-03: validación del token de Keycloak en la API, `core/auth` y la entrada en la web). HU-06 agrega la invitación de un Administrador a su equipo (`InviteToTeam`, `POST /v1/teams/{team_id}/invitations`): a un correo sin cuenta le llega el enlace de activación y una cuenta existente entra directo al equipo con un aviso; invitar de nuevo revoca la invitación pendiente (`Invitation.revoke`), también en `make invite`. HU-04 después |
 | `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio (con el nombre como objeto de valor `TeamName`; cambio de rol y remoción de un integrante, HU-06, con la regla del último Administrador en el agregado y en `member_rules.py`, que también usa el listado), comandos (`CreateTeam` y `AddTeamMember` de HU-02, `CreateTeamAsAdmin` de HU-05, `ChangeMemberRole` y `RemoveMember` de HU-06), consultas (administradores, `ListMyTeams`, `GetTeam`, la membresía de un usuario y `ListTeamMembers`, que trae nombre y correo de `identity` por el puerto `MemberContactsDirectory`), persistencia (el repositorio bloquea la fila del equipo con `SELECT … FOR UPDATE` al cargarlo) y API HTTP (`/v1/teams`, HU-05; `/v1/teams/{team_id}/members`, HU-06). Del sprint, HU-06 solo crea la tabla `sprint` mínima (equipo, fechas y estado) y una sola consulta «¿hay sprint activo?» (`team_has_active_sprint`, detrás del puerto `ActiveSprints`), que bloquea el cambio de rol y que el listado expone como motivo; lo demás con HU-07… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
@@ -128,7 +128,7 @@ api/
 ├── migrations/                       Alembic; env.py lee la URL de la configuración
 │   └── versions/
 ├── src/agilina_api/
-│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams, en los dos sentidos), authentication.py (el adaptador de tokens, cerrado hasta HU-03) e invite.py (`make invite`)
+│   ├── bootstrap/                    Raíz de composición: app.py (fábrica, lifespan, cableado), container.py (todo cableado a sus adaptadores reales), context_adapters.py (lo que conecta identity con teams, en los dos sentidos) e invite.py (`make invite`)
 │   ├── shared_kernel/                Bloques base del dominio: Entity, AggregateRoot, DomainEvent, DomainError
 │   ├── shared/
 │   │   ├── application/              Consultas de salud, los puertos Clock, UnitOfWork, Mailer y EmailRenderer, y los de acceso (AuthenticatedUsers y TeamAccess)
@@ -302,6 +302,7 @@ en el code review.
 ## Dónde está el porqué
 
 - Cómo se da estilo a la web (Tailwind CSS con los tokens `--agl-*` como tema): [AD-27](adr/0027-dar-estilo-a-la-web-con-tailwind-css.md).
+- Cómo se inicia sesión (página de Keycloak con tema propio, `keycloak-js`, validación del token en la API): [AD-28](adr/0028-iniciar-sesion-con-keycloak.md).
 - Cómo se organizan las pruebas (árbol espejo, *Data Builders*, cobertura del 100 %): [AD-25](adr/0025-organizar-las-pruebas-con-arbol-espejo-builders-y-cobertura-total.md).
 - La decisión de organizar el código así: [AD-21](adr/0021-organizar-el-codigo-en-contextos-y-capas.md).
 - Cómo se envía el correo (SMTP, Mailpit y el proveedor por configuración): [AD-23](adr/0023-enviar-correo-por-smtp-con-mailpit-y-proveedor-configurable.md).

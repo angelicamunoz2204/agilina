@@ -1,4 +1,4 @@
-# Build context of the Python image (the repository root).
+# Build context of the Python and Keycloak images (the repository root).
 # Keep it small: only what the image needs is sent to the Docker daemon.
 .git
 .github
@@ -16,5 +16,8 @@
 coverage.xml
 htmlcov
 docs
-web
-infra
+web/node_modules
+web/dist
+web/.angular
+web/coverage
+web/out-tsc

@@ -1,23 +1,27 @@
 import { type Routes } from '@angular/router';
 
+import { authGuard, entranceGuard } from '@core/auth/auth.guard';
 import { AppShell } from '@layout/app-shell/app-shell';
 import { CenteredLayout } from '@layout/centered-layout/centered-layout';
 
 /**
  * Screen map of the product. Every screen is lazy-loaded and arrives with the story that
  * builds it, inside the layout its mockup asks for: the team selector and its form in the
- * centered frame, the rest under the application header. The root shows the environment
- * status, which proves that the application talks to the API; /activate is the account
- * activation (HU-02).
+ * centered frame, the rest under the application header.
  *
- * No route carries an access rule: the API decides who sees a team. That includes the team
- * settings, which only an admin may open: a guard would hide the API's 403, and the screen
- * shows "no access" with it.
+ * Public screens: /activate (the account activation, HU-02) and /status (the environment
+ * status, which proves that the application talks to the API). The entrance, /, sends the
+ * signed-in to their teams and everybody else to sign in (HU-03). The routes of the teams
+ * need a session: the guard takes the person to sign in and brings them back to the page
+ * they asked for. It is comfort, not security: the API decides who sees a team. That
+ * includes the team settings, which only an admin may open: no guard checks the role, since
+ * it would hide the API's 403, and the screen shows "no access" with it.
  */
 export const routes: Routes = [
   {
     path: 'teams',
     component: CenteredLayout,
+    canActivate: [authGuard],
     children: [
       {
         path: '',
@@ -39,8 +43,14 @@ export const routes: Routes = [
     component: AppShell,
     children: [
       {
+        // Never renders: the guard always sends the person somewhere else.
         path: '',
         pathMatch: 'full',
+        canActivate: [entranceGuard],
+        children: [],
+      },
+      {
+        path: 'status',
         loadComponent: () =>
           import('@features/status/presentation/status-page').then((m) => m.StatusPage),
         title: 'Agilina',
@@ -54,6 +64,7 @@ export const routes: Routes = [
       },
       {
         path: 'teams/:teamId',
+        canActivate: [authGuard],
         loadComponent: () =>
           import('@features/teams/presentation/team-dashboard-page').then(
             (m) => m.TeamDashboardPage,
@@ -63,6 +74,7 @@ export const routes: Routes = [
       {
         // Settings → Team (HU-06): the members of the team, for its admins.
         path: 'teams/:teamId/settings',
+        canActivate: [authGuard],
         loadComponent: () =>
           import('@features/teams/presentation/team-settings-page').then((m) => m.TeamSettingsPage),
         title: 'Agilina',

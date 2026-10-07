@@ -4,10 +4,23 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
-  "resetPasswordAllowed": true,
+  "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "verifyEmail": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "permanentLockout": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "es",
+    "en"
+  ],
+  "defaultLocale": "es",
+  "loginTheme": "agilina",
   "passwordPolicy": "length(12) and notUsername and notEmail",
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 1800,
@@ -33,12 +46,30 @@
       "serviceAccountsEnabled": false,
       "rootUrl": "http://localhost:4200",
       "baseUrl": "/",
-      "redirectUris": ["http://localhost:4200/*"],
-      "webOrigins": ["http://localhost:4200"],
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:4200/*"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-agilina-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "agilina-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "agilina-worker",
@@ -76,14 +107,19 @@
       "username": "service-account-agilina-worker",
       "enabled": true,
       "serviceAccountClientId": "agilina-worker",
-      "realmRoles": ["worker"]
+      "realmRoles": [
+        "worker"
+      ]
     },
     {
       "username": "service-account-agilina-api",
       "enabled": true,
       "serviceAccountClientId": "agilina-api",
       "clientRoles": {
-        "realm-management": ["manage-users", "view-users"]
+        "realm-management": [
+          "manage-users",
+          "view-users"
+        ]
       }
     }
   ],

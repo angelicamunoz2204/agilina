@@ -120,6 +120,14 @@ las plantillas reales cuando la prueba necesita leer lo que recibe la persona.
   un servidor, se simula o va a `integration/`.
 - Todo error corregido deja una prueba que lo habría detectado.
 
+## De punta a punta
+
+`tests/e2e/` (Playwright, Chromium) recorre en un navegador real lo que ninguna otra prueba junta:
+invitar → activar → iniciar sesión → entrar al equipo → volver a la página pedida. Corren contra el
+entorno levantado, en un contenedor sobre la red del anfitrión (`make test-e2e`, que invita a una
+persona nueva por cada ejecución). Son pocas a propósito: cubren los recorridos, no las reglas, que
+siguen en las pruebas de cada capa. Aún no corren en la CI.
+
 ## Comandos
 
 | Quiero… | Comando |
@@ -127,6 +135,7 @@ las plantillas reales cuando la prueba necesita leer lo que recibe la persona.
 | Las pruebas unitarias | `make test-python` |
 | Las de integración (levanta PostgreSQL) | `make test-integration` |
 | Las del adaptador de Keycloak real | `make test-keycloak` |
+| Un recorrido completo en un navegador real | `make test-e2e` (con `make up`) |
 | La cobertura, con el umbral del 100 % | `make coverage` |
 | Todo lo que corre la CI | `make verify` |
 

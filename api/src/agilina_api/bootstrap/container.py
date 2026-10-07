@@ -6,7 +6,6 @@ graph, so they cannot drift apart.
 
 from dataclasses import dataclass
 
-from agilina_api.bootstrap.authentication import ClosedAuthenticatedUsers
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
     TeamsBackedContacts,
@@ -20,6 +19,12 @@ from agilina_api.identity.application.commands.request_new_invitation import (
 )
 from agilina_api.identity.application.queries.get_invitation_status import (
     GetInvitationStatusHandler,
+)
+from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
+    KeycloakAccessTokenVerifier,
+)
+from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
+    KeycloakAuthenticatedUsers,
 )
 from agilina_api.identity.infrastructure.keycloak.identity_provider import KeycloakIdentityProvider
 from agilina_api.identity.infrastructure.persistence.invitation_queries import SqlInvitationQueries
@@ -64,9 +69,11 @@ class Container:
     authenticated_users: AuthenticatedUsers
     team_access: TeamAccess
     identity_provider: KeycloakIdentityProvider
+    access_token_verifier: KeycloakAccessTokenVerifier
 
     async def aclose(self) -> None:
         await self.identity_provider.aclose()
+        await self.access_token_verifier.aclose()
 
 
 def build_container(settings: Settings) -> Container:
@@ -88,6 +95,18 @@ def build_container(settings: Settings) -> Container:
         realm=settings.keycloak_realm,
         client_id=settings.keycloak_api_client,
         client_secret=settings.keycloak_api_secret.get_secret_value(),
+    )
+    realm_url = f"{settings.keycloak_public_url.rstrip('/')}/realms/{settings.keycloak_realm}"
+    access_token_verifier = KeycloakAccessTokenVerifier(
+        # The keys are read through the API's own route to Keycloak, but the issuer a token
+        # carries is the public one.
+        jwks_url=(
+            f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
+            "/protocol/openid-connect/certs"
+        ),
+        issuer=realm_url,
+        audience=settings.keycloak_api_client,
+        clock=clock,
     )
     identity_uow = identity_unit_of_work_factory(session_factory, team_membership_factory(clock))
     teams_uow = teams_unit_of_work_factory(session_factory)
@@ -131,10 +150,10 @@ def build_container(settings: Settings) -> Container:
         change_member_role=ChangeMemberRoleHandler(teams_uow, clock),
         remove_member=RemoveMemberHandler(teams_uow, clock),
         team_queries=team_queries,
-        # TODO(HU-03): the adapter that validates Keycloak access tokens.
-        authenticated_users=ClosedAuthenticatedUsers(),
+        authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),
         # The teams query answers the shared port as it is: the membership is checked
         # against the stored role, never against a claim of the token.
         team_access=team_queries,
         identity_provider=identity_provider,
+        access_token_verifier=access_token_verifier,
     )

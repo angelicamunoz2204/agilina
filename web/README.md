@@ -23,7 +23,7 @@ guía está en [AD-26](../docs/adr/0026-organizar-y-equipar-la-aplicacion-web.md
 | Análisis estático | ESLint con `angular-eslint`, `typescript-eslint` (reglas *type-checked*) e `import-x` |
 | Estilos | Tailwind CSS 4, con tokens `--agl-*` como tema ([AD-27](../docs/adr/0027-dar-estilo-a-la-web-con-tailwind-css.md)) |
 | Formato | Prettier, con el ordenador de clases de Tailwind |
-| Pruebas | Jasmine con Karma sobre Chromium sin interfaz |
+| Pruebas | Jasmine con Karma sobre Chromium sin interfaz; de punta a punta, Playwright en `tests/e2e` (`make test-e2e`) |
 | Ejecución | Todo corre dockerizado: en desarrollo `ng serve`, en producción nginx sin privilegios |
 
 ## Cómo se corre
@@ -92,7 +92,7 @@ web/
         │   ├── http/             Interceptores
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
-        │   └── auth/             Keycloak (llega con la historia de autenticación)
+        │   └── auth/             Sesión: puerto AuthSession, adaptador de keycloak-js, guards e interceptor
         ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
         │                         centered-layout (las pantallas antes de entrar a un equipo)
         ├── shared/               Reutilizable y sin estado (@shared/*)
@@ -261,11 +261,22 @@ Un solo estilo para todos los formularios (el de `/activate`, el de `/teams/new`
 
 ## Autenticación y autorización
 
-- La sesión la resuelve Keycloak (OIDC); la integración vive en `core/auth`
-  y se construye con su historia.
+- La sesión la resuelve Keycloak (OIDC, *authorization code* con PKCE), con la **página de login
+  de Keycloak** y `keycloak-js` directo ([AD-28](../docs/adr/0028-iniciar-sesion-con-keycloak.md)).
+  La integración vive en `core/auth`, detrás del puerto `AuthSession`: nadie más importa
+  `keycloak-js`.
+- La sesión se pide **cuando algo la necesita**, no al arrancar: `authGuard` (rutas restringidas),
+  `entranceGuard` (`/`) y `authInterceptor`. Las pantallas públicas (`/activate`, `/status`) nunca
+  llevan a iniciar sesión.
+- `authInterceptor` envía el token **solo a la API** (nunca a Keycloak ni a otro host) y, ante un
+  401, lleva a iniciar sesión y de vuelta a la página donde estaba. Un *guard* también vuelve a la
+  página pedida.
+- El token vive **solo en memoria**: nunca en `localStorage` ni `sessionStorage`.
 - Las rutas restringidas usan un *guard* y los elementos restringidos se
   ocultan según el rol interno, pero **la autorización es de la API**: un
   *guard* es comodidad para el usuario, no seguridad.
+- Con un solo equipo, el selector (`/teams`) entra directo a él. Cerrar sesión y la expiración
+  por inactividad son HU-09.
 
 ## Fechas y zonas horarias
 
@@ -467,14 +478,10 @@ Estos puntos no están decididos; se preguntan antes de decidir:
 
 - Destino remoto de los registros (endpoint de la API, Sentry/GlitchTip u
   OpenTelemetry). Hoy solo consola.
-- Librería de integración con Keycloak (`keycloak-angular` o `keycloak-js`
-  directo) y cómo se renueva el token.
 - Migrar las pruebas de Karma a Vitest (el valor por defecto desde Angular 21;
   Karma está archivado).
 - Librería de componentes (tablas, menús…) para `shared/ui`; si se adopta una, que se apoye
   en Tailwind (AD-27). Mientras tanto, los diálogos son `agl-dialog` sobre el `<dialog>`
   nativo (HU-06).
-- Herramienta de pruebas de punta a punta en el navegador (por ejemplo,
-  Playwright en su propio contenedor). Hoy los flujos se cubren con la
-  integración HTTP de la API contra PostgreSQL y con pruebas de componentes con
-  el Router real. Se decide cuando exista el inicio de sesión (HU-03).
+- Correr las pruebas de punta a punta (`make test-e2e`, Playwright) en la CI: hoy corren en
+  local, contra el entorno levantado (AD-28).

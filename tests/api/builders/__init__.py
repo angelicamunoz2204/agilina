@@ -6,6 +6,14 @@ object through the domain's own rules. A state like "used" or "expired" is reach
 behavior (``Invitation.accept``), never by writing private fields.
 """
 
+from tests.api.builders.access_token import (
+    AUDIENCE,
+    ISSUER,
+    SUBJECT,
+    AccessTokenBuilder,
+    SigningKey,
+    signing_key,
+)
 from tests.api.builders.contacts import ContactBuilder, TeamContactsBuilder
 from tests.api.builders.defaults import NOW, PASSWORD, TOKEN
 from tests.api.builders.email_message import EmailMessageBuilder
@@ -22,9 +30,13 @@ from tests.api.builders.team_commands import ChangeMemberRoleBuilder, RemoveMemb
 from tests.api.builders.user import AppUserBuilder
 
 __all__ = [
+    "AUDIENCE",
+    "ISSUER",
     "NOW",
     "PASSWORD",
+    "SUBJECT",
     "TOKEN",
+    "AccessTokenBuilder",
     "ActivateAccountBuilder",
     "AppUserBuilder",
     "ChangeMemberRoleBuilder",
@@ -32,6 +44,7 @@ __all__ = [
     "EmailMessageBuilder",
     "InvitationBuilder",
     "InviteToTeamBuilder",
+    "SigningKey",
     "IssueInvitationBuilder",
     "RemoveMemberBuilder",
     "RequestNewInvitationBuilder",
@@ -39,4 +52,5 @@ __all__ = [
     "TeamContactsBuilder",
     "next_id",
     "reset_ids",
+    "signing_key",
 ]
