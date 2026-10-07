@@ -68,6 +68,12 @@ Las capas apuntan hacia adentro: `presentation` e `infrastructure` → `applicat
   `mask_email`). Un adaptador registra cada llamada a un sistema externo con su resultado, y
   un mensaje de error de un sistema externo no se devuelve al cliente.
 - Las respuestas de autenticación llevan `Cache-Control: no-store`.
+- **Toda ruta nueva exige una sesión.** Declara `Depends(current_user_id)` (o
+  `current_team_member` si es de un equipo): la API valida el token de Keycloak (firma, emisor,
+  audiencia, vigencia) antes de confiar en él ([AD-28](../docs/adr/0028-iniciar-sesion-con-keycloak.md)).
+  Una ruta pública es una excepción: se agrega a `PUBLIC` en
+  `tests/api/unit/bootstrap/test_authentication.py`, con su razón; si no, esa prueba falla.
+  Nunca se lee un rol ni un equipo del token: se consulta lo guardado.
 - Los errores de la API tienen la forma `{code, detail, reasons?}`, con `code` estable: el
   cliente decide por el código, no por el texto.
 
