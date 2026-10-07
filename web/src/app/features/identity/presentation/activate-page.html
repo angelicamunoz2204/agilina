@@ -97,28 +97,32 @@
         />
 
         <label for="password" class="mb-1 text-sm">{{ t('password') }}</label>
-        <input
-          aglTextField
-          id="password"
-          name="password"
-          type="password"
-          autocomplete="new-password"
-          aria-describedby="password-hint"
-          [ngModel]="password()"
-          (ngModelChange)="password.set($event)"
-        />
+        <agl-password-field [toggleLabel]="t('show_password')">
+          <input
+            aglTextField
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            aria-describedby="password-hint"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+          />
+        </agl-password-field>
         <p id="password-hint" class="mt-1 mb-4 text-sm text-muted">{{ t('password_hint') }}</p>
 
         <label for="confirmation" class="mb-1 text-sm">{{ t('confirmation') }}</label>
-        <input
-          aglTextField
-          id="confirmation"
-          name="confirmation"
-          type="password"
-          autocomplete="new-password"
-          [ngModel]="confirmation()"
-          (ngModelChange)="confirmation.set($event)"
-        />
+        <agl-password-field [toggleLabel]="t('show_password')">
+          <input
+            aglTextField
+            id="confirmation"
+            name="confirmation"
+            type="password"
+            autocomplete="new-password"
+            [ngModel]="confirmation()"
+            (ngModelChange)="confirmation.set($event)"
+          />
+        </agl-password-field>
 
         @if (rejections().length > 0) {
           <div role="alert" class="mt-4 text-sm text-danger">

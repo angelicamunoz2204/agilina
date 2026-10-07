@@ -60,6 +60,7 @@
       "password": "Password",
       "password_hint": "At least 12 characters. It cannot be the same as your email or your username.",
       "confirmation": "Confirm password",
+      "show_password": "Show password",
       "submit": "Activate and sign in",
       "submitting": "Activating…",
       "checking": "Checking your invitation…",

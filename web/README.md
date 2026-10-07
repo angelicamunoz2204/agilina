@@ -376,7 +376,9 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 - Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `aglButton`
   (con `variant="primary" | "secondary"`), que va sobre un `<button>` o, si navega, sobre un
   `<a routerLink>` (un enlace sigue siendo enlace), e `input[aglTextField]`: directivas sobre
-  el elemento nativo. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
+  el elemento nativo. Una contraseña va dentro de `<agl-password-field [toggleLabel]="…">`,
+  que agrega el botón para mostrarla u ocultarla (con `aria-pressed`) sin quitarle su
+  `<label for>`. El espacio y el ancho los pone quien coloca la pieza (`class="mt-4 w-full"`).
 - El orden de las clases lo decide Prettier (`make format`); no se discute en el review.
 - Nada de estilos en línea (`style="…"`). *(ESLint.)*
 - Un `.scss` de componente (`styleUrl`) es la excepción, solo para lo que las utilidades no
