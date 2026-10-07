@@ -1,5 +1,7 @@
 """The teams HTTP API, with in-memory doubles behind the use cases and the access ports."""
 
+import logging
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -371,6 +373,15 @@ async def test_an_admin_changes_the_role_of_a_member(api):
     assert api.members_uow.committed is True
 
 
+async def test_the_admin_of_the_token_is_who_asked_for_a_role_change(api, caplog):
+    with caplog.at_level(logging.INFO):
+        await api.request(
+            "PATCH", f"/{api.atlas}/members/{api.carla}", TOKEN_ANA, json={"role": "admin"}
+        )
+
+    assert f"user {api.ana} changed the role of user {api.carla}" in caplog.text
+
+
 async def test_the_only_admin_cannot_demote_themselves_and_gets_409_last_admin(api):
     response = await api.request(
         "PATCH", f"/{api.atlas}/members/{api.ana}", TOKEN_ANA, json={"role": "member"}
@@ -415,6 +426,13 @@ async def test_an_admin_removes_a_member(api):
 
     assert response.status_code == 204 and response.content == b""
     assert api.role_in_atlas(api.carla) is None and api.members_uow.committed is True
+
+
+async def test_the_admin_of_the_token_is_who_asked_for_a_removal(api, caplog):
+    with caplog.at_level(logging.INFO):
+        await api.request("DELETE", f"/{api.atlas}/members/{api.carla}", TOKEN_ANA)
+
+    assert f"user {api.ana} removed user {api.carla}" in caplog.text
 
 
 async def test_a_sprint_in_progress_does_not_prevent_a_removal(api):

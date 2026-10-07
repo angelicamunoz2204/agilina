@@ -321,6 +321,10 @@ recibe el mismo `409`. Dos Administradores que se degradan a la vez no dejan el 
 sin ninguno: el cambio bloquea la fila del equipo hasta terminar, y el segundo recibe
 `409 last_admin`.
 
+Cada cambio de rol y cada eliminación quedan en el log de la API (`make logs s=api`) con
+el equipo, quién lo pidió, a quién y el rol anterior y el nuevo (o el que tenía), como ya
+pasa con las invitaciones.
+
 ### Cómo probarlo
 
 **En el entorno levantado, con el login (HU-03).** Con una Administradora activada como en

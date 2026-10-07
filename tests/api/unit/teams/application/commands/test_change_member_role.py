@@ -1,6 +1,8 @@
 """ChangeMemberRole: an admin gives a member another role, unless the team has a sprint in
 progress or the change would leave it without an admin (HU-06)."""
 
+import logging
+
 import pytest
 
 from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
@@ -120,3 +122,54 @@ async def test_a_team_that_does_not_exist_is_not_found(scenario):
         await scenario.handler.handle(ChangeMemberRoleBuilder().build())
 
     assert scenario.uow.committed is False
+
+
+async def test_a_role_change_is_logged_with_who_asked_for_whom_and_from_which_role(
+    scenario, caplog
+):
+    team = await scenario.a_team()
+
+    with caplog.at_level(logging.INFO):
+        await scenario.handler.handle(
+            ChangeMemberRoleBuilder()
+            .for_team(team.id)
+            .of_user(scenario.bruno)
+            .requested_by_admin(scenario.ana)
+            .build()
+        )
+
+    assert (
+        f"Team {team.id}: user {scenario.ana} changed the role of user {scenario.bruno} "
+        "from member to admin"
+    ) in caplog.text
+
+
+async def test_asking_for_the_same_role_changes_nothing_and_logs_nothing(scenario, caplog):
+    team = await scenario.a_team()
+
+    with caplog.at_level(logging.INFO):
+        await scenario.handler.handle(
+            ChangeMemberRoleBuilder()
+            .for_team(team.id)
+            .of_user(scenario.bruno)
+            .to_role(TeamRole.MEMBER)
+            .build()
+        )
+
+    assert scenario.role_of(team.id, scenario.bruno) is TeamRole.MEMBER
+    assert "changed the role" not in caplog.text
+
+
+async def test_a_refused_role_change_logs_nothing(scenario, caplog):
+    team = await scenario.a_team()
+
+    with caplog.at_level(logging.INFO), pytest.raises(LastAdminError):
+        await scenario.handler.handle(
+            ChangeMemberRoleBuilder()
+            .for_team(team.id)
+            .of_user(scenario.ana)
+            .to_role(TeamRole.MEMBER)
+            .build()
+        )
+
+    assert "changed the role" not in caplog.text

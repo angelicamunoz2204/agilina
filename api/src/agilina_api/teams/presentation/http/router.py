@@ -223,7 +223,11 @@ async def change_member_role(
     team: TeamContext = Depends(current_team_admin),
     handler: ChangeMemberRoleHandler = Depends(get_change_member_role_handler),
 ) -> Response:
-    await handler.handle(ChangeMemberRole(team_id=team.team_id, user_id=user_id, role=request.role))
+    await handler.handle(
+        ChangeMemberRole(
+            team_id=team.team_id, user_id=user_id, role=request.role, requested_by=team.user_id
+        )
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -252,5 +256,7 @@ async def remove_member(
     team: TeamContext = Depends(current_team_admin),
     handler: RemoveMemberHandler = Depends(get_remove_member_handler),
 ) -> Response:
-    await handler.handle(RemoveMember(team_id=team.team_id, user_id=user_id))
+    await handler.handle(
+        RemoveMember(team_id=team.team_id, user_id=user_id, requested_by=team.user_id)
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

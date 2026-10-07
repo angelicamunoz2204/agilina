@@ -1,5 +1,6 @@
 """An admin gives a member of the team another role (HU-06)."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
@@ -7,7 +8,10 @@ from uuid import UUID
 from agilina_api.shared.application.ports import Clock
 from agilina_api.teams.application.ports.outbound import TeamsUnitOfWork
 from agilina_api.teams.domain.errors import RoleChangeDuringActiveSprintError, TeamNotFoundError
+from agilina_api.teams.domain.events import MemberRoleChanged
 from agilina_shared.enums import TeamRole
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -16,6 +20,8 @@ class ChangeMemberRole:
     user_id: UUID
     """The member whose role changes (it may be the admin who asks)."""
     role: TeamRole
+    requested_by: UUID
+    """The admin who asks: the audit log names them."""
 
 
 class ChangeMemberRoleHandler:
@@ -24,6 +30,10 @@ class ChangeMemberRoleHandler:
     The sprint is not part of the ``Team`` aggregate, so the use case asks whether one is in
     progress, inside the same transaction and once the team is loaded (and locked), and
     refuses before touching the aggregate. The aggregate keeps the last-admin rule.
+
+    Once committed, the change is logged with who asked, for whom and from which role to
+    which: who administers a team is worth auditing. Asking for the same role changes
+    nothing and logs nothing.
     """
 
     def __init__(self, uow_factory: Callable[[], TeamsUnitOfWork], clock: Clock) -> None:
@@ -44,3 +54,13 @@ class ChangeMemberRoleHandler:
             )
             await uow.teams.save(team)
             await uow.commit()
+        changes = [event for event in team.pull_events() if isinstance(event, MemberRoleChanged)]
+        for change in changes:
+            logger.info(
+                "Team %s: user %s changed the role of user %s from %s to %s",
+                change.team_id,
+                command.requested_by,
+                change.user_id,
+                change.previous_role,
+                change.role,
+            )

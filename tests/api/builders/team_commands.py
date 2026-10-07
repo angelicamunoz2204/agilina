@@ -17,6 +17,7 @@ class ChangeMemberRoleBuilder:
     team_id: UUID = field(default_factory=next_id)
     user_id: UUID = field(default_factory=next_id)
     role: TeamRole = TeamRole.ADMIN
+    requested_by: UUID = field(default_factory=next_id)
 
     def for_team(self, team_id: UUID) -> Self:
         return replace(self, team_id=team_id)
@@ -27,8 +28,16 @@ class ChangeMemberRoleBuilder:
     def to_role(self, role: TeamRole) -> Self:
         return replace(self, role=role)
 
+    def requested_by_admin(self, user_id: UUID) -> Self:
+        return replace(self, requested_by=user_id)
+
     def build(self) -> ChangeMemberRole:
-        return ChangeMemberRole(team_id=self.team_id, user_id=self.user_id, role=self.role)
+        return ChangeMemberRole(
+            team_id=self.team_id,
+            user_id=self.user_id,
+            role=self.role,
+            requested_by=self.requested_by,
+        )
 
 
 @dataclass(frozen=True)
@@ -37,6 +46,7 @@ class RemoveMemberBuilder:
 
     team_id: UUID = field(default_factory=next_id)
     user_id: UUID = field(default_factory=next_id)
+    requested_by: UUID = field(default_factory=next_id)
 
     def for_team(self, team_id: UUID) -> Self:
         return replace(self, team_id=team_id)
@@ -44,5 +54,10 @@ class RemoveMemberBuilder:
     def of_user(self, user_id: UUID) -> Self:
         return replace(self, user_id=user_id)
 
+    def requested_by_admin(self, user_id: UUID) -> Self:
+        return replace(self, requested_by=user_id)
+
     def build(self) -> RemoveMember:
-        return RemoveMember(team_id=self.team_id, user_id=self.user_id)
+        return RemoveMember(
+            team_id=self.team_id, user_id=self.user_id, requested_by=self.requested_by
+        )
