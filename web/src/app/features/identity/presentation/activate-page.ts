@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 import { Button } from '@shared/ui/button';
+import { PasswordField } from '@shared/ui/password-field';
 import { TextField } from '@shared/ui/text-field';
 
 import { ActivationFacade } from '../application/activation.facade';
@@ -16,7 +17,7 @@ import { readActivationToken } from '../domain/activation-link';
  */
 @Component({
   selector: 'agl-activate-page',
-  imports: [TranslocoDirective, FormsModule, Button, TextField],
+  imports: [TranslocoDirective, FormsModule, Button, PasswordField, TextField],
   providers: [ActivationFacade],
   templateUrl: './activate-page.html',
 })

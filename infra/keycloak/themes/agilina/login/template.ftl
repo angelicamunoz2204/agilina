@@ -25,6 +25,7 @@
             }
         }
     </script>
+    <script type="module" src="${url.resourcesPath}/js/password-visibility.js"></script>
     <script type="module">
         import { startSessionPolling } from "${url.resourcesPath}/js/authChecker.js";
 

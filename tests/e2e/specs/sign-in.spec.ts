@@ -9,6 +9,9 @@ import { MAILPIT } from '../playwright.config';
  * both before this runs. In each tenant she activates her account from the email, signs in with
  * Keycloak and lands on her team; a page she opens without a session takes her to sign in and
  * brings her back. Then the tenants are shown not to mix.
+ *
+ * Elements are found by their `data-testid`, which does not move when a text, a label or the
+ * markup changes; what the person reads is still checked, on the element found that way.
  */
 const RUN = process.env['E2E_RUN'] ?? '';
 const EMAIL = `e2e-${RUN}@example.test`;
@@ -44,9 +47,9 @@ async function activationLink(tenant: string): Promise<string> {
 }
 
 async function signInOnKeycloak(page: Page, password: string, email = EMAIL): Promise<void> {
-  await page.getByLabel('Correo electrónico').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  await page.getByTestId('login-email').fill(email);
+  await page.getByTestId('login-password').fill(password);
+  await page.getByTestId('login-submit').click();
 }
 
 for (const tenant of TENANTS) {
@@ -61,30 +64,48 @@ for (const tenant of TENANTS) {
 
       await signInOnKeycloak(page, PASSWORD);
 
-      await expect(page.getByRole('alert')).toHaveText(REFUSED);
+      await expect(page.getByTestId('login-error')).toHaveText(REFUSED);
     });
 
     test('activates the account from the link of the invitation email', async ({ page }) => {
       await page.goto(await activationLink(tenant));
-      await expect(page.getByRole('heading', { name: 'Activar cuenta' })).toBeVisible();
+      await expect(page.getByTestId('activate-title')).toHaveText('Activar cuenta');
       await expect(page).not.toHaveURL(/#t=/); // the token left the address bar once read
 
-      await page.getByLabel('Contraseña', { exact: true }).fill(PASSWORD);
-      await page.getByLabel('Confirmar contraseña').fill(PASSWORD);
-      await page.getByRole('button', { name: 'Activar y entrar' }).click();
+      const password = page.getByTestId('activate-password');
+      const confirmation = page.getByTestId('activate-confirmation');
+      await password.fill(PASSWORD);
+      await confirmation.fill(PASSWORD);
+      // Each box has its own button to see what was typed.
+      await page.getByTestId('activate-password-toggle').click();
+      await expect(password).toHaveAttribute('type', 'text');
+      await expect(confirmation).toHaveAttribute('type', 'password');
+      await page.getByTestId('activate-confirmation-toggle').click();
+      await expect(confirmation).toHaveAttribute('type', 'text');
+      await page.getByTestId('activate-submit').click();
 
       // The next stop is the sign-in of this tenant's realm, with the email already typed.
       await expect(page).toHaveURL(keycloakLogin(tenant));
-      await expect(page.getByLabel('Correo electrónico')).toHaveValue(EMAIL);
+      await expect(page.getByTestId('login-email')).toHaveValue(EMAIL);
+
+      // There, too, the password can be seen while it is typed.
+      const signInPassword = page.getByTestId('login-password');
+      const toggle = page.getByTestId('login-password-toggle');
+      await signInPassword.fill('anything');
+      await toggle.click();
+      await expect(signInPassword).toHaveAttribute('type', 'text');
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     });
 
     test('a used link says so and offers a new invitation', async ({ page }) => {
       await page.goto(await activationLink(tenant));
 
-      await expect(page.getByRole('heading', { name: 'Este enlace ya se usó' })).toBeVisible();
-      await expect(
-        page.getByRole('button', { name: 'Solicitar una invitación nueva' }),
-      ).toBeVisible();
+      await expect(page.getByTestId('activate-link-problem-title')).toHaveText(
+        'Este enlace ya se usó',
+      );
+      await expect(page.getByTestId('activate-request-new')).toHaveText(
+        'Solicitar una invitación nueva',
+      );
     });
 
     test('refused credentials get one generic message, whether or not the email exists', async ({
@@ -94,10 +115,10 @@ for (const tenant of TENANTS) {
       await expect(page).toHaveURL(keycloakLogin(tenant));
 
       await signInOnKeycloak(page, 'not-the-password');
-      await expect(page.getByRole('alert')).toHaveText(REFUSED);
+      await expect(page.getByTestId('login-error')).toHaveText(REFUSED);
 
       await signInOnKeycloak(page, 'not-the-password', 'nobody@example.test');
-      await expect(page.getByRole('alert')).toHaveText(REFUSED);
+      await expect(page.getByTestId('login-error')).toHaveText(REFUSED);
     });
 
     test('signing in from the entrance lands on the only team of the person', async ({ page }) => {
@@ -107,7 +128,7 @@ for (const tenant of TENANTS) {
       await signInOnKeycloak(page, PASSWORD);
 
       await expect(page).toHaveURL(new RegExp(`/${tenant}/teams/[0-9a-f-]{36}$`));
-      await expect(page.getByRole('heading', { name: teamName(tenant) })).toBeVisible();
+      await expect(page.getByTestId('team-name')).toHaveText(teamName(tenant));
       teamUrl = page.url();
     });
 
@@ -122,8 +143,10 @@ for (const tenant of TENANTS) {
       await expect(page).toHaveURL(keycloakLogin(tenant));
       await signInOnKeycloak(page, PASSWORD);
 
-      await expect(page).toHaveURL(teamUrl);
-      await expect(page.getByRole('heading', { name: teamName(tenant) })).toBeVisible();
+      await expect(page.getByTestId('team-name')).toHaveText(teamName(tenant));
+      // Read once the team shows, not polled: Keycloak's answer (#state=…&code=…) must not come
+      // back to the address bar after a first moment without it.
+      expect(page.url()).toBe(teamUrl);
       await context.close();
     });
 
@@ -133,7 +156,7 @@ for (const tenant of TENANTS) {
 
       await page.goto(`/${tenant}/status`);
 
-      await expect(page.getByRole('heading', { name: 'Estado del entorno' })).toBeVisible();
+      await expect(page.getByTestId('status-title')).toHaveText('Estado del entorno');
       await expect(page).toHaveURL(new RegExp(`/${tenant}/status$`));
       await context.close();
     });
@@ -156,16 +179,16 @@ test.describe('the tenants do not mix', () => {
     await signInOnKeycloak(page, PASSWORD);
 
     await expect(page).toHaveURL(new RegExp(`/ecomoda/teams/${acmeTeamId}$`));
-    await expect(page.getByRole('heading', { name: teamName('acme') })).toHaveCount(0);
+    await expect(page.getByTestId('team-name')).toHaveCount(0);
     await context.close();
   });
 
   test('an address that names no organization is not found', async ({ page }) => {
     for (const address of ['/', '/nobody', '/nobody/teams', '/Acme/teams']) {
       await page.goto(address);
-      await expect(
-        page.getByRole('heading', { name: 'No encontramos esta organización' }),
-      ).toBeVisible();
+      await expect(page.getByTestId('not-found-title')).toHaveText(
+        'No encontramos esta organización',
+      );
     }
   });
 });

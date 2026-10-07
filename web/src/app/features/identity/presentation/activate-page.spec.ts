@@ -139,6 +139,22 @@ describe('ActivatePage', () => {
       );
     });
 
+    it('lets the person see each password while typing it, one box at a time', async () => {
+      const toggles = Array.from(
+        root().querySelectorAll<HTMLButtonElement>('button[aria-label="Mostrar contraseña"]'),
+      );
+      expect(toggles.map((toggle) => toggle.getAttribute('aria-controls'))).toEqual([
+        'password',
+        'confirmation',
+      ]);
+
+      toggles[1]!.click();
+      await settle();
+
+      expect(field('confirmation').type).toBe('text');
+      expect(field('password').type).toBe('password');
+    });
+
     it('does not ask the API when the two passwords differ', async () => {
       type('password', PASSWORD);
       type('confirmation', 'another-password');

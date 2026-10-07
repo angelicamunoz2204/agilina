@@ -5,6 +5,7 @@ import type Keycloak from 'keycloak-js';
 
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 import { TenantContext } from '@core/tenant/tenant-context';
+import { isValidTenantSlug } from '@core/tenant/tenant-slug';
 
 import { type AuthSession, type SignInOptions } from './auth-session';
 
@@ -23,6 +24,15 @@ export const KEYCLOAK_CLIENT_FACTORY = new InjectionToken<KeycloakClientFactory>
 
 /** The access token is renewed when it has less than this many seconds left. */
 const MIN_TOKEN_VALIDITY_SECONDS = 30;
+
+/**
+ * Whether the fragment of the address is Keycloak's answer to a sign-in (`#state=…&code=…`,
+ * or `#state=…&error=…`). The activation link (`#t=…`) is not.
+ */
+export function isSignInAnswer(fragment: string): boolean {
+  const params = new URLSearchParams(fragment.replace(/^#/, ''));
+  return params.has('state') && (params.has('code') || params.has('error'));
+}
 
 interface TenantSession {
   readonly client: KeycloakClient;
@@ -78,12 +88,29 @@ export class KeycloakAuthSession implements AuthSession {
   }
 
   /**
+   * Reads Keycloak's answer to a sign-in that has just come back, when the address carries
+   * one, so that it happens before the router reads the address (provide-auth.ts runs it while
+   * the application starts). keycloak-js takes the answer out of the address; read later, from
+   * the guard, the router would write the address it started with back, answer included.
+   *
+   * No guard has recorded the tenant yet, so it is the first segment of the address, the realm
+   * the answer comes from; the guard that asks later finds that session already started.
+   * Without an answer it does nothing: the public screens never start keycloak-js.
+   */
+  async readSignInAnswer(): Promise<void> {
+    const { hash, pathname } = this.document.location;
+    const slug = pathname.split('/')[1] ?? '';
+    if (isSignInAnswer(hash) && isValidTenantSlug(slug)) {
+      await this.start(slug);
+    }
+  }
+
+  /**
    * Starts keycloak-js for the tenant of the address, once. With no `onLoad` it only reads the
    * answer of a sign-in that has just come back (the `code` in the address) and redirects
    * nowhere.
    */
-  private async start(): Promise<TenantSession> {
-    const slug = this.tenant.require();
+  private async start(slug = this.tenant.require()): Promise<TenantSession> {
     let session = this.sessions.get(slug);
     if (session === undefined) {
       const client = this.newClient(`${this.realmPrefix}${slug}`);

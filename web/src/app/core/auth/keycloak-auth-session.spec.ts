@@ -7,6 +7,7 @@ import { provideTestI18n } from '@testing/i18n';
 import { provideTestRuntimeConfig } from '@testing/runtime-config';
 
 import {
+  isSignInAnswer,
   KEYCLOAK_CLIENT_FACTORY,
   KeycloakAuthSession,
   type KeycloakClient,
@@ -65,7 +66,12 @@ describe('KeycloakAuthSession', () => {
         {
           provide: DOCUMENT,
           useValue: {
-            location: { href: 'http://app.test/acme/teams/a', origin: 'http://app.test' },
+            location: {
+              href: 'http://app.test/acme/teams/a',
+              origin: 'http://app.test',
+              pathname: '/acme/teams/a',
+              hash: '',
+            },
           },
         },
       ],
@@ -128,6 +134,76 @@ describe('KeycloakAuthSession', () => {
 
   it('is not signed in until something has asked', () => {
     expect(session.authenticated()).toBeFalse();
+  });
+
+  describe('readSignInAnswer', () => {
+    function arriveAt(pathname: string, hash: string): void {
+      Object.assign(TestBed.inject(DOCUMENT).location, { pathname, hash });
+    }
+
+    it("reads Keycloak's answer right away, in the realm of the tenant of the address", async () => {
+      keycloak.authenticated = true;
+      arriveAt('/acme/teams/a', '#state=s-1&session_state=x&iss=http%3A%2F%2Fkc&code=c-1');
+
+      await session.readSignInAnswer();
+
+      expect(realms).toEqual(['agilina-acme']);
+      expect(keycloak.inits).toEqual([{ pkceMethod: 'S256', checkLoginIframe: false }]);
+      expect(session.authenticated()).toBeTrue();
+    });
+
+    it('takes the tenant from the address, since no guard has recorded it yet', async () => {
+      arriveAt('/ecomoda/teams/a', '#state=s-1&code=c-1');
+
+      await session.readSignInAnswer();
+
+      expect(realms).toEqual(['agilina-ecomoda']);
+    });
+
+    it('starts keycloak-js only once: the guard that asks later reuses that start', async () => {
+      keycloak.authenticated = true;
+      arriveAt('/acme/teams/a', '#state=s-1&code=c-1');
+
+      await session.readSignInAnswer();
+      expect(await session.ensureSignedIn('/acme/teams/a')).toBeTrue();
+
+      expect(realms).toEqual(['agilina-acme']);
+      expect(keycloak.inits.length).toBe(1);
+      expect(keycloak.logins).toEqual([]);
+    });
+
+    it('does nothing without an answer, as on the activation link', async () => {
+      arriveAt('/acme/activate', '#t=activation-token');
+      await session.readSignInAnswer();
+      arriveAt('/acme/teams', '');
+      await session.readSignInAnswer();
+
+      expect(realms).toEqual([]);
+    });
+
+    it('does nothing when the address names no tenant', async () => {
+      arriveAt('/', '#state=s-1&code=c-1');
+      await session.readSignInAnswer();
+      arriveAt('/not-found', '#state=s-1&code=c-1');
+      await session.readSignInAnswer();
+
+      expect(realms).toEqual([]);
+    });
+  });
+
+  describe('isSignInAnswer', () => {
+    it('recognises a code or an error that comes with its state', () => {
+      expect(isSignInAnswer('#state=s&code=c')).toBeTrue();
+      expect(isSignInAnswer('#state=s&error=access_denied')).toBeTrue();
+      expect(isSignInAnswer('state=s&code=c')).toBeTrue();
+    });
+
+    it('ignores anything else', () => {
+      expect(isSignInAnswer('')).toBeFalse();
+      expect(isSignInAnswer('#t=token')).toBeFalse();
+      expect(isSignInAnswer('#code=c')).toBeFalse();
+      expect(isSignInAnswer('#state=s')).toBeFalse();
+    });
   });
 
   describe('ensureSignedIn', () => {
