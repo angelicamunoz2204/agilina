@@ -1,5 +1,5 @@
-import { Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, computed, effect, inject } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 import { Button } from '@shared/ui/button';
@@ -16,8 +16,18 @@ import { TeamSelectorFacade } from '../application/team-selector.facade';
 })
 export class TeamSelectorPage {
   private readonly facade = inject(TeamSelectorFacade);
+  private readonly router = inject(Router);
 
   protected readonly teams = this.facade.teams;
   protected readonly loading = this.facade.loading;
   protected readonly problemMessage = computed(() => problemMessageKey(this.facade.problem()));
+
+  /** With a single team there is nothing to choose: go in, replacing this page in the history
+   * so that "back" does not bring the person here just to be sent on again. */
+  private readonly enterTheOnlyTeam = effect(() => {
+    const team = this.facade.onlyTeam();
+    if (team !== null) {
+      void this.router.navigate(['/teams', team.id], { replaceUrl: true });
+    }
+  });
 }
