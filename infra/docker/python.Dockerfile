@@ -13,6 +13,11 @@
 ARG PYTHON_VERSION=3.12
 
 # --------------------------------------------------------------------- base --
+# Time zones: the API validates and converts IANA zones (the daily's capture time zone,
+# AD-31) with the system tzdata (/usr/share/zoneinfo), which bookworm-slim ships; the PyPI
+# tzdata package is only locked for Windows. Changing the base image (here or in the `api`
+# target) must keep it, or every zone fails with ZoneInfoNotFoundError in production. CI
+# runs on Ubuntu, which has it too, so it would not notice.
 FROM python:${PYTHON_VERSION}-slim-bookworm AS base
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /uvx /bin/
 
@@ -51,6 +56,7 @@ COPY api/ api/
 RUN uv sync --locked --package agilina-api --no-dev --no-editable
 
 # ---------------------------------------------------------------------- api --
+# Same base as `base`, for its system tzdata (see the note there and AD-31).
 FROM python:${PYTHON_VERSION}-slim-bookworm AS api
 RUN useradd --system --create-home --uid 10001 agilina
 COPY --from=api-build /opt/venv /opt/venv
