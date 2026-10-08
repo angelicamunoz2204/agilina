@@ -96,7 +96,7 @@ def test_a_route_asks_for_exactly_the_role_the_inventory_says(operation):
 def _matrix_of_the_doc() -> dict[tuple[str, str], tuple[str, str, str]]:
     doc = (ROOT / "docs" / "permisos.md").read_text(encoding="utf-8")
     rows = re.findall(
-        r"^\| .+? \| `(GET|POST|PATCH|DELETE) (\S+)` \| (\w+) \| (✅|❌) \| (✅|❌) \|$",
+        r"^\| .+? \| `(GET|POST|PUT|PATCH|DELETE) (\S+)` \| (\w+) \| (✅|❌) \| (✅|❌) \|$",
         doc,
         flags=re.MULTILINE,
     )

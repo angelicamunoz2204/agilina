@@ -67,6 +67,11 @@ Las capas apuntan hacia adentro: `presentation` e `infrastructure` → `applicat
   nueva no necesita más, y la prueba de inventario falla si olvida el tenant. Nada de un tenant se
   guarda en el catálogo salvo lo que `tenancy` define, y nadie usa la base de un tenant para otro.
 - **La API hace la autorización.** La interfaz solo oculta lo que la API ya protege.
+- **El rol interno autoriza; la etiqueta solo se muestra** ([permisos](../docs/permisos.md)). Hay dos
+  roles guardados por equipo (`admin`, `member`); la etiqueta (`member`, `scrum_master`, `admin`) se
+  deriva del rol y del modo con `agilina_shared.role_label`, no se guarda, y solo la leen la
+  presentación y las consultas. Las rutas de personas viven en `/v1/users` y nombran el equipo en `?team_id=` (`current_team_*_by_query`). Una ruta de equipo o de usuarios nueva declara su rol mínimo en el inventario de
+  `tests/api/unit/bootstrap/test_permissions.py` y en `docs/permisos.md`.
 
 ## Seguridad
 

@@ -16,7 +16,7 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | `TeamRole` | Rol | El rol **interno** por equipo: `admin` o `member`. Es lo único contra lo que se autoriza |
 | `admin` | Administrador | Rol que gestiona el equipo. En modo soporte se muestra como **Scrum Master** |
 | `member` | Miembro | Rol de quien participa en la daily |
-| Visible label | Etiqueta visible | Cómo se rotula un rol en pantalla (Administrador, Scrum Master o Miembro). Se **deriva** de rol + modo; no se guarda |
+| Visible label | Etiqueta visible | Cómo se rotula un rol en pantalla: `scrum_master` (Scrum Master), `admin` (Administrador) o `member` (Miembro). Se **deriva** de rol + modo con `role_label`; no se guarda y nunca autoriza |
 | Platform operator | Operador de la plataforma | Quien administra la instalación (no es un integrante); emite la invitación del primer Administrador |
 | `TeamSelector` | Selector de equipo | Pantalla con los equipos a los que pertenece el usuario, para entrar a uno o crear uno nuevo |
 | `TeamDashboard` | Dashboard del equipo | Pantalla de entrada a un equipo, a la que se llega desde el selector o al crearlo |
