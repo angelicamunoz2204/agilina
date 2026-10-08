@@ -13,6 +13,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
+import { DatePicker } from '@shared/ui/date-picker';
 import { TextField } from '@shared/ui/text-field';
 import { formatLocalDateTime, localTimeOf } from '@shared/utils/local-date-time';
 
@@ -44,6 +45,7 @@ interface Turn {
     RouterLink,
     TranslocoDirective,
     Button,
+    DatePicker,
     TextField,
     SettingsNoAccess,
     SettingsTabs,

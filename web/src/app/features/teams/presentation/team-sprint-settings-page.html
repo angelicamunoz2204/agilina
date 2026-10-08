@@ -55,17 +55,18 @@
               <label for="sprint-start-date" class="mb-1.5 text-sm font-medium">
                 {{ t('start_date') }}
               </label>
-              <input
-                aglTextField
-                id="sprint-start-date"
-                name="startDate"
-                type="date"
-                data-testid="sprint-start-date"
-                aria-describedby="sprint-start-date-problem"
-                [attr.aria-invalid]="startProblem() !== null"
-                [ngModel]="startDate()"
-                (ngModelChange)="changeStartDate($event)"
-                (blur)="startTouched.set(true)"
+              <agl-date-picker
+                inputId="sprint-start-date"
+                testId="sprint-start-date"
+                describedBy="sprint-start-date-problem"
+                [locale]="language"
+                [placeholder]="t('calendar.choose_date')"
+                [previousMonthLabel]="t('calendar.previous_month')"
+                [nextMonthLabel]="t('calendar.next_month')"
+                [invalid]="startProblem() !== null"
+                [value]="startDate()"
+                (valueChange)="changeStartDate($event)"
+                (touched)="startTouched.set(true)"
               />
               <p
                 id="sprint-start-date-problem"
@@ -82,18 +83,19 @@
               <label for="sprint-end-date" class="mb-1.5 text-sm font-medium">
                 {{ t('end_date') }}
               </label>
-              <input
-                aglTextField
-                id="sprint-end-date"
-                name="endDate"
-                type="date"
-                data-testid="sprint-end-date"
-                aria-describedby="sprint-end-date-problem"
+              <agl-date-picker
+                inputId="sprint-end-date"
+                testId="sprint-end-date"
+                describedBy="sprint-end-date-problem"
+                [locale]="language"
                 [min]="startDate()"
-                [attr.aria-invalid]="endProblem() !== null"
-                [ngModel]="endDate()"
-                (ngModelChange)="changeEndDate($event)"
-                (blur)="endTouched.set(true)"
+                [placeholder]="t('calendar.choose_date')"
+                [previousMonthLabel]="t('calendar.previous_month')"
+                [nextMonthLabel]="t('calendar.next_month')"
+                [invalid]="endProblem() !== null"
+                [value]="endDate()"
+                (valueChange)="changeEndDate($event)"
+                (touched)="endTouched.set(true)"
               />
               <p
                 id="sprint-end-date-problem"

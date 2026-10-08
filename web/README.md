@@ -425,8 +425,12 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
   `<a routerLink>` (un enlace sigue siendo enlace), `input[aglTextField]` y
   `select[aglSelect]`: directivas sobre el elemento nativo. Una contraseña va dentro de
   `<agl-password-field [toggleLabel]="…">`, que agrega el botón para mostrarla u ocultarla (con
-  `aria-pressed`) sin quitarle su `<label for>`. El espacio y el ancho los pone quien coloca la
-  pieza (`class="mt-4 w-full"`).
+  `aria-pressed`) sin quitarle su `<label for>`. Una fecha de calendario se elige con
+  `<agl-date-picker inputId="…" [(value)]="…">` y no con `<input type="date">`, cuyo calendario
+  dibuja el navegador y no se puede agrandar ni darle estilo: abre un calendario propio con el
+  teclado del patrón de WAI-ARIA (flechas, Re Pág/Av Pág, Inicio/Fin, Escape), los nombres de
+  `Intl` en el idioma activo y `min` para los días que no se pueden elegir. El espacio y el ancho
+  los pone quien coloca la pieza (`class="mt-4 w-full"`).
 - Los diálogos usan `agl-dialog`, un componente sobre el `<dialog>` nativo (`showModal()`):
   el navegador atrapa el foco, deja inerte el resto de la página y lo cierra con Escape, sin
   dependencias. Se abre al colocarlo y se cierra al quitarlo, así que quien lo coloca decide

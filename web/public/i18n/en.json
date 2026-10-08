@@ -225,6 +225,11 @@
       },
       "forbidden": {
         "text": "Only the team's Administrators can configure the sprint."
+      },
+      "calendar": {
+        "choose_date": "Choose a date",
+        "previous_month": "Previous month",
+        "next_month": "Next month"
       }
     }
   },

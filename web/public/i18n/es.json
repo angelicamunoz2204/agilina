@@ -225,6 +225,11 @@
       },
       "forbidden": {
         "text": "Solo los Administradores del equipo pueden configurar el sprint."
+      },
+      "calendar": {
+        "choose_date": "Elige una fecha",
+        "previous_month": "Mes anterior",
+        "next_month": "Mes siguiente"
       }
     }
   },

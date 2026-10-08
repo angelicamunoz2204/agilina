@@ -168,6 +168,35 @@ describe('TeamSprintSettingsPage', () => {
     return page.querySelector<HTMLInputElement>(`#${found!.getAttribute('for')!}`)!;
   }
 
+  /** The calendar date a date box holds (`YYYY-MM-DD`), or empty. */
+  function dateIn(label: string): string {
+    return field(label).getAttribute('data-value') ?? '';
+  }
+
+  /** The day of the open calendar for a calendar date, if the month it shows has it. */
+  function calendarDay(date: string): HTMLButtonElement | null {
+    return page.querySelector<HTMLButtonElement>(`[role="dialog"] button[data-date="${date}"]`);
+  }
+
+  /** Opens the calendar of a date box, goes to the month of `date` and picks that day. */
+  async function pickDate(label: string, date: string): Promise<void> {
+    field(label).click();
+    await harness.fixture.whenStable();
+    for (let step = 0; step < 36 && calendarDay(date) === null; step++) {
+      const shown = page
+        .querySelector('[role="dialog"] button[data-date]')!
+        .getAttribute('data-date')!
+        .slice(0, 7);
+      const towards = date.slice(0, 7) > shown ? 'Mes siguiente' : 'Mes anterior';
+      page
+        .querySelector<HTMLButtonElement>(`[role="dialog"] button[aria-label="${towards}"]`)!
+        .click();
+      await harness.fixture.whenStable();
+    }
+    calendarDay(date)!.click();
+    await harness.fixture.whenStable();
+  }
+
   async function type(control: HTMLInputElement, value: string): Promise<void> {
     control.value = value;
     control.dispatchEvent(new Event('input'));
@@ -235,8 +264,9 @@ describe('TeamSprintSettingsPage', () => {
     await open();
 
     expect(text(page)).not.toContain('Sprint activo');
-    expect(field('Inicio').value).toBe('');
-    expect(field('Fin').value).toBe('');
+    expect(dateIn('Inicio')).toBe('');
+    expect(dateIn('Fin')).toBe('');
+    expect(text(field('Inicio'))).toBe('Elige una fecha');
     expect(field('Hora de la daily (única para el equipo)').value).toBe('');
     expect(checkbox('Ana Gil').checked).toBeFalse();
     expect(turns()).toEqual([]);
@@ -257,9 +287,10 @@ describe('TeamSprintSettingsPage', () => {
   it('fills the form with the saved dates and the daily time in the browser zone', async () => {
     await open();
 
-    expect(field('Inicio').type).toBe('date');
-    expect(field('Inicio').value).toBe('2026-10-05');
-    expect(field('Fin').value).toBe('2026-10-16');
+    expect(field('Inicio').getAttribute('aria-haspopup')).toBe('dialog');
+    expect(dateIn('Inicio')).toBe('2026-10-05');
+    expect(text(field('Inicio'))).toBe('5 de octubre de 2026');
+    expect(dateIn('Fin')).toBe('2026-10-16');
     const time = field('Hora de la daily (única para el equipo)');
     expect(time.type).toBe('time');
     expect(time.value).toBe('09:00');
@@ -316,7 +347,9 @@ describe('TeamSprintSettingsPage', () => {
   it('does not accept an end before the start, and says why', async () => {
     await open();
 
-    await type(field('Fin'), '2026-10-01');
+    await pickDate('Inicio', '2026-10-20');
+    field('Fin').dispatchEvent(new Event('blur'));
+    await harness.fixture.whenStable();
 
     expect(field('Fin').getAttribute('aria-invalid')).toBe('true');
     expect(text(page)).toContain('La fecha de fin no puede ser anterior a la de inicio.');
@@ -326,16 +359,22 @@ describe('TeamSprintSettingsPage', () => {
   it('accepts an end on the same day as the start', async () => {
     await open();
 
-    await type(field('Fin'), '2026-10-05');
+    await pickDate('Fin', '2026-10-05');
 
     expect(field('Fin').getAttribute('aria-invalid')).toBe('false');
     expect(submitButton().disabled).toBeFalse();
   });
 
   it('asks for a date and the time once the person leaves them empty', async () => {
+    sprints.current = null;
     await open();
 
-    await type(field('Inicio'), '');
+    field('Inicio').click();
+    await harness.fixture.whenStable();
+    page
+      .querySelector('[role="dialog"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await harness.fixture.whenStable();
     await type(field('Hora de la daily (única para el equipo)'), '');
 
     expect(text(page)).toContain('Elige la fecha de inicio.');
@@ -433,8 +472,8 @@ describe('TeamSprintSettingsPage', () => {
     sprints.current = null;
     await open();
 
-    await type(field('Inicio'), '2026-10-19');
-    await type(field('Fin'), '2026-10-30');
+    await pickDate('Inicio', '2026-10-19');
+    await pickDate('Fin', '2026-10-30');
     await type(field('Hora de la daily (única para el equipo)'), '09:30');
     await toggle('Carla Ruiz');
     await toggle('Ana Gil');
