@@ -171,7 +171,7 @@ describe('TeamSettingsPage', () => {
     await open();
 
     expect(port.listed).toEqual(['atlas']);
-    expect(page.querySelector('h1')?.textContent.trim()).toBe('Equipo');
+    expect(page.querySelector('h2')?.textContent.trim()).toBe('Equipo');
     const [ana, bruno] = rows();
     expect(text(ana)).toContain('Ana Gil');
     expect(text(ana)).toContain('ana@example.com');
@@ -179,6 +179,18 @@ describe('TeamSettingsPage', () => {
     expect(text(bruno)).toContain('Bruno Díaz');
     expect(text(bruno)).toContain('bruno@example.com');
     expect(text(bruno)).toContain('Miembro');
+  });
+
+  it('is the Team tab of the settings, next to the Sprint one', async () => {
+    await open();
+
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Configuración');
+    const tabs = Array.from(page.querySelectorAll('nav a'));
+    expect(tabs.map((tab) => text(tab))).toEqual(['Equipo', 'Sprint']);
+    expect(text(page.querySelector('nav a[aria-current="page"]'))).toBe('Equipo');
+    expect(tabs[1]?.getAttribute('href')).toBe('/acme/teams/atlas/settings/sprint');
+    // The end-to-end tests of HU-06 look for this title: it keeps its text.
+    expect(text(page.querySelector('[data-testid="settings-title"]'))).toBe('Equipo');
   });
 
   it('shows each role in a control with the options the API gave', async () => {
@@ -435,6 +447,6 @@ describe('TeamSettingsPage', () => {
     expect(text(page.querySelector('[role="alert"]'))).toBe(
       'No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.',
     );
-    expect(page.querySelector('h1')?.textContent.trim()).toBe('Equipo');
+    expect(page.querySelector('h2')?.textContent.trim()).toBe('Equipo');
   });
 });

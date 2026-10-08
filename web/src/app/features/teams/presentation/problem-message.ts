@@ -1,4 +1,5 @@
 import { type MemberFailureKind } from '../domain/member-failure';
+import { type SprintFailureKind } from '../domain/sprint-failure';
 import { type TeamFailureKind } from '../domain/team-failure';
 
 /**
@@ -6,7 +7,7 @@ import { type TeamFailureKind } from '../domain/team-failure';
  * screen words it for its own context, and an unexpected failure uses its `failed` text.
  */
 export function problemMessageKey(
-  problem: TeamFailureKind | MemberFailureKind | null,
+  problem: TeamFailureKind | MemberFailureKind | SprintFailureKind | null,
 ): string | null {
   if (problem === null) {
     return null;

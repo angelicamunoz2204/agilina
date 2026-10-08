@@ -14,8 +14,8 @@ import { MAILPIT } from '../playwright.config';
  * move when a text, a label or the markup changes; what the person reads is still checked, on
  * the element found that way.
  *
- * The sprint in progress is not walked here: no API creates sprints yet (HU-07), so the
- * integration tests cover it.
+ * The sprint in progress is not walked here: Settings → Sprint (HU-07) creates it, and its own
+ * flows are covered by the integration tests of the API and the unit tests of the web.
  */
 const RUN = process.env['E2E_RUN'] ?? '';
 const TENANT = 'acme';

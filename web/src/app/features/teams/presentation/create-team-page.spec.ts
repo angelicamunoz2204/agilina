@@ -9,6 +9,7 @@ import { provideTestTenant } from '@testing/tenant';
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
 import { TeamSelectorPage } from './team-selector-page';
+import { SprintsPort } from '../application/sprints.port';
 import { TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
 import { TeamFailure } from '../domain/team-failure';
@@ -66,6 +67,11 @@ describe('CreateTeamPage', () => {
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
+        // The dashboard also reads the sprint: the team has none here.
+        {
+          provide: SprintsPort,
+          useValue: { active: () => of(null), start: () => NEVER, reconfigure: () => NEVER },
+        },
       ],
     });
     harness = await RouterTestingHarness.create('/acme/teams/new');

@@ -1,0 +1,27 @@
+<ng-container *transloco="let t; prefix: 'teams.settings.tabs'">
+  <h1 class="font-display text-3xl font-bold tracking-tight">{{ t('title') }}</h1>
+  <nav class="mt-6" [attr.aria-label]="t('label')">
+    <div class="grid grid-cols-2 gap-1 rounded-xl bg-border/50 p-1 text-sm font-medium">
+      <a
+        class="flex min-h-10 items-center justify-center rounded-lg px-3 text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        routerLinkActive="bg-surface text-foreground shadow-sm"
+        ariaCurrentWhenActive="page"
+        data-testid="settings-tab-team"
+        [routerLink]="tenant.path('teams', teamId(), 'settings')"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        {{ t('team') }}
+      </a>
+      <a
+        class="flex min-h-10 items-center justify-center rounded-lg px-3 text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        routerLinkActive="bg-surface text-foreground shadow-sm"
+        ariaCurrentWhenActive="page"
+        data-testid="settings-tab-sprint"
+        [routerLink]="tenant.path('teams', teamId(), 'settings', 'sprint')"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        {{ t('sprint') }}
+      </a>
+    </div>
+  </nav>
+</ng-container>

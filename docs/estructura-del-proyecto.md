@@ -229,7 +229,7 @@ web/
 └── src/app/
     ├── app.config.ts                Raíz de composición: enlaza puertos con adaptadores
     ├── app.routes.ts                Mapa de pantallas, con carga diferida
-    ├── core/                        config, http, i18n, logging (y auth, cuando llegue)
+    ├── core/                        auth, config, http, i18n, logging, tenant y time
     ├── layout/                      Cabecera y marco de la aplicación
     ├── shared/                      Componentes, pipes y utilidades sin estado
     └── features/<contexto>/
@@ -244,10 +244,13 @@ Hoy existen `features/status` (la pantalla de estado del entorno) y
 mínimo, el formulario para crear un equipo y el dashboard del equipo, que por ahora muestra su
 nombre y, a un Administrador, el enlace a Configuración; HU-06: Configuración → Equipo en
 `/teams/:teamId/settings`, con su puerto `TeamMembersPort` y su adaptador
-`HttpTeamMembersApi`, sin guard: si la API responde 403, la pantalla muestra «sin acceso»).
-`shared/ui` tiene `aglButton`, `aglTextField`, `aglSelect` y `agl-dialog` (sobre el
-`<dialog>` nativo). Las demás (`ceremonies` y el resto de `identity`) llegan con sus
-historias. El detalle,
+`HttpTeamMembersApi`, sin guard: si la API responde 403, la pantalla muestra «sin acceso»;
+HU-07: Configuración → Sprint en `/teams/:teamId/settings/sprint`, pestaña hermana de Equipo,
+con su puerto `SprintsPort` y su adaptador `HttpSprintsApi`, y la línea «Día N de M» del
+dashboard). `core/time` tiene `BROWSER_TIME_ZONE` (la zona IANA del navegador) y `shared/utils`,
+las funciones puras de fechas (`local-date-time.ts`). `shared/ui` tiene `aglButton`,
+`aglTextField`, `aglSelect` y `agl-dialog` (sobre el `<dialog>` nativo). Las demás
+(`ceremonies` y el resto de `identity`) llegan con sus historias. El detalle,
 las convenciones y el porqué están en [web/README.md](../web/README.md) y en
 [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 

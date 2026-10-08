@@ -400,9 +400,9 @@ los pasos 1 a 3 de «Cómo probarlo» de *Crear equipos*, que inicia sesión en 
 6. Con la sesión de un Miembro, abrir `/acme/teams/<id>/settings` por URL muestra «sin acceso»,
    y cualquiera de las cuatro rutas responde `403 not_a_team_admin`.
 
-El cambio de rol con un sprint activo todavía no se puede ver en la pantalla, porque la pantalla
-del sprint llega con HU-07 (Configuración → Sprint); mientras tanto se crea un sprint con
-`POST /v1/teams/{team_id}/sprints` desde Swagger, y lo cubren las pruebas automatizadas. Swagger
+Para ver el cambio de rol bloqueado, guarda primero un sprint en **Configuración → Sprint**
+(ver [Configurar el sprint](#configurar-el-sprint-hu-07)): mientras esté activo, el control de rol
+de cada integrante aparece deshabilitado con el motivo. Swagger
 (<http://localhost:8000/docs>) muestra las cuatro operaciones en la sección *teams* con
 sus códigos de error; sin un token válido responden `401 not_authenticated`.
 
@@ -426,6 +426,51 @@ sus códigos de error; sin un token válido responden `401 not_authenticated`.
 - `make invite` envía la invitación con la misma plantilla. Si repites
   `make invite tenant=acme team_id=<uuid> …` con el mismo correo, el comando avisa que revocó
   la anterior y el primer enlace deja de servir.
+
+## Configurar el sprint (HU-07)
+
+**Configuración → Sprint** (`/acme/teams/<id>/settings/sprint`, la pestaña junto a *Equipo*) es
+donde un **Administrador** define el sprint activo del equipo: inicio y fin (fechas de calendario,
+cualquier día de la semana; cuentan todos los días del periodo), la hora de la daily, única para
+todo el equipo, y quiénes participan en ella, en orden de turno. La API lo guarda con
+`POST /v1/teams/{team_id}/sprints` si el equipo no tiene sprint activo y con
+`PUT /v1/teams/{team_id}/sprints/active` si ya lo tiene; el contrato y sus errores están en
+[api.md](api.md#sprint).
+
+- La hora se escribe y se ve en la **zona horaria del navegador**. La web envía el instante en UTC
+  (la hora elegida en el día de inicio) junto con la zona IANA del navegador de quien guarda, y la
+  API guarda las dos cosas ([AD-31](adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)).
+  La pantalla muestra la zona guardada y avisa si al guardar pasará a la del navegador.
+- La próxima daily la calcula la API (`next_daily_at`) y la pantalla solo la formatea.
+- Los participantes se eligen entre los integrantes actuales y se ordenan con los botones *subir* y
+  *bajar*; el primero de la lista habla primero.
+- El dashboard del equipo muestra, a cualquier integrante, «Día N de M» mientras el sprint está en
+  curso, «El sprint empieza el …» antes del inicio, «Sprint terminado» después del fin y «Sin
+  sprint activo» si no hay uno.
+- Cerrar el sprint es la HU-10: todavía no hay botón para hacerlo.
+
+### Cómo probarlo
+
+**En el entorno levantado, con el login (HU-03).** Con la Administradora de *Gestionar
+integrantes*:
+
+1. En **Configuración**, abre la pestaña **Sprint**: sin sprint activo, el formulario está vacío
+   y sin la insignia «Sprint activo».
+2. Elige inicio y fin, la hora de la daily y al menos un participante; ordena los turnos y pulsa
+   **Guardar sprint**. Aparece la insignia «Sprint activo», la zona guardada y la próxima daily.
+3. Vuelve al dashboard: muestra «Día N de M» (o el texto que corresponda a la fecha de inicio).
+4. Pon un fin anterior al inicio: la pantalla lo avisa y no deja guardar; un `POST` o un `PUT`
+   directo desde Swagger responde `422 sprint_ends_before_start`.
+5. Con el sprint activo, en la pestaña **Equipo** el control de rol aparece deshabilitado.
+   Eliminar a un participante lo saca también de la daily, y el orden se compacta.
+6. Con la sesión de un Miembro, el dashboard muestra el día del sprint, y abrir
+   `/acme/teams/<id>/settings/sprint` por URL muestra «sin acceso» (`403 not_a_team_admin`).
+
+**Pruebas automatizadas.** `make test-integration` recorre los flujos HTTP del sprint contra
+PostgreSQL (`tests/api/integration/teams/presentation/http/test_sprint_flow.py`),
+`tests/shared/unit/sprint_calendar/`
+cubre el día N de M y las ocurrencias de la daily con el cambio de horario, y `make test-web` monta
+la pantalla y el dashboard con puertos falsos.
 
 ## Entrar a Keycloak
 

@@ -16,15 +16,7 @@
       }
     </div>
   } @else if (forbidden()) {
-    <div class="rounded-2xl border border-border bg-surface p-6 text-center shadow-sm sm:p-8">
-      <h1 class="font-display text-xl font-semibold" data-testid="settings-forbidden-title">
-        {{ t('forbidden.title') }}
-      </h1>
-      <p class="mt-2 text-sm text-muted">{{ t('forbidden.text') }}</p>
-      <a aglButton variant="secondary" class="mt-6" [routerLink]="tenant.path('teams', teamId())">
-        {{ t('back') }}
-      </a>
-    </div>
+    <agl-settings-no-access [teamId]="teamId()" [text]="t('forbidden.text')" />
   } @else {
     <a
       class="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -48,11 +40,13 @@
       {{ t('back') }}
     </a>
 
-    <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <agl-settings-tabs class="mt-2 block" [teamId]="teamId()" />
+
+    <div class="mt-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 class="font-display text-3xl font-bold tracking-tight" data-testid="settings-title">
+        <h2 class="font-display text-2xl font-semibold tracking-tight" data-testid="settings-title">
           {{ t('title') }}
-        </h1>
+        </h2>
         <p class="mt-1 text-sm text-muted">{{ t('subtitle') }}</p>
       </div>
       @if (members() !== null) {
