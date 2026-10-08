@@ -1,12 +1,21 @@
-"""ReconfigureSprint: an admin edits the team's active sprint whole; without one there is
-nothing to edit (HU-07)."""
+"""ReconfigureSprint: an admin edits the team's active sprint whole, with the same rules as
+when it starts; without one there is nothing to edit (HU-07)."""
 
+import logging
 from datetime import UTC, date, datetime
 
 import pytest
 
 from agilina_api.teams.application.commands.reconfigure_sprint import ReconfigureSprintHandler
-from agilina_api.teams.domain.errors import NoActiveSprintError, TeamNotFoundError
+from agilina_api.teams.domain.errors import (
+    DailyParticipantNotAMemberError,
+    DuplicateDailyParticipantError,
+    InvalidTimeZoneError,
+    NoActiveSprintError,
+    NoDailyParticipantsError,
+    SprintEndsBeforeStartError,
+    TeamNotFoundError,
+)
 from agilina_api.teams.domain.sprint import DailyTime, SprintPeriod, SprintStatus
 from tests.api.builders import ReconfigureSprintBuilder, SprintBuilder, TeamBuilder, next_id
 from tests.api.doubles import FakeTeamsUnitOfWork
@@ -20,14 +29,11 @@ class Scenario:
         self.uow = FakeTeamsUnitOfWork()
         self.handler = ReconfigureSprintHandler(lambda: self.uow)
 
-    async def a_team(self):
-        return await (
-            TeamBuilder()
-            .with_admin(self.ana)
-            .with_member(self.bruno)
-            .with_member(self.carla)
-            .saved_in(self.uow.teams)
+    async def a_team(self, builder: TeamBuilder | None = None):
+        team = builder or (
+            TeamBuilder().with_admin(self.ana).with_member(self.bruno).with_member(self.carla)
         )
+        return await team.saved_in(self.uow.teams)
 
     async def a_sprint(self, builder: SprintBuilder):
         return await builder.saved_in(self.uow.sprints)
@@ -106,3 +112,103 @@ async def test_a_daily_time_without_an_offset_changes_nothing(scenario):
 
     assert scenario.uow.sprints.sprints[sprint.id].daily_time == sprint.daily_time
     assert scenario.uow.sprints.saved == [] and scenario.uow.committed is False
+
+
+# ----------------------------------------------------------------- the rules --
+@pytest.mark.parametrize(
+    ("edit", "error"),
+    [
+        (
+            lambda b, s: b.with_period(date(2026, 10, 16), date(2026, 10, 15)),
+            SprintEndsBeforeStartError,
+        ),
+        (
+            lambda b, s: b.with_daily_time(datetime(2026, 10, 5, 14, 0, tzinfo=UTC), "utc"),
+            InvalidTimeZoneError,
+        ),
+        (lambda b, s: b.with_participants(), NoDailyParticipantsError),
+        (lambda b, s: b.with_participants(s.bruno, s.bruno), DuplicateDailyParticipantError),
+        (lambda b, s: b.with_participants(s.ana, next_id()), DailyParticipantNotAMemberError),
+    ],
+    ids=["ends_before_start", "time_zone", "no_participants", "twice", "outsider"],
+)
+async def test_an_edit_that_breaks_a_rule_changes_nothing(scenario, edit, error):
+    team = await scenario.a_team()
+    sprint = await scenario.a_sprint(SprintBuilder().for_team(team))
+    valid = ReconfigureSprintBuilder().for_team(team.id).with_participants(scenario.ana)
+
+    with pytest.raises(error):
+        await scenario.handler.handle(edit(valid, scenario).build())
+
+    stored = scenario.uow.sprints.sprints[sprint.id]
+    assert (stored.period, stored.daily_time, stored.participants) == (
+        sprint.period,
+        sprint.daily_time,
+        sprint.participants,
+    )
+    assert scenario.uow.sprints.saved == [] and scenario.uow.committed is False
+
+
+async def test_a_member_who_was_removed_cannot_be_kept_in_the_daily(scenario):
+    team = await scenario.a_team(
+        TeamBuilder().with_admin(scenario.ana).with_removed_member(scenario.bruno)
+    )
+    sprint = await scenario.a_sprint(
+        SprintBuilder().for_team_id(team.id).with_participants(scenario.ana)
+    )
+
+    with pytest.raises(DailyParticipantNotAMemberError):
+        await scenario.handler.handle(
+            ReconfigureSprintBuilder()
+            .for_team(team.id)
+            .with_participants(scenario.bruno, scenario.ana)
+            .build()
+        )
+
+    assert scenario.uow.sprints.sprints[sprint.id].participants == (scenario.ana,)
+    assert scenario.uow.committed is False
+
+
+async def test_a_sprint_left_without_participants_is_configured_again_with_active_members(
+    scenario,
+):
+    """A removal may leave the daily empty (Q4); the next edit gives it its participants."""
+    team = await scenario.a_team()
+    sprint = await scenario.a_sprint(SprintBuilder().for_team_id(team.id))
+
+    await scenario.handler.handle(
+        ReconfigureSprintBuilder()
+        .for_team(team.id)
+        .with_participants(scenario.carla, scenario.bruno)
+        .build()
+    )
+
+    assert scenario.uow.sprints.sprints[sprint.id].participants == (scenario.carla, scenario.bruno)
+
+
+# ------------------------------------------------------------------- the log --
+async def test_an_edit_is_logged_with_who_asked_and_the_sprint(scenario, caplog):
+    team = await scenario.a_team()
+    sprint = await scenario.a_sprint(SprintBuilder().for_team(team))
+
+    with caplog.at_level(logging.INFO):
+        await scenario.handler.handle(
+            ReconfigureSprintBuilder()
+            .for_team(team.id)
+            .with_participants(scenario.carla)
+            .requested_by_admin(scenario.ana)
+            .build()
+        )
+
+    assert f"Team {team.id}: user {scenario.ana} reconfigured sprint {sprint.id}" in caplog.text
+    assert str(scenario.carla) not in caplog.text
+
+
+async def test_a_refused_edit_logs_nothing(scenario, caplog):
+    team = await scenario.a_team()
+    await scenario.a_sprint(SprintBuilder().for_team(team))
+
+    with caplog.at_level(logging.INFO), pytest.raises(NoDailyParticipantsError):
+        await scenario.handler.handle(ReconfigureSprintBuilder().for_team(team.id).build())
+
+    assert "reconfigured sprint" not in caplog.text

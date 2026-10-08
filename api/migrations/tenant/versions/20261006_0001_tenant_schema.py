@@ -12,8 +12,11 @@ both sides agree on the limit).
 "does the team have a sprint in progress?") and HU-07 completes it: the daily's time as a UTC
 anchor instant plus the IANA time zone it was captured in (AD-31; no column holds a local time),
 and ``sprint_participant``, the daily's participants with their ``turn_order`` from 1. Both
-foreign keys of a participant share its ``team_id``, so the database itself keeps every
-participant a member of the sprint's team. The statuses are the glossary's (``planned``,
+foreign keys of a participant share its ``team_id``, so the database keeps every participant
+someone who has been a member of the sprint's team. ``team_member`` rows are never deleted (a
+removed member keeps theirs as ``removed``), so the foreign key cannot tell an active member
+from a removed one: the ``Sprint`` aggregate admits only active members, and removing a member
+takes them out of the active sprint's participants. The statuses are the glossary's (``planned``,
 ``active``, ``closed``), and the partial unique index makes the database keep a team to one
 active sprint at most.
 
@@ -179,8 +182,9 @@ UPGRADE = [
     "CREATE TRIGGER trg_sprint_updated BEFORE UPDATE ON sprint "
     "FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
     # ----------------------------------------------------- sprint_participant --
-    # The daily's participants (HU-07). Both foreign keys share team_id: the participant is a
-    # member of the very team the sprint belongs to. The order of the list is the turn order.
+    # The daily's participants (HU-07). Both foreign keys share team_id: the participant has a
+    # membership (active or removed) in the very team the sprint belongs to. Being an active
+    # member is the aggregate's rule, not the database's. The order of the list is the turn order.
     """
     CREATE TABLE sprint_participant (
         sprint_id   UUID        NOT NULL,
@@ -198,7 +202,9 @@ UPGRADE = [
     )
     """,
     "COMMENT ON TABLE sprint_participant IS "
-    "'The daily''s participants of a sprint, each a member of its team (HU-07).'",
+    "'The daily''s participants of a sprint (HU-07). The foreign key only ensures each one "
+    "has a membership in the sprint''s team; that it is active is kept by the application, "
+    "which takes a removed member out of the active sprint.'",
     "COMMENT ON COLUMN sprint_participant.turn_order IS "
     "'Position in the daily''s round, from 1: the order of the list is the turn order.'",
 ]

@@ -7,11 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agilina_api.teams.application.dtos import ActiveSprintRecord
 from agilina_api.teams.application.ports.outbound import SprintQueries
-from agilina_api.teams.infrastructure.persistence.orm_models import SprintRow
-from agilina_api.teams.infrastructure.persistence.sprint_queries import (
-    is_active_sprint_of,
-    participants_of,
+from agilina_api.teams.infrastructure.persistence.orm_models import (
+    SprintParticipantRow,
+    SprintRow,
 )
+from agilina_api.teams.infrastructure.persistence.sprint_queries import is_active_sprint_of
 
 
 class SqlSprintQueries(SprintQueries):
@@ -19,23 +19,33 @@ class SqlSprintQueries(SprintQueries):
         self._session_factory = session_factory
 
     async def active_sprint_of(self, team_id: UUID) -> ActiveSprintRecord | None:
-        statement = select(
-            SprintRow.id,
-            SprintRow.start_date,
-            SprintRow.end_date,
-            SprintRow.daily_time_utc,
-            SprintRow.daily_time_zone,
-        ).where(is_active_sprint_of(team_id))
+        """One statement for the sprint and its participants, so the read is a single
+        snapshot: an edit committed halfway cannot mix the old sprint with the new
+        participants. One row per participant, in turn order; a sprint left with no
+        participant comes back as one row with no ``user_id``."""
+        statement = (
+            select(
+                SprintRow.id,
+                SprintRow.start_date,
+                SprintRow.end_date,
+                SprintRow.daily_time_utc,
+                SprintRow.daily_time_zone,
+                SprintParticipantRow.user_id,
+            )
+            .outerjoin(SprintParticipantRow, SprintParticipantRow.sprint_id == SprintRow.id)
+            .where(is_active_sprint_of(team_id))
+            .order_by(SprintParticipantRow.turn_order)
+        )
         async with self._session_factory() as session:
-            row = (await session.execute(statement)).one_or_none()
-            if row is None:
-                return None
-            participants = await participants_of(session, row.id)
+            rows = (await session.execute(statement)).all()
+        if not rows:
+            return None
+        sprint = rows[0]
         return ActiveSprintRecord(
-            sprint_id=row.id,
-            start_date=row.start_date,
-            end_date=row.end_date,
-            daily_time=row.daily_time_utc,
-            time_zone=row.daily_time_zone,
-            participants=participants,
+            sprint_id=sprint.id,
+            start_date=sprint.start_date,
+            end_date=sprint.end_date,
+            daily_time=sprint.daily_time_utc,
+            time_zone=sprint.daily_time_zone,
+            participants=tuple(row.user_id for row in rows if row.user_id is not None),
         )

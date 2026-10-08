@@ -231,7 +231,9 @@ async def change_member_role(
         "being called to the team's ceremonies. Their account is not deleted, since it may "
         "belong to other teams, and they can be invited again. The team's only admin cannot "
         "be removed, also when they ask it themselves (`last_admin`); a sprint in progress "
-        "does not prevent it. Only an admin of the team may do it."
+        "does not prevent it. If they take part in the daily of the active sprint, they leave "
+        "it in the same change and whoever came after them moves one turn forward, even if "
+        "the daily is left with no participant. Only an admin of the team may do it."
     ),
     responses={
         204: {"description": "Removed"},
@@ -260,6 +262,21 @@ ACTIVE_SPRINT_BODY = (
     "The body is the active sprint as `GET …/sprints/active` returns it: its day N of M and "
     "its next daily are computed at the moment of the request."
 )
+SPRINT_RULES = (
+    "The end date cannot be before the start date (`sprint_ends_before_start`; both may be "
+    "the same day), the time zone must be a known IANA one (`invalid_time_zone`), and the "
+    "daily needs at least one participant (`no_daily_participants`), none twice "
+    "(`duplicate_daily_participant`) and each an active member of the team "
+    "(`daily_participant_not_a_member`); when a rule is broken, nothing is saved."
+)
+# The configuration of the sprint breaks one of these rules.
+SPRINT_RULE_ERRORS = (
+    TeamsErrors.SPRINT_ENDS_BEFORE_START,
+    TeamsErrors.INVALID_TIME_ZONE,
+    TeamsErrors.NO_DAILY_PARTICIPANTS,
+    TeamsErrors.DUPLICATE_DAILY_PARTICIPANT,
+    TeamsErrors.DAILY_PARTICIPANT_NOT_A_MEMBER,
+)
 
 
 async def _active_sprint(handler: GetActiveSprintHandler, team_id: UUID) -> ActiveSprintResponse:
@@ -279,6 +296,8 @@ async def _active_sprint(handler: GetActiveSprintHandler, team_id: UUID) -> Acti
         "Stores the sprint with its period, the daily's time (one for the whole team, with the "
         "time zone of the browser of whoever saves) and the daily's participants in turn "
         "order. The sprint is saved `active`, and while it is, no role changes in the team. "
+        "A team has one active sprint at most: while it has one, it is edited with `PUT "
+        f"…/sprints/active` and starting another answers `active_sprint_exists`. {SPRINT_RULES} "
         f"Only an admin of the team may do it. {ACTIVE_SPRINT_BODY}"
     ),
     responses={
@@ -289,6 +308,8 @@ async def _active_sprint(handler: GetActiveSprintHandler, team_id: UUID) -> Acti
             *ADMINS_ONLY,
             SharedErrors.TEAM_NOT_FOUND,
             TeamsErrors.NO_ACTIVE_SPRINT,
+            TeamsErrors.ACTIVE_SPRINT_EXISTS,
+            *SPRINT_RULE_ERRORS,
         ),
     },
 )
@@ -307,6 +328,7 @@ async def start_sprint(
             daily_time=request.daily_time,
             time_zone=request.time_zone,
             participants=tuple(request.participants),
+            requested_by=team.user_id,
         )
     )
     response.headers["Location"] = f"{router.prefix}/{team.team_id}/sprints/active"
@@ -340,8 +362,8 @@ async def get_active_sprint(
     description=(
         "Replaces the whole configuration of the active sprint: its period, the daily's time "
         "with the time zone of the browser of whoever saves (it replaces the stored one) and "
-        "the daily's participants in turn order. The sprint stays `active`. Only an admin of "
-        f"the team may do it. {ACTIVE_SPRINT_BODY}"
+        "the daily's participants in turn order. The sprint stays `active`. "
+        f"{SPRINT_RULES} Only an admin of the team may do it. {ACTIVE_SPRINT_BODY}"
     ),
     responses=errors_of(
         *SIGNED_IN,
@@ -349,6 +371,7 @@ async def get_active_sprint(
         *ADMINS_ONLY,
         SharedErrors.TEAM_NOT_FOUND,
         TeamsErrors.NO_ACTIVE_SPRINT,
+        *SPRINT_RULE_ERRORS,
     ),
 )
 async def reconfigure_sprint(
@@ -365,6 +388,7 @@ async def reconfigure_sprint(
             daily_time=request.daily_time,
             time_zone=request.time_zone,
             participants=tuple(request.participants),
+            requested_by=team.user_id,
         )
     )
     return await _active_sprint(active_sprint, team.team_id)

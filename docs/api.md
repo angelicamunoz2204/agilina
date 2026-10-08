@@ -81,6 +81,12 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 409 | `last_admin` | El cambio dejaría al equipo sin admin: a su único admin no se le baja el rol ni se le retira, tampoco por su propia mano | — |
 | 409 | `sprint_in_progress` | El equipo tiene un sprint en curso: los roles no cambian mientras dure | — |
 | 404 | `no_active_sprint` | El equipo no tiene un sprint activo que editar | — |
+| 409 | `active_sprint_exists` | El equipo ya tiene un sprint activo: se edita, no se crea otro | — |
+| 422 | `sprint_ends_before_start` | La fecha de fin del sprint es anterior a la de inicio | — |
+| 422 | `invalid_time_zone` | La zona horaria no es una zona IANA conocida | — |
+| 422 | `no_daily_participants` | La daily no tiene ningún participante | — |
+| 422 | `duplicate_daily_participant` | Un participante de la daily aparece más de una vez | — |
+| 422 | `daily_participant_not_a_member` | Un participante de la daily no es miembro activo del equipo | — |
 | 422 | `invalid_email` | El correo no es una dirección válida | — |
 | 422 | `invalid_full_name` | El nombre de la persona está en blanco | — |
 | 409 | `already_a_team_member` | La persona ya es miembro activo del equipo | — |
@@ -250,7 +256,9 @@ rol que ya tiene no cambia nada. Queda en el registro quién cambió qué rol a 
 Retira a un miembro activo del equipo, que puede ser el mismo admin que lo pide. Solo para los
 admins del equipo. Termina la membresía (queda como `removed`, con su fecha): la cuenta de la
 persona no se toca, porque puede estar en otros equipos, y se la puede volver a invitar. Un sprint
-en curso no lo impide. Queda en el registro quién retiró a quién.
+en curso no lo impide. Si la persona participa en la daily del sprint activo, sale de los
+participantes en el mismo cambio y quienes iban después avanzan un turno (el orden sigue desde 1, sin
+huecos), aunque la daily quede sin participantes. Queda en el registro quién retiró a quién.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
@@ -313,6 +321,15 @@ participants}` (un campo desconocido se rechaza).
 - `participants` son los `user_id` de los integrantes que participan en la daily, en orden de
   turno: el primero habla primero.
 
+Reglas al crear y al editar (si una se incumple, no se guarda nada):
+
+- el fin no puede ser anterior al inicio (`sprint_ends_before_start`); pueden ser el mismo día;
+- `time_zone` debe ser una zona IANA conocida (`invalid_time_zone`), con sus mayúsculas exactas;
+- la daily necesita al menos un participante (`no_daily_participants`), ninguno repetido
+  (`duplicate_daily_participant`) y todos miembros activos del equipo
+  (`daily_participant_not_a_member`). Un integrante nuevo no se agrega solo, y uno retirado sale
+  de los participantes del sprint activo (ver `DELETE …/members/{user_id}`).
+
 La respuesta de las tres rutas es el sprint activo: `{id, start_date, end_date, daily_time,
 time_zone, next_daily_at, participants: [{user_id, turn_order}], day: {number, total, phase}}`.
 `daily_time` es el instante de anclaje en UTC; `next_daily_at`, la próxima daily en UTC, calculada
@@ -327,7 +344,12 @@ roles del equipo (`409 sprint_in_progress` en `PATCH …/members/{user_id}`). Ce
 
 ### `POST /v1/teams/{team_id}/sprints`
 
-Configura el sprint del equipo, que queda activo. Solo para los admins del equipo.
+Configura el sprint del equipo, que queda activo. Solo para los admins del equipo. Un equipo tiene
+a lo sumo un sprint activo: mientras lo tenga, se edita con `PUT …/sprints/active`. La API lo
+comprueba con el equipo bloqueado y un índice único parcial de la base lo respalda; si dos
+peticiones simultáneas llegan a la base, la segunda recibe el mismo `active_sprint_exists`.
+Esa comprobación va antes que las reglas del sprint: con un sprint activo, la respuesta es el
+`409` aunque el cuerpo también incumpla alguna regla de las `422`.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
@@ -337,7 +359,10 @@ Configura el sprint del equipo, que queda activo. Solo para los admins del equip
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 404 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
+| 409 | error `active_sprint_exists` | El equipo ya tiene un sprint activo; nada se guarda |
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
+| 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada se guarda |
+| 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada se guarda |
 
 ### `GET /v1/teams/{team_id}/sprints/active`
 
@@ -366,6 +391,8 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 | 404 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
+| 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada cambia |
+| 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada cambia |
 
 ## Ceremonias (contrato del worker)
 

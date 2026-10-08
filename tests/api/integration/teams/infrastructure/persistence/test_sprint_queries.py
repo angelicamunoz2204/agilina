@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+from agilina_api.teams.domain.errors import ActiveSprintExistsError
 from agilina_api.teams.infrastructure.persistence.sprint_queries import (
     SqlActiveSprints,
     team_has_active_sprint,
@@ -66,8 +67,12 @@ async def test_a_team_cannot_have_two_sprints_in_progress(session_factory):
     team = await stored_team(session_factory)
     await stored_sprint(session_factory, SprintBuilder().for_team(team))
 
-    with pytest.raises(IntegrityError, match="sprint_one_active_per_team"):
+    # The repository turns the index's refusal into the domain's error (HU-07).
+    with pytest.raises(ActiveSprintExistsError) as refused:
         await stored_sprint(session_factory, SprintBuilder().for_team(team))
+
+    assert isinstance(refused.value.__cause__, IntegrityError)
+    assert "sprint_one_active_per_team" in str(refused.value.__cause__)
 
 
 async def test_two_teams_can_each_have_their_sprint_in_progress(session_factory):

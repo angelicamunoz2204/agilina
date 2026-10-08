@@ -79,9 +79,13 @@ class _SprintConfigurationBuilder:
     daily_time: datetime = DAILY_TIME
     time_zone: str = DAILY_TIME_ZONE
     participants: tuple[UUID, ...] = ()
+    requested_by: UUID = field(default_factory=next_id)
 
     def for_team(self, team_id: UUID) -> Self:
         return replace(self, team_id=team_id)
+
+    def requested_by_admin(self, user_id: UUID) -> Self:
+        return replace(self, requested_by=user_id)
 
     def with_period(self, start: date, end: date) -> Self:
         return replace(self, start_date=start, end_date=end)
@@ -106,6 +110,7 @@ class StartSprintBuilder(_SprintConfigurationBuilder):
             daily_time=self.daily_time,
             time_zone=self.time_zone,
             participants=self.participants,
+            requested_by=self.requested_by,
         )
 
 
@@ -121,4 +126,5 @@ class ReconfigureSprintBuilder(_SprintConfigurationBuilder):
             daily_time=self.daily_time,
             time_zone=self.time_zone,
             participants=self.participants,
+            requested_by=self.requested_by,
         )

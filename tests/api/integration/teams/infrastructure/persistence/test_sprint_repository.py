@@ -1,5 +1,6 @@
 """The sprint repository against a real PostgreSQL: the sprint round-trips with the daily's
-time as a UTC instant, its capture time zone and the participants in turn order (HU-07)."""
+time as a UTC instant, its capture time zone and the participants in turn order, and a second
+active sprint that reaches the database is refused as the domain's error (HU-07)."""
 
 from datetime import UTC, date, datetime
 
@@ -8,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+from agilina_api.teams.domain.errors import ActiveSprintExistsError
 from agilina_api.teams.domain.sprint import DailyTime, SprintPeriod, SprintStatus
 from agilina_api.teams.infrastructure.persistence.sprint_repository import (
     SqlAlchemySprintRepository,
@@ -138,7 +140,12 @@ async def test_saving_replaces_the_period_the_daily_time_and_the_participants(
         repository = SqlAlchemySprintRepository(uow.session)
         loaded = await repository.get_active(atlas.team.id)
         assert loaded is not None
-        loaded.reconfigure(period=period, daily_time=tokyo, participants=[atlas.carla, atlas.ana])
+        loaded.reconfigure(
+            period=period,
+            daily_time=tokyo,
+            participants=[atlas.carla, atlas.ana],
+            active_members=atlas.team.active_member_ids,
+        )
         await repository.save(loaded)
         await uow.commit()
 
@@ -162,7 +169,10 @@ async def test_reversing_the_turn_order_does_not_collide_with_the_unique_turns(
             loaded = await repository.get_active(atlas.team.id)
             assert loaded is not None
             loaded.reconfigure(
-                period=loaded.period, daily_time=loaded.daily_time, participants=order
+                period=loaded.period,
+                daily_time=loaded.daily_time,
+                participants=order,
+                active_members=atlas.team.active_member_ids,
             )
             await repository.save(loaded)
             await uow.commit()
@@ -191,5 +201,51 @@ async def test_the_database_keeps_every_participant_a_member_of_the_sprints_team
             session_factory,
             SprintBuilder().for_team(atlas.team).with_participants(atlas.ana, outsider.id),
         )
+
+    assert await _active(session_factory, atlas.team.id) is None
+
+
+async def test_a_second_active_sprint_that_skips_the_check_gets_the_domains_error(
+    session_factory, engine, atlas
+):
+    """``StartSprint`` asks first under the team's lock; if a second active sprint still
+    reaches the database (the check was skipped), the index refuses it and the repository
+    answers ``ActiveSprintExistsError``, not an ``IntegrityError``."""
+    first = await stored_sprint(
+        session_factory, SprintBuilder().for_team(atlas.team).with_participants(atlas.ana)
+    )
+    second = SprintBuilder().for_team(atlas.team).with_participants(atlas.bruno).build()
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        with pytest.raises(ActiveSprintExistsError) as refused:
+            await SqlAlchemySprintRepository(uow.session).add(second)
+
+    assert isinstance(refused.value.__cause__, IntegrityError)
+    assert "sprint_one_active_per_team" in str(refused.value.__cause__)
+    loaded = await _active(session_factory, atlas.team.id)
+    assert loaded is not None and loaded.id == first.id
+    assert await _turns(engine, second.id) == []
+
+
+async def test_a_closed_sprint_does_not_stop_a_new_active_one_from_being_added(
+    session_factory, atlas
+):
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).closed())
+
+    added = await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team))
+
+    loaded = await _active(session_factory, atlas.team.id)
+    assert loaded is not None and loaded.id == added.id
+
+
+async def test_another_violation_on_add_goes_up_as_it_is(session_factory, atlas):
+    """Only ``sprint_one_active_per_team`` is the domain's: a participant who is not a member
+    of the team breaks a foreign key, and that ``IntegrityError`` is not translated."""
+    outsider = await stored_user(session_factory)
+    sprint = SprintBuilder().for_team(atlas.team).with_participants(outsider.id).build()
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        with pytest.raises(IntegrityError, match="sprint_participant_member_fk"):
+            await SqlAlchemySprintRepository(uow.session).add(sprint)
 
     assert await _active(session_factory, atlas.team.id) is None

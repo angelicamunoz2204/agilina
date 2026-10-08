@@ -111,6 +111,29 @@ def test_the_admin_count_only_counts_active_admins():
     assert team.admin_count == 2
 
 
+def test_the_active_member_ids_are_every_active_member_whatever_their_role():
+    """Who may take part in the team's ceremonies (HU-07): admins and members alike, but not
+    someone who was removed, although their membership is kept."""
+    ana, bruno, carla = next_id(), next_id(), next_id()
+    team = TeamBuilder().with_admin(ana).with_member(bruno).with_removed_member(carla).build()
+
+    assert team.active_member_ids == frozenset({ana, bruno})
+    assert team.membership_of(carla) is not None
+
+
+def test_someone_removed_who_comes_back_is_an_active_member_again():
+    ana, bruno = next_id(), next_id()
+    team = TeamBuilder().with_admin(ana).with_removed_member(bruno).build()
+
+    _join(team, user_id=bruno, now=LATER)
+
+    assert team.active_member_ids == frozenset({ana, bruno})
+
+
+def test_a_team_without_members_has_no_active_member():
+    assert TeamBuilder().build().active_member_ids == frozenset()
+
+
 # ------------------------------------------------- created by a user (HU-05) --
 def test_a_team_created_by_a_user_makes_them_its_admin():
     user_id = next_id()

@@ -704,6 +704,137 @@ SPRINT_WRITES = [("POST", "/{atlas}/sprints"), ("PUT", "/{atlas}/sprints/active"
 SPRINT_ROUTES = [*SPRINT_WRITES, ("GET", "/{atlas}/sprints/active")]
 
 
+def _rule_breaking_body(api: Api, rule: str) -> dict:
+    """A sprint body that breaks one of the rules of the domain, and only that one."""
+    changes = {
+        "sprint_ends_before_start": {"start_date": "2026-10-16", "end_date": "2026-10-15"},
+        "invalid_time_zone": {"time_zone": "Mars/Olympus"},
+        "no_daily_participants": {"participants": []},
+        "duplicate_daily_participant": {"participants": [str(api.carla), str(api.carla)]},
+        # Bruno has an account but is not a member of Atlas.
+        "daily_participant_not_a_member": {"participants": [str(api.ana), str(api.bruno)]},
+    }[rule]
+    return _sprint_body(api, **changes)
+
+
+SPRINT_RULES = [
+    "sprint_ends_before_start",
+    "invalid_time_zone",
+    "no_daily_participants",
+    "duplicate_daily_participant",
+    "daily_participant_not_a_member",
+]
+
+
+@pytest.mark.parametrize("rule", SPRINT_RULES)
+async def test_starting_a_sprint_that_breaks_a_rule_answers_422_with_its_code(api, rule):
+    response = await api.request(
+        "POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_rule_breaking_body(api, rule)
+    )
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert set(error) == {"status", "code", "message", "request_id"}
+    assert (error["status"], error["code"]) == (422, rule)
+    assert api.members_uow.sprints.sprints == {} and api.members_uow.committed is False
+
+
+@pytest.mark.parametrize("rule", SPRINT_RULES)
+async def test_an_edit_that_breaks_a_rule_answers_422_with_its_code_and_changes_nothing(api, rule):
+    sprint = await (
+        SprintBuilder()
+        .for_team_id(api.atlas)
+        .with_participants(api.ana)
+        .saved_in(api.members_uow.sprints)
+    )
+
+    response = await api.request(
+        "PUT", f"/{api.atlas}/sprints/active", TOKEN_ANA, json=_rule_breaking_body(api, rule)
+    )
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert set(error) == {"status", "code", "message", "request_id"}
+    assert (error["status"], error["code"]) == (422, rule)
+    stored = _active_sprint(api)
+    assert stored is not None and stored.participants == (api.ana,)
+    assert (stored.period, stored.daily_time) == (sprint.period, sprint.daily_time)
+    assert api.members_uow.sprints.saved == [] and api.members_uow.committed is False
+
+
+@pytest.mark.parametrize(("method", "path"), SPRINT_WRITES)
+async def test_a_refused_sprint_does_not_echo_what_was_sent(api, method, path):
+    """The message and the details are the catalog's: the values sent are not repeated."""
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    body = _sprint_body(api, time_zone="Europe/Atlantis", participants=[str(api.bruno)])
+
+    zone = await api.request(method, _path(api, path), TOKEN_ANA, json=body)
+    outsider = await api.request(
+        method, _path(api, path), TOKEN_ANA, json=_sprint_body(api, participants=[str(api.bruno)])
+    )
+
+    assert zone.json()["error"]["code"] == "invalid_time_zone"
+    assert outsider.json()["error"]["code"] == "daily_participant_not_a_member"
+    assert "Atlantis" not in zone.text and str(api.bruno) not in outsider.text
+
+
+async def test_a_sprint_may_start_and_end_on_the_same_day(api):
+    body = _sprint_body(api, start_date="2026-10-10", end_date="2026-10-10")
+
+    response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=body)
+
+    assert response.status_code == 201
+    assert response.json()["day"] == {"number": 0, "total": 1, "phase": "not_started"}
+
+
+async def test_starting_a_second_active_sprint_answers_409_active_sprint_exists(api):
+    first = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+    api.members_uow.active_sprints.teams_with_active_sprint.add(api.atlas)
+    api.members_uow.committed = False
+
+    response = await api.request(
+        "POST",
+        f"/{api.atlas}/sprints",
+        TOKEN_ANA,
+        json=_sprint_body(api, participants=[str(api.ana)]),
+    )
+
+    assert first.status_code == 201
+    assert response.status_code == 409
+    error = response.json()["error"]
+    assert set(error) == {"status", "code", "message", "request_id"}
+    assert error["code"] == "active_sprint_exists"
+    assert len(api.members_uow.sprints.sprints) == 1 and api.members_uow.committed is False
+    active = _active_sprint(api)
+    assert active is not None and active.participants == (api.carla, api.ana)
+
+
+async def test_a_member_in_the_daily_who_is_removed_leaves_it_and_the_turns_close_up(api):
+    await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    removed = await api.request("DELETE", f"/{api.atlas}/members/{api.carla}", TOKEN_ANA)
+    read = await api.request("GET", f"/{api.atlas}/sprints/active", TOKEN_ANA)
+
+    assert removed.status_code == 204
+    assert read.json()["participants"] == [{"user_id": str(api.ana), "turn_order": 1}]
+
+
+async def test_the_admin_of_the_token_is_who_started_the_sprint_in_the_log(api, caplog):
+    with caplog.at_level(logging.INFO):
+        await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    assert f"Team {api.atlas}: user {api.ana} started sprint" in caplog.text
+
+
+async def test_the_admin_of_the_token_is_who_edited_the_sprint_in_the_log(api, caplog):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+
+    with caplog.at_level(logging.INFO):
+        await api.request("PUT", f"/{api.atlas}/sprints/active", TOKEN_ANA, json=_sprint_body(api))
+
+    assert f"Team {api.atlas}: user {api.ana} reconfigured sprint" in caplog.text
+
+
 @pytest.mark.parametrize(("method", "path"), SPRINT_WRITES)
 async def test_a_member_who_is_not_an_admin_cannot_configure_the_sprint(api, method, path):
     await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
@@ -748,7 +879,7 @@ async def test_the_openapi_documents_the_sprint_routes_and_their_errors(api):
     create = spec["paths"]["/v1/teams/{team_id}/sprints"]["post"]
     active = spec["paths"]["/v1/teams/{team_id}/sprints/active"]
     # 400 and the 404 of the tenant come with every signed-in route (AD-29).
-    assert set(create["responses"]) == {"201", "400", "401", "403", "404", "422"}
+    assert set(create["responses"]) == {"201", "400", "401", "403", "404", "409", "422"}
     assert set(active["get"]["responses"]) == {"200", "400", "401", "403", "404", "422"}
     assert set(active["put"]["responses"]) == {"200", "400", "401", "403", "404", "422"}
     assert "`not_a_team_admin`" in create["responses"]["403"]["description"]
@@ -760,3 +891,21 @@ async def test_the_openapi_documents_the_sprint_routes_and_their_errors(api):
     schemas = spec["components"]["schemas"]
     assert set(schemas["SprintDayResponse"]["properties"]) == {"number", "total", "phase"}
     assert schemas["SprintRequest"]["additionalProperties"] is False
+
+
+async def test_the_openapi_documents_each_rule_of_the_sprint_with_its_code(api):
+    async with api.client() as client:
+        spec = (await client.get("/openapi.json")).json()
+
+    create = spec["paths"]["/v1/teams/{team_id}/sprints"]["post"]
+    edit = spec["paths"]["/v1/teams/{team_id}/sprints/active"]["put"]
+    for operation in (create, edit):
+        refused = operation["responses"]["422"]["description"]
+        assert all(f"`{code}`" in refused for code in SPRINT_RULES)
+        assert all(f"`{code}`" in operation["description"] for code in SPRINT_RULES)
+    assert "`active_sprint_exists`" in create["responses"]["409"]["description"]
+    assert "409" not in edit["responses"]
+    request = spec["components"]["schemas"]["SprintRequest"]
+    assert all(f"`{code}`" in request["description"] for code in SPRINT_RULES)
+    member = spec["paths"]["/v1/teams/{team_id}/members/{user_id}"]["delete"]
+    assert "daily" in member["description"]

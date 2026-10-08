@@ -6,7 +6,11 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 class SprintRequest(BaseModel):
     """The whole configuration of the sprint, to create it or to edit the active one. The
-    team comes from the path."""
+    team comes from the path.
+
+    The shape is checked here (`422 validation_error`); the rules, by the domain, each with
+    its own code: `sprint_ends_before_start`, `invalid_time_zone`, `no_daily_participants`,
+    `duplicate_daily_participant` and `daily_participant_not_a_member`."""
 
     # An unknown field (``team_id``, ``status``…) is refused, not silently ignored.
     model_config = ConfigDict(extra="forbid")
@@ -17,7 +21,8 @@ class SprintRequest(BaseModel):
     )
     end_date: date = Field(
         description=(
-            "The sprint's last day, included. Every day of the period counts, weekends too."
+            "The sprint's last day, included. Every day of the period counts, weekends too. "
+            "It may be the start date, but not before it (`sprint_ends_before_start`)."
         ),
         examples=["2026-10-16"],
     )
@@ -32,12 +37,16 @@ class SprintRequest(BaseModel):
     time_zone: str = Field(
         description=(
             "The IANA time zone of the browser of whoever saves (AD-31). It fixes the daily's "
-            "wall-clock time and the sprint's calendar, and replaces the stored one."
+            "wall-clock time and the sprint's calendar, and replaces the stored one. A key the "
+            "time zone database does not know, with its exact case, answers `invalid_time_zone`."
         ),
         examples=["America/Bogota"],
     )
     participants: list[UUID] = Field(
         description=(
-            "The `user_id` of the daily's participants, in turn order: the first one speaks first."
+            "The `user_id` of the daily's participants, in turn order: the first one speaks "
+            "first. At least one (`no_daily_participants`), none twice "
+            "(`duplicate_daily_participant`) and each an active member of the team "
+            "(`daily_participant_not_a_member`)."
         )
     )

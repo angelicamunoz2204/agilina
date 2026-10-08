@@ -1,10 +1,12 @@
-"""The daily's time: a UTC anchor instant plus the time zone it was captured in (AD-31)."""
+"""The daily's time: a UTC anchor instant plus the time zone it was captured in (AD-31), which
+must be a known IANA key (HU-07)."""
 
 from datetime import UTC, datetime, time, timedelta, timezone, tzinfo
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from agilina_api.teams.domain.errors import InvalidTimeZoneError
 from agilina_api.teams.domain.sprint import DailyTime
 
 
@@ -55,3 +57,30 @@ def test_two_daily_times_at_the_same_instant_and_zone_are_equal():
     )
 
     assert utc == local
+
+
+@pytest.mark.parametrize("time_zone", ["America/New_York", "UTC", "Asia/Tokyo", "America/Bogota"])
+def test_a_known_iana_time_zone_is_accepted(time_zone):
+    daily = DailyTime(at=datetime(2026, 10, 5, 14, 0, tzinfo=UTC), time_zone=time_zone)
+
+    assert daily.time_zone == time_zone and daily.zone == ZoneInfo(time_zone)
+
+
+@pytest.mark.parametrize(
+    "time_zone",
+    [
+        "Mars/Olympus",  # no such key
+        "",
+        "../etc/passwd",  # a path, not a key
+        "America",  # a directory of the database, not a zone
+        "utc",  # keys keep their exact case
+        "America/Bogota ",
+        "-05:00",  # an offset is not a time zone
+    ],
+)
+def test_a_time_zone_that_is_not_a_known_iana_key_is_refused(time_zone):
+    with pytest.raises(InvalidTimeZoneError) as refused:
+        DailyTime(at=datetime(2026, 10, 5, 14, 0, tzinfo=UTC), time_zone=time_zone)
+
+    # The message is generic: the value comes from the request and is not repeated.
+    assert str(refused.value) == "The daily's time zone is not a known IANA time zone"

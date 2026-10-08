@@ -14,3 +14,5 @@ class ReconfigureSprint:
     """The IANA time zone of the browser of whoever saves: it replaces the stored one."""
     participants: tuple[UUID, ...]
     """The ``app_user`` ids of the daily's participants, in turn order."""
+    requested_by: UUID
+    """The admin who asks: the audit log names them."""

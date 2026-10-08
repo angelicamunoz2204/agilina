@@ -114,6 +114,12 @@ class Team(AggregateRoot[UUID]):
         return self._memberships.get(user_id)
 
     @property
+    def active_member_ids(self) -> frozenset[UUID]:
+        """The ``app_user`` ids of the team's active members: who may take part in its
+        ceremonies (HU-07). Removed members keep their membership, but are not here."""
+        return frozenset(m.user_id for m in self._memberships.values() if m.is_active)
+
+    @property
     def admin_count(self) -> int:
         return sum(
             1 for m in self._memberships.values() if m.is_active and m.role is TeamRole.ADMIN

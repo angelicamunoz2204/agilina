@@ -23,7 +23,7 @@ class SprintBuilder:
 
     ``for_team(team)`` takes the team's active members, in the order they joined, as the
     daily's participants. ``closed()`` and ``planned()`` restore a sprint in that status: no
-    behavior reaches them yet (closing a sprint is HU-10), so they are rebuilt as stored.
+    behavior reaches them yet (closing a sprint is HU-10). Every sprint is rebuilt as stored.
     """
 
     sprint_id: UUID = field(default_factory=next_id)
@@ -64,21 +64,14 @@ class SprintBuilder:
         return replace(self, status=SprintStatus.PLANNED)
 
     def build(self) -> Sprint:
-        period = SprintPeriod(start=self.start, end=self.end)
-        daily_time = DailyTime(at=self.daily_at, time_zone=self.time_zone)
-        if self.status is SprintStatus.ACTIVE:
-            return Sprint.start(
-                sprint_id=self.sprint_id,
-                team_id=self.team_id,
-                period=period,
-                daily_time=daily_time,
-                participants=self.participants,
-            )
+        """The sprint as stored, restored with no participant rule checked again: a sprint
+        whose daily was left with no participant, or with someone who later left the team,
+        can be built too. The rules of ``Sprint.start`` are tested on it, not here."""
         return Sprint(
             sprint_id=self.sprint_id,
             team_id=self.team_id,
-            period=period,
-            daily_time=daily_time,
+            period=SprintPeriod(start=self.start, end=self.end),
+            daily_time=DailyTime(at=self.daily_at, time_zone=self.time_zone),
             participants=self.participants,
             status=self.status,
         )
