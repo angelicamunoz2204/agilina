@@ -36,8 +36,11 @@ spike-hu01/
 ├── docker-compose.gpu.yml # override para la instancia GPU (imagen CUDA, reserva de GPU, sin puerto 8000)
 ├── scripts/subir-gpu.sh # rsync a la instancia (sin client/ ni .env)
 ├── .env / .env.example
-├── client/              # Angular 22 + livekit-client 2.22 (cliente mínimo de sala)
-├── agent/               # Python 3.12 + livekit-agents 1.8.4 (agent.py, requirements.txt, Dockerfile)
+├── client/              # Angular 22 + livekit-client 2.22 (cliente mínimo de sala, fin de turno automático)
+├── cliente/index.html   # cliente estático con botón "Terminar turno" (turno manual, RPC terminar_turno)
+├── agent/               # Python 3.12 + livekit-agents 1.8.4 (agent.py, turnos.py, metricas.py, Dockerfile)
+├── analizar_corrida.py  # analiza logs de corridas de turno manual (tiempos por segmento, botón→confirmado, WER)
+├── pruebas/             # textos de referencia (intervencion_larga.txt)
 └── whisper/warmup.wav   # audio corto para precalentar el modelo
 ```
 

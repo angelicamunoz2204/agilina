@@ -292,6 +292,33 @@
   tiempo entre el fin de la voz y el inicio de la voz de Agilina, y compararlo con `u3_aprox_s` de la misma fila.
   La diferencia es la parte de red y búfer que el agente no ve.
 
+## Ajuste · Cierre manual del turno (implementado, sin corridas)
+Verificado en el código instalado (livekit-agents 1.8.4, livekit rtc 1.1.20):
+- `AgentSession.commit_user_turn(*, transcript_timeout=2.0, stt_flush_duration=2.0, skip_reply=False) -> Future[str]`.
+  El modo se activa con `turn_handling={"turn_detection": "manual"}` (el parámetro directo está deprecado).
+- Comportamiento de `commit_user_turn`: si la última transcripción final llegó hace más de 0,5 s, espera la
+  *siguiente* hasta `transcript_timeout`; el silencio de vaciado (`stt_flush_duration`) solo se inyecta si el audio de
+  entrada está desconectado. Con STT sin streaming y micrófono activo: si no queda nada en vuelo, el commit tarda el
+  timeout completo; si una transcripción llegó hace < 0,5 s, no espera aunque otro segmento siga en Whisper.
+  Por eso la espera la controla el agente (VAD + segmentos en vuelo, máximo `ESPERA_TRANSCRIPCION_S`) y luego llama
+  `commit_user_turn(transcript_timeout=0, stt_flush_duration=0)`.
+- `StreamAdapter` procesa en serie: hace `await recognize()` dentro del bucle de eventos del VAD, así que no hay dos
+  peticiones a Whisper a la vez y los transcripts no se desordenan; los eventos siguientes del VAD esperan en cola
+  (el VAD sigue procesando audio en su propia tarea). Calcula `speech_end_time` al consumir el evento, no al
+  producirlo: para un segmento que esperó en cola, el `transcript_delay` oficial subestima la espera real.
+- Silero: `max_buffered_speech` = 60 s por defecto; si un segmento lo supera, el audio sobrante se **descarta**
+  ("max_buffered_speech reached, ignoring further data for the current speech input"), el segmento no se corta.
+  `min_silence_duration` = 0,55 s por defecto; el agente usa los valores por defecto.
+- RPC: `rtc.LocalParticipant.register_rpc_method(nombre, handler)`; `RpcInvocationData` trae `caller_identity`.
+  livekit-client 2.22.3 tiene `performRpc` y `Participant.isAgent`.
+
+Implementación (`agent/turnos.py`, `cliente/index.html`, `analizar_corrida.py`):
+- Un segmento cuenta "en vuelo" desde el fin de voz del VAD de la sesión (`user_state` speaking → listening) hasta
+  que Whisper responde; el i-ésimo fin de voz se empareja con la i-ésima petición
+  (`en_vuelo = max(fines de voz, peticiones) − respuestas`), porque el adaptador usa otro flujo del mismo VAD.
+- En el spike se acepta el RPC de cualquier participante y se registra `caller_identity` (restricción en HU-26).
+- Se verificó solo con una sesión simulada y logs sintéticos; los tiempos de esas pruebas no son mediciones.
+
 ## Cierre · Estimaciones de costo (U5, U6)
 - U5 (estimado): ~20 min de instancia por ceremonia (15 de daily + ~5 de arranque) × USD 0,526/h ≈ USD 0,18
   (20/60 × 0,526 = 0,175).

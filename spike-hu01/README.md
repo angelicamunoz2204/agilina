@@ -128,3 +128,40 @@ docker run --rm -v "$PWD":/w -w /w python:3.12-slim python scripts/resumen-metri
 
 Opciones: `--participantes N` y `--dias N` para proyectar U6, y `--cuota N` (caracteres mensuales del plan de
 ElevenLabs) para el veredicto.
+
+## Turno manual (diseño de HU-26)
+
+Con `MODO_TURNO=manual` (por defecto) el turno lo cierra el participante con el botón **Terminar turno** del
+cliente estático `cliente/index.html` (sin build; livekit-client 2.22.3 desde jsDelivr). El botón envía el RPC
+`terminar_turno` al agente; el agente espera a que el VAD dé por terminada la voz y a que Whisper devuelva los
+segmentos pendientes (máximo `ESPERA_TRANSCRIPCION_S`, 10 s por defecto) y confirma con `commit_user_turn()`.
+Responde con la plantilla vía `session.say()` mientras `USAR_LLM` no sea `1`. Detalle en `agent/turnos.py`.
+
+Servir el cliente en localhost (el micrófono solo funciona en localhost o HTTPS; si el puerto está ocupado, cambiar
+el primer número):
+
+```bash
+docker run --rm -p 8080:80 -v "$PWD/cliente":/usr/share/nginx/html:ro nginx:alpine
+```
+
+Abrir http://localhost:8080, pegar URL y token, **Conectar**, activar el micrófono, hablar y pulsar
+**Terminar turno**. El registro de la página muestra la ida y vuelta del RPC.
+
+### Analizar una corrida
+
+El agente registra con `t_ms` (epoch en ms) cada fin de voz del VAD, cada petición a Whisper (cola, duración, RTF),
+el botón, la espera separada en VAD y Whisper (o el timeout), el commit, el turno confirmado y el inicio de la voz
+de Agilina. En la instancia, una sala nueva por corrida:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml logs --since 10m agent > logs/A.txt
+```
+
+En el Mac (solo biblioteca estándar; jiwer es opcional):
+
+```bash
+docker run --rm -v "$PWD":/w -w /w python:3.12-slim \
+  python analizar_corrida.py logs/A.txt --referencia pruebas/intervencion_larga.txt
+docker run --rm -v "$PWD":/w -w /w python:3.12-slim python analizar_corrida.py --comparar \
+  C=logs/C.txt A=logs/A.txt:pruebas/intervencion_larga.txt B=logs/B.txt:pruebas/intervencion_larga.txt
+```
