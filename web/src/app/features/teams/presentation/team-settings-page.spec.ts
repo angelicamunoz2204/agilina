@@ -3,15 +3,20 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
+import { ShellContext } from '@core/shell/shell-context';
 import { provideTestI18n } from '@testing/i18n';
+import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
 
 import { TeamSettingsPage } from './team-settings-page';
-import { TeamMembersPort } from '../application/team-members.port';
+import { TeamsPort } from '../application/teams.port';
+import { UsersPort } from '../application/users.port';
 import { MemberFailure } from '../domain/member-failure';
+import { type Team } from '../domain/team';
 import {
   type InvitationOutcome,
   type MemberInvitation,
+  type MyMembership,
   type TeamMember,
   type TeamMembers,
   type TeamRole,
@@ -23,6 +28,7 @@ const ANA: TeamMember = {
   email: 'ana@example.com',
   role: 'admin',
   label: 'admin',
+  joinedAt: new Date('2026-10-08T15:04:05Z'),
   roleChangeBlockedBy: 'last_admin',
   removalBlockedBy: 'last_admin',
 };
@@ -32,15 +38,31 @@ const BRUNO: TeamMember = {
   email: 'bruno@example.com',
   role: 'member',
   label: 'member',
+  joinedAt: new Date('2026-10-08T15:04:05Z'),
   roleChangeBlockedBy: null,
   removalBlockedBy: null,
 };
+
+/** The team of the screen, read for the top bar. */
+class FakeTeamsPort extends TeamsPort {
+  listMine(): Observable<readonly Team[]> {
+    return of([]);
+  }
+
+  create(): Observable<string> {
+    return of('new');
+  }
+
+  get(teamId: string): Observable<Team> {
+    return of(aTeam(teamId, 'Atlas'));
+  }
+}
 
 /**
  * Port double: list() answers what `answer` holds for the team (a failure, or nothing yet for
  * 'slow'); the commands wait until the test answers them.
  */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   answer: TeamMembers | MemberFailure = {
     roles: [
       { role: 'admin', label: 'admin' },
@@ -62,6 +84,29 @@ class FakeTeamMembersPort extends TeamMembersPort {
     }
     const answer = this.answer;
     return answer instanceof MemberFailure ? throwError(() => answer) : of(answer);
+  }
+
+  get(teamId: string, userId: string): Observable<TeamMember> {
+    const answer = this.answer;
+    const member =
+      answer instanceof MemberFailure ? undefined : answer.members.find((m) => m.userId === userId);
+    return member === undefined ? throwError(() => new MemberFailure('not_found')) : of(member);
+  }
+
+  /** How the API calls Ana in the team right now; each read of `me` is counted. */
+  myLabel: MyMembership['label'] = 'scrum_master';
+  meCalls = 0;
+
+  me(): Observable<MyMembership> {
+    this.meCalls += 1;
+    return of({
+      userId: 'ana',
+      fullName: 'Ana Gil',
+      email: 'ana@example.com',
+      role: this.myLabel === 'member' ? 'member' : 'admin',
+      label: this.myLabel,
+      joinedAt: new Date('2026-10-08T15:04:05Z'),
+    });
   }
 
   invite(teamId: string, invitation: MemberInvitation): Observable<InvitationOutcome> {
@@ -104,12 +149,12 @@ class FakeTeamMembersPort extends TeamMembersPort {
 }
 
 describe('TeamSettingsPage', () => {
-  let port: FakeTeamMembersPort;
+  let port: FakeUsersPort;
   let harness: RouterTestingHarness;
   let page: HTMLElement;
 
   beforeEach(async () => {
-    port = new FakeTeamMembersPort();
+    port = new FakeUsersPort();
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
@@ -118,7 +163,8 @@ describe('TeamSettingsPage', () => {
           [{ path: ':tenant/teams/:teamId/settings', component: TeamSettingsPage }],
           withComponentInputBinding(),
         ),
-        { provide: TeamMembersPort, useValue: port },
+        { provide: UsersPort, useValue: port },
+        { provide: TeamsPort, useClass: FakeTeamsPort },
       ],
     });
     harness = await RouterTestingHarness.create();
@@ -136,8 +182,8 @@ describe('TeamSettingsPage', () => {
     await harness.fixture.whenStable();
   }
 
-  function rows(): HTMLLIElement[] {
-    return Array.from(page.querySelectorAll('li'));
+  function rows(): HTMLTableRowElement[] {
+    return Array.from(page.querySelectorAll('tbody tr'));
   }
 
   function roleControl(userId: string): HTMLSelectElement {
@@ -386,7 +432,7 @@ describe('TeamSettingsPage', () => {
 
     expect(page.querySelector('h1')?.textContent.trim()).toBe('No tienes acceso a esta pantalla');
     expect(text(page)).toContain(
-      'Solo los Administradores del equipo pueden gestionar a sus integrantes.',
+      'Solo quienes administran el equipo pueden gestionar a sus integrantes.',
     );
     expect(rows()).toEqual([]);
     expect(page.querySelector('select')).toBeNull();
@@ -448,5 +494,91 @@ describe('TeamSettingsPage', () => {
       'No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.',
     );
     expect(page.querySelector('h2')?.textContent.trim()).toBe('Equipo');
+  });
+
+  it('puts the team and how the user is called in it in the top bar while it lives', async () => {
+    await open();
+
+    expect(TestBed.inject(ShellContext).team()).toEqual({
+      name: 'Atlas',
+      roleLabel: 'scrum_master',
+      userName: 'Ana Gil',
+    });
+  });
+
+  it('names whoever manages the team with the label of the team in its messages', async () => {
+    port.answer = {
+      roles: [
+        { role: 'admin', label: 'admin' },
+        { role: 'member', label: 'member' },
+      ],
+      members: [{ ...ANA, label: 'admin' }, BRUNO],
+    };
+
+    await open();
+
+    expect(page.querySelector('[data-testid=member-role-blocked]')?.textContent).toContain(
+      'Es el único Administrador',
+    );
+  });
+
+  it('has an eye per member that opens their detail in a dialog, next to the way to remove', async () => {
+    await open();
+    const eye = page.querySelector<HTMLButtonElement>(
+      '[data-testid="member-bruno@example.com"] [data-testid=member-view]',
+    )!;
+
+    expect(eye.getAttribute('aria-label')).toBe('Ver a Bruno Díaz');
+    eye.click();
+    await harness.fixture.whenStable();
+
+    expect(page.querySelector('[data-testid=user-detail-title]')?.textContent.trim()).toBe(
+      'Bruno Díaz',
+    );
+    expect(page.querySelector('[data-testid=user-detail-email]')?.textContent.trim()).toBe(
+      'bruno@example.com',
+    );
+  });
+
+  it('closes the detail and leaves the list as it was', async () => {
+    await open();
+    page.querySelector<HTMLButtonElement>('[data-testid=member-view]')!.click();
+    await harness.fixture.whenStable();
+
+    page.querySelector<HTMLButtonElement>('[data-testid=user-detail-close]')!.click();
+    await harness.fixture.whenStable();
+
+    expect(page.querySelector('[data-testid=user-detail-title]')).toBeNull();
+    expect(rows().length).toBe(2);
+  });
+
+  it('asks the API for me again after a role change, so the top bar shows my label of now', async () => {
+    await open();
+    const shell = TestBed.inject(ShellContext);
+    expect(shell.team()?.roleLabel).toBe('scrum_master');
+    expect(port.meCalls).toBe(1);
+
+    // As if the change had been Ana's own: the API now calls her a member.
+    port.myLabel = 'member';
+    roleControl('bruno').value = 'admin';
+    roleControl('bruno').dispatchEvent(new Event('change'));
+    await harness.fixture.whenStable();
+    port.accept();
+    await settled();
+
+    expect(port.meCalls).toBe(2);
+    expect(shell.team()?.roleLabel).toBe('member');
+  });
+
+  it('asks the API for me again after a removal', async () => {
+    await open();
+    removeButtonOf('Bruno Díaz').click();
+    await harness.fixture.whenStable();
+
+    button('Eliminar del equipo', dialog()!).click();
+    port.accept();
+    await settled();
+
+    expect(port.meCalls).toBe(2);
   });
 });

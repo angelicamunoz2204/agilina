@@ -177,6 +177,11 @@ en inglés.
 
 - Archivos en `kebab-case`; clases y tipos en `PascalCase`; el resto en
   `camelCase`; constantes globales en `UPPER_CASE`. *(ESLint.)*
+- **La etiqueta de un rol viene de la API** (`label`: `member`, `scrum_master`, `admin`) y se traduce
+  con `app.role_labels.<label>`; el cliente no la deriva ni decide nada con ella. Lo que una pantalla
+  ofrece sigue al `role` (`admin`/`member`). Los mensajes que nombran a quien administra el equipo
+  reciben su etiqueta como parámetro (`{{ admin }}`) o se redactan sin nombrarla. El encabezado
+  muestra el equipo y la etiqueta a través de `ShellContext` (`@core/shell`).
 - **Una clase por archivo**, con el nombre de la clase en `kebab-case`: `TenantNotFoundError` va en
   `tenant-not-found-error.ts`. Una interfaz o un tipo viaja con la clase que describe
   ([code-conventions.md](../docs/code-conventions.md)).
@@ -422,7 +427,8 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 - Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `aglButton`
   (con `variant="primary" | "secondary" | "danger"`; `danger` para lo que no se deshace, como
   eliminar a alguien del equipo), que va sobre un `<button>` o, si navega, sobre un
-  `<a routerLink>` (un enlace sigue siendo enlace), `input[aglTextField]` y
+  `<a routerLink>` (un enlace sigue siendo enlace), `button[aglIconButton]` (solo ícono, con
+  `aria-label`: el ojo y el bote de la tabla de integrantes), `input[aglTextField]` y
   `select[aglSelect]`: directivas sobre el elemento nativo. Una contraseña va dentro de
   `<agl-password-field [toggleLabel]="…">`, que agrega el botón para mostrarla u ocultarla (con
   `aria-pressed`) sin quitarle su `<label for>`. Una fecha de calendario se elige con

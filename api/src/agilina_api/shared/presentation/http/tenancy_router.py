@@ -29,7 +29,11 @@ class TenantResponse(BaseModel):
     "",
     response_model=TenantResponse,
     summary="The tenant the request names, if it exists and is active",
-    responses=errors_of(SharedErrors.TENANT_REQUIRED, SharedErrors.TENANT_NOT_FOUND),
+    # The 422 is the one FastAPI derives from the header parameter; the header is optional, so
+    # it does not happen in practice, but it is declared in the common body.
+    responses=errors_of(
+        SharedErrors.TENANT_REQUIRED, SharedErrors.TENANT_NOT_FOUND, SharedErrors.VALIDATION
+    ),
 )
 async def get_tenant(
     response: Response, tenant: Tenant = Depends(current_tenant)

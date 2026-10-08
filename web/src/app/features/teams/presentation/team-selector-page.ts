@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoPipe } from '@jsverse/transloco';
 
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
@@ -11,7 +11,7 @@ import { TeamSelectorFacade } from '../application/team-selector.facade';
 /** Team selector: the teams of the user, to enter one, and the way to create a new one. */
 @Component({
   selector: 'agl-team-selector-page',
-  imports: [RouterLink, TranslocoDirective, Button],
+  imports: [RouterLink, TranslocoDirective, TranslocoPipe, Button],
   providers: [TeamSelectorFacade],
   templateUrl: './team-selector-page.html',
 })

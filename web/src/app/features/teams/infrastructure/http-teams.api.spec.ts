@@ -30,20 +30,35 @@ describe('HttpTeamsApi', () => {
     backend.verify();
   });
 
-  it('lists the teams of the user and keeps their id, name and role', () => {
+  it('lists the teams of the user and keeps their id, name, role, mode and label', () => {
     let received: readonly Team[] | undefined;
     api.listMine().subscribe((teams) => (received = teams));
 
     const request = backend.expectOne(teamsUrl);
     expect(request.request.method).toBe('GET');
     request.flush([
-      { id: 'a', name: 'Atlas', role: 'admin' },
-      { id: 'b', name: 'Boreal', role: 'member' },
+      { id: 'a', name: 'Atlas', role: 'admin', mode: 'support', label: 'scrum_master' },
+      { id: 'b', name: 'Boreal', role: 'member', mode: 'autonomous', label: 'member' },
+      { id: 'c', name: 'Cielo', role: 'admin', mode: 'autonomous', label: 'admin' },
     ]);
 
     expect(received).toEqual([
-      { id: 'a', name: 'Atlas', role: 'admin' },
-      { id: 'b', name: 'Boreal', role: 'member' },
+      { id: 'a', name: 'Atlas', role: 'admin', mode: 'support', label: 'scrum_master' },
+      { id: 'b', name: 'Boreal', role: 'member', mode: 'autonomous', label: 'member' },
+      { id: 'c', name: 'Cielo', role: 'admin', mode: 'autonomous', label: 'admin' },
+    ]);
+  });
+
+  it('reads a mode or a label it does not know as support and member', () => {
+    let received: readonly Team[] | undefined;
+    api.listMine().subscribe((teams) => (received = teams));
+
+    backend
+      .expectOne(teamsUrl)
+      .flush([{ id: 'a', name: 'Atlas', role: 'admin', mode: 'hybrid', label: 'product_owner' }]);
+
+    expect(received).toEqual([
+      { id: 'a', name: 'Atlas', role: 'admin', mode: 'support', label: 'member' },
     ]);
   });
 
@@ -65,9 +80,22 @@ describe('HttpTeamsApi', () => {
 
     const request = backend.expectOne(`${teamsUrl}/team-1`);
     expect(request.request.method).toBe('GET');
-    request.flush({ id: 'team-1', name: 'Atlas', mode: 'support', language: 'en', role: 'admin' });
+    request.flush({
+      id: 'team-1',
+      name: 'Atlas',
+      mode: 'autonomous',
+      language: 'en',
+      role: 'admin',
+      label: 'admin',
+    });
 
-    expect(received).toEqual({ id: 'team-1', name: 'Atlas', role: 'admin' });
+    expect(received).toEqual({
+      id: 'team-1',
+      name: 'Atlas',
+      role: 'admin',
+      mode: 'autonomous',
+      label: 'admin',
+    });
   });
 
   it('escapes the team id in the path', () => {

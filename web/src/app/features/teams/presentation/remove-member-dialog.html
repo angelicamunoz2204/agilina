@@ -4,6 +4,7 @@
   (dismissed)="dismissed.emit()"
 >
   <ng-container *transloco="let t; prefix: 'teams.settings.remove'">
+    @let labels = { admin: 'app.role_labels.' + adminLabel() | transloco };
     <h2
       id="remove-member-title"
       class="font-display text-lg font-semibold break-words"
@@ -18,7 +19,7 @@
 
     @if (problem(); as message) {
       <p role="alert" class="mt-4 text-sm text-danger" data-testid="remove-problem">
-        {{ t(message) }}
+        {{ t(message, labels) }}
       </p>
     }
 

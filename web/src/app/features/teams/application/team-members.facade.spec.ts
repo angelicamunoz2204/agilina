@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { TeamMembersFacade } from './team-members.facade';
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { MemberFailure } from '../domain/member-failure';
 import { type TeamMember, type TeamMembers, type TeamRole } from '../domain/team-member';
 
@@ -13,6 +13,7 @@ const ANA: TeamMember = {
   email: 'ana@example.com',
   role: 'admin',
   label: 'admin',
+  joinedAt: new Date('2026-10-08T15:04:05Z'),
   roleChangeBlockedBy: 'last_admin',
   removalBlockedBy: 'last_admin',
 };
@@ -22,6 +23,7 @@ const BRUNO: TeamMember = {
   email: 'bruno@example.com',
   role: 'member',
   label: 'member',
+  joinedAt: new Date('2026-10-08T15:04:05Z'),
   roleChangeBlockedBy: null,
   removalBlockedBy: null,
 };
@@ -34,7 +36,7 @@ const ROLES = [
  * Port double: list() answers the members of each known team (and fails for any other);
  * changeRole() and remove() wait until the test answers them.
  */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   readonly listed: string[] = [];
   readonly changes: [string, string, TeamRole][] = [];
   readonly removals: [string, string][] = [];
@@ -48,6 +50,14 @@ class FakeTeamMembersPort extends TeamMembersPort {
     this.listed.push(teamId);
     const members = this.teams[teamId];
     return members === undefined ? throwError(() => new MemberFailure('forbidden')) : of(members);
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
+    return NEVER;
   }
 
   invite(): Observable<never> {
@@ -77,13 +87,13 @@ class FakeTeamMembersPort extends TeamMembersPort {
 }
 
 describe('TeamMembersFacade', () => {
-  let port: FakeTeamMembersPort;
+  let port: FakeUsersPort;
   let facade: TeamMembersFacade;
 
   beforeEach(() => {
-    port = new FakeTeamMembersPort();
+    port = new FakeUsersPort();
     TestBed.configureTestingModule({
-      providers: [TeamMembersFacade, { provide: TeamMembersPort, useValue: port }],
+      providers: [TeamMembersFacade, { provide: UsersPort, useValue: port }],
     });
     facade = TestBed.inject(TeamMembersFacade);
   });

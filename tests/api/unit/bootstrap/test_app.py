@@ -36,9 +36,10 @@ def test_every_context_exposes_its_routes():
     assert "/v1/ceremonies/{ceremony_id}/context" in paths
     assert "/v1/teams" in paths
     assert "/v1/teams/{team_id}" in paths
-    assert "/v1/teams/{team_id}/members" in paths
-    assert {"patch", "delete"} <= set(paths["/v1/teams/{team_id}/members/{user_id}"])
-    assert "post" in paths["/v1/teams/{team_id}/invitations"]
+    assert {"get"} <= set(paths["/v1/users"])
+    assert "get" in paths["/v1/users/me"]
+    assert {"get", "patch", "delete"} <= set(paths["/v1/users/{user_id}"])
+    assert "post" in paths["/v1/users/invitations"]
     assert "post" in paths["/v1/teams/{team_id}/sprints"]
     assert {"get", "put"} <= set(paths["/v1/teams/{team_id}/sprints/active"])
 

@@ -327,12 +327,12 @@ web:
 
 | Operación | Qué hace |
 | --- | --- |
-| `GET /v1/teams/{team_id}/members` | Los integrantes activos con `user_id`, `full_name`, `email`, `role` (interno: `admin` o `member`) y `label` (el código de la etiqueta que traduce la web), ordenados por nombre sin distinguir mayúsculas, y los `roles` que se pueden asignar. Cada integrante trae `role_change_blocked_by` y `removal_blocked_by`: el motivo por el que hoy no se puede cambiar su rol o sacarlo, o `null` |
-| `POST /v1/teams/{team_id}/invitations` | Con `{"full_name", "email", "role"}`. Si el correo no tiene cuenta, guarda una invitación y envía el enlace de activación (`201 {"outcome": "invitation_sent"}`); si ya tiene cuenta, la persona entra al equipo en ese momento y recibe un aviso sin enlace (`201 {"outcome": "member_added"}`). Si había una invitación pendiente de ese correo al equipo, queda revocada |
-| `PATCH /v1/teams/{team_id}/members/{user_id}` | Con `{"role"}`: cambia el rol de un integrante activo, que puede ser el mismo admin que lo pide; `204`. Dar el rol que ya tiene no cambia nada |
-| `DELETE /v1/teams/{team_id}/members/{user_id}` | Termina la membresía: la persona deja de recibir convocatorias del equipo; `204`. Su cuenta de Keycloak y su `app_user` quedan intactos (puede estar en otros equipos) y se la puede volver a invitar |
+| `GET /v1/users?team_id=…` | Los usuarios activos del equipo con `joined_at` y con `user_id`, `full_name`, `email`, `role` (interno: `admin` o `member`) y `label` (el código de la etiqueta que traduce la web), ordenados por nombre sin distinguir mayúsculas, y los `roles` que se pueden asignar. Cada integrante trae `role_change_blocked_by` y `removal_blocked_by`: el motivo por el que hoy no se puede cambiar su rol o sacarlo, o `null` |
+| `POST /v1/users/invitations?team_id=…` | Con `{"full_name", "email", "role"}`. Si el correo no tiene cuenta, guarda una invitación y envía el enlace de activación (`201 {"outcome": "invitation_sent"}`); si ya tiene cuenta, la persona entra al equipo en ese momento y recibe un aviso sin enlace (`201 {"outcome": "member_added"}`). Si había una invitación pendiente de ese correo al equipo, queda revocada |
+| `PATCH /v1/users/{user_id}?team_id=…` | Con `{"role"}`: cambia el rol de un integrante activo, que puede ser el mismo admin que lo pide; `204`. Dar el rol que ya tiene no cambia nada |
+| `DELETE /v1/users/{user_id}?team_id=…` | Termina la membresía: la persona deja de recibir convocatorias del equipo; `204`. Su cuenta de Keycloak y su `app_user` quedan intactos (puede estar en otros equipos) y se la puede volver a invitar |
 
-Las cuatro exigen `Authorization: Bearer <token>` y el encabezado del tenant
+Además, `GET /v1/users/{user_id}?team_id=…` da el detalle de un usuario (lo abre el ojito de la tabla) y `GET /v1/users/me?team_id=…` devuelve a quien llama como miembro del equipo (lo usa el encabezado). Toda ruta de usuarios nombra el equipo en la query. Las cuatro exigen `Authorization: Bearer <token>` y el encabezado del tenant
 (`X-Agilina-Tenant: acme`), como toda ruta de equipos; el contrato completo está en
 [api.md](api.md). Quien invita es siempre el usuario del token, y la invitación guarda su
 membresía como autora (`created_by`). Los errores responden con el formato único de la API
@@ -554,7 +554,7 @@ equipo):
 | `new_invitation_request` | Cuando alguien con un enlace vencido pide uno nuevo | A los administradores del equipo, el motivo |
 
 Para ver el aviso `member_added` en Mailpit (<http://localhost:8025>), invita desde
-Configuración → Equipo (o con `POST /v1/teams/{team_id}/invitations`) el correo de alguien
+Configuración → Equipo (o con `POST /v1/users/invitations?team_id=…`) el correo de alguien
 que ya activó su cuenta y no está en el equipo.
 
 Para ver un cambio de diseño: edita la plantilla, ejecuta `make mail-test to=...` y

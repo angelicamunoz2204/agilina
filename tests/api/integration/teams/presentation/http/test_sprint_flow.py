@@ -100,7 +100,14 @@ class Sprints:
         return [(p["user_id"], p["turn_order"]) for p in sprint["participants"]]
 
     async def remove(self, user, token: str = TOKEN_ANA):
-        return await self.request("DELETE", f"/members/{user.id}", token)
+        async with AsyncClient(
+            transport=ASGITransport(app=self.app), base_url="http://tests"
+        ) as client:
+            return await client.delete(
+                f"/v1/users/{user.id}",
+                params={"team_id": str(self.team.id)},
+                headers={"Authorization": f"Bearer {token}"},
+            )
 
 
 def _body(*participants, start=START, end=END, daily_time=DAILY_AT, time_zone=TIME_ZONE) -> dict:

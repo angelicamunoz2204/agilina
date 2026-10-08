@@ -118,7 +118,7 @@ Toda ruta HTTP sobre un equipo lleva `{team_id}` en el camino y declara
 resuelve a quien llama con `current_user_id` (`401 not_authenticated` si no hay un
 usuario) y comprueba su membresía activa guardada en la base (`403 not_a_team_member` si no
 la tiene). Una regla sobre el rol (solo un `admin` puede…) es otra dependencia encima de
-esa: `Depends(current_team_admin)` (HU-06) responde `403 not_a_team_admin` a un integrante
+esa: `Depends(current_team_admin)` (HU-06; `current_team_*_by_query` en las rutas de `/v1/users`, que nombran el equipo en `?team_id=`) responde `403 not_a_team_admin` a un integrante
 que no es Administrador, con el rol guardado en la membresía. La autorización nunca vive en
 la web.
 
@@ -243,14 +243,16 @@ Hoy existen `features/status` (la pantalla de estado del entorno) y
 `features/identity` (la pantalla `/activate`, HU-02) y `features/teams` (HU-05: el selector
 mínimo, el formulario para crear un equipo y el dashboard del equipo, que por ahora muestra su
 nombre y, a un Administrador, el enlace a Configuración; HU-06: Configuración → Equipo en
-`/teams/:teamId/settings`, con su puerto `TeamMembersPort` y su adaptador
-`HttpTeamMembersApi`, sin guard: si la API responde 403, la pantalla muestra «sin acceso»;
-HU-07: Configuración → Sprint en `/teams/:teamId/settings/sprint`, pestaña hermana de Equipo,
-con su puerto `SprintsPort` y su adaptador `HttpSprintsApi`, y la línea «Día N de M» del
+`/teams/:teamId/settings`, con su puerto `UsersPort` y su adaptador `HttpUsersApi` (la API
+`/v1/users`), un ojito por integrante que abre su detalle y el equipo, la etiqueta del rol y el
+nombre de la persona en el encabezado, sin guard: si la API responde 403, la pantalla muestra «sin
+acceso»; HU-07: Configuración → Sprint en `/teams/:teamId/settings/sprint`, pestaña hermana de
+Equipo, con su puerto `SprintsPort` y su adaptador `HttpSprintsApi`, y la línea «Día N de M» del
 dashboard). `core/time` tiene `BROWSER_TIME_ZONE` (la zona IANA del navegador) y `shared/utils`,
 las funciones puras de fechas (`local-date-time.ts`). `shared/ui` tiene `aglButton`,
-`aglTextField`, `aglSelect` y `agl-dialog` (sobre el `<dialog>` nativo). Las demás
-(`ceremonies` y el resto de `identity`) llegan con sus historias. El detalle,
+`aglIconButton` (botón solo de ícono), `aglTextField`, `aglSelect` y `agl-dialog` (sobre el
+`<dialog>` nativo). Las demás (`ceremonies` y el resto de `identity`) llegan con sus historias. El
+detalle,
 las convenciones y el porqué están en [web/README.md](../web/README.md) y en
 [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 

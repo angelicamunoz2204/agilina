@@ -1,6 +1,11 @@
 {
   "app": {
-    "tagline": "Virtual Scrum Master for the daily stand-up"
+    "tagline": "Virtual Scrum Master for the daily stand-up",
+    "role_labels": {
+      "member": "Member",
+      "scrum_master": "Scrum Master",
+      "admin": "Administrator"
+    }
   },
   "status": {
     "title": "Environment status",
@@ -23,6 +28,10 @@
       "create": "Create a new team",
       "problems": {
         "not_authenticated": "Your session is not valid or has expired. Sign in again."
+      },
+      "modes": {
+        "support": "Support",
+        "autonomous": "Autonomous"
       }
     },
     "create": {
@@ -33,7 +42,7 @@
         "blank": "Enter the team's name.",
         "too_long": "The name cannot be longer than {{ max }} characters."
       },
-      "defaults_hint": "The team will be created in support mode with English as its language. You will be its Administrator.",
+      "defaults_hint": "The team will be created in support mode with English as its language. You will be its Scrum Master.",
       "submit": "Create team",
       "saving": "Creating…",
       "failed": "The team could not be created. Try again.",
@@ -63,30 +72,37 @@
       "subtitle": "The people who take part in the team's ceremonies, and their role.",
       "back": "Back to the team",
       "members": "Members",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "Active"
+      },
+      "role_hint": "A role can only change while there is no sprint in progress.",
       "loading": "Loading the members…",
       "failed": "The members could not be loaded. Try again later.",
       "saving": "Saving…",
       "role_of": "Role of {{ name }}",
-      "roles": {
-        "admin": "Administrator",
-        "member": "Member"
-      },
       "blocked": {
         "role_change": {
           "sprint_in_progress": "The role cannot change while the team has a sprint in progress.",
-          "last_admin": "This is the only Administrator: the team cannot be left without one."
+          "last_admin": "This is the only {{ admin }}: the team cannot be left without one."
         },
         "removal": {
-          "last_admin": "This is the only Administrator: they cannot be removed from the team."
+          "last_admin": "This is the only {{ admin }}: they cannot be removed from the team."
         }
       },
       "forbidden": {
         "title": "You do not have access to this screen",
-        "text": "Only the team's Administrators can manage its members."
+        "text": "Only the people who manage the team can manage its members."
       },
       "lost_access": {
         "title": "You no longer administer this team",
-        "role_change": "Your change was saved: you are now a Member, and only Administrators manage the members.",
+        "role_change": "Your change was saved: you are now a Member, and only the people who manage the team can manage its members.",
         "removal": "Your change was saved: you no longer belong to this team nor receive its meetings.",
         "to_teams": "Go to my teams"
       },
@@ -97,9 +113,9 @@
         "failed": "The role could not be changed. Try again.",
         "problems": {
           "not_authenticated": "Your session is not valid or has expired. Sign in again.",
-          "forbidden": "You are no longer an Administrator of this team.",
+          "forbidden": "You are no longer the {{ admin }} of this team.",
           "not_found": "This person is no longer in the team.",
-          "last_admin": "The role cannot change: the team cannot be left without an Administrator.",
+          "last_admin": "The role cannot change: the team cannot be left without its {{ admin }}.",
           "sprint_in_progress": "The role cannot change while the team has a sprint in progress."
         }
       },
@@ -128,7 +144,7 @@
         "failed": "The invitation could not be sent. Try again.",
         "problems": {
           "not_authenticated": "Your session is not valid or has expired. Sign in again.",
-          "forbidden": "You are no longer an Administrator of this team.",
+          "forbidden": "You are no longer the {{ admin }} of this team.",
           "already_member": "This person is already a member of the team.",
           "account_disabled": "This person's account is disabled, so they cannot be added to the team.",
           "invalid_email": "The email is not valid. Check it and try again.",
@@ -152,9 +168,33 @@
         "failed": "This person could not be removed. Try again.",
         "problems": {
           "not_authenticated": "Your session is not valid or has expired. Sign in again.",
-          "forbidden": "You are no longer an Administrator of this team.",
+          "forbidden": "You are no longer the {{ admin }} of this team.",
           "not_found": "This person is no longer in the team.",
-          "last_admin": "They cannot be removed: the team cannot be left without an Administrator."
+          "last_admin": "They cannot be removed: the team cannot be left without its {{ admin }}."
+        }
+      },
+      "view": {
+        "open_label": "View {{ name }}",
+        "subtitle": "The person's details in this team.",
+        "email": "Email",
+        "role": "Role",
+        "joined": "In the team since",
+        "loading": "Loading…",
+        "close": "Close",
+        "failed": "This person could not be loaded. Try again later.",
+        "blocked": {
+          "role_change": {
+            "sprint_in_progress": "The role cannot change while the team has a sprint in progress.",
+            "last_admin": "This is the only {{ admin }}: the team cannot be left without its {{ admin }}."
+          },
+          "removal": {
+            "last_admin": "This is the only {{ admin }}: they cannot be removed from the team."
+          }
+        },
+        "problems": {
+          "not_authenticated": "Your session is not valid or has expired. Sign in again.",
+          "forbidden": "You are no longer the {{ admin }} of this team.",
+          "not_found": "This person is no longer in the team."
         }
       },
       "tabs": {

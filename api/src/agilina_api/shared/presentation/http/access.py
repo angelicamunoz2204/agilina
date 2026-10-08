@@ -12,6 +12,11 @@ the other teams out (HU-05).
 A route only an admin of the team may use declares ``Depends(current_team_admin)`` instead:
 a member who is not an admin gets ``403 not_a_team_admin`` (HU-06).
 
+The routes about the users of a team (``/v1/users``) are not under ``/v1/teams/{team_id}``:
+they name the team in the query (``?team_id=``), because a user has a different role in each
+team. ``current_team_member_by_query`` and ``current_team_admin_by_query`` are the same two
+dependencies for them, with the same answers in the same order.
+
 The adapters are declared here and provided by the composition root, so this layer never
 imports the infrastructure one.
 """
@@ -19,7 +24,7 @@ imports the infrastructure one.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from agilina_api.shared.application.access import (
@@ -62,6 +67,24 @@ async def current_user_id(
     return user_id
 
 
+async def _membership(team_id: UUID, user_id: UUID, access: TeamAccess) -> TeamContext:
+    membership = await access.membership_of(team_id=team_id, user_id=user_id)
+    if membership is None:
+        raise NotATeamMemberError("The user is not an active member of the team")
+    return TeamContext(
+        team_id=team_id,
+        user_id=user_id,
+        membership_id=membership.membership_id,
+        role=membership.role,
+    )
+
+
+def _require_admin(team: TeamContext) -> TeamContext:
+    if team.role is not TeamRole.ADMIN:
+        raise NotATeamAdminError("Only an admin of the team may do this")
+    return team
+
+
 async def current_team_member(
     team_id: Annotated[UUID, Path(description="The team the request is about.")],
     user_id: UUID = Depends(current_user_id),
@@ -74,15 +97,7 @@ async def current_team_member(
     this one. The caller is resolved first, so a request without a valid token answers
     ``401`` before the membership is looked at.
     """
-    membership = await access.membership_of(team_id=team_id, user_id=user_id)
-    if membership is None:
-        raise NotATeamMemberError("The user is not an active member of the team")
-    return TeamContext(
-        team_id=team_id,
-        user_id=user_id,
-        membership_id=membership.membership_id,
-        role=membership.role,
-    )
+    return await _membership(team_id, user_id, access)
 
 
 async def current_team_admin(team: TeamContext = Depends(current_team_member)) -> TeamContext:
@@ -92,6 +107,20 @@ async def current_team_admin(team: TeamContext = Depends(current_team_member)) -
     ``401`` and a user outside the team ``403 not_a_team_member`` first. The role is the one
     stored in the membership, never a claim of the token.
     """
-    if team.role is not TeamRole.ADMIN:
-        raise NotATeamAdminError("Only an admin of the team may do this")
-    return team
+    return _require_admin(team)
+
+
+async def current_team_member_by_query(
+    team_id: Annotated[UUID, Query(description="The team the request is about.")],
+    user_id: UUID = Depends(current_user_id),
+    access: TeamAccess = Depends(get_team_access),
+) -> TeamContext:
+    """``current_team_member`` for a route that names the team in ``?team_id=``."""
+    return await _membership(team_id, user_id, access)
+
+
+async def current_team_admin_by_query(
+    team: TeamContext = Depends(current_team_member_by_query),
+) -> TeamContext:
+    """``current_team_admin`` for a route that names the team in ``?team_id=``."""
+    return _require_admin(team)

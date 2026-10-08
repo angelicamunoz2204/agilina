@@ -4,25 +4,37 @@ import { TestBed } from '@angular/core/testing';
 
 import { provideTestRuntimeConfig, TEST_RUNTIME_CONFIG } from '@testing/runtime-config';
 
-import { HttpTeamMembersApi } from './http-team-members.api';
+import { HttpUsersApi } from './http-users.api';
 import { MemberFailure } from '../domain/member-failure';
-import { type InvitationOutcome, type TeamMembers } from '../domain/team-member';
+import {
+  type InvitationOutcome,
+  type MyMembership,
+  type TeamMember,
+  type TeamMembers,
+} from '../domain/team-member';
 
-describe('HttpTeamMembersApi', () => {
-  const teamUrl = `${TEST_RUNTIME_CONFIG.apiUrl}/v1/teams/atlas`;
-  let api: HttpTeamMembersApi;
+describe('HttpUsersApi', () => {
+  const usersUrl = `${TEST_RUNTIME_CONFIG.apiUrl}/v1/users`;
+  let api: HttpUsersApi;
   let backend: HttpTestingController;
+
+  /** The request to `/v1/users{path}` that names this team in the query. */
+  function expectUsers(path = '', team = 'atlas') {
+    return backend.expectOne(
+      (request) => request.url === `${usersUrl}${path}` && request.params.get('team_id') === team,
+    );
+  }
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        HttpTeamMembersApi,
+        HttpUsersApi,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTestRuntimeConfig(),
       ],
     });
-    api = TestBed.inject(HttpTeamMembersApi);
+    api = TestBed.inject(HttpUsersApi);
     backend = TestBed.inject(HttpTestingController);
   });
 
@@ -34,20 +46,21 @@ describe('HttpTeamMembersApi', () => {
     let received: TeamMembers | undefined;
     api.list('atlas').subscribe((members) => (received = members));
 
-    const request = backend.expectOne(`${teamUrl}/members`);
+    const request = expectUsers();
     expect(request.request.method).toBe('GET');
     request.flush({
       roles: [
         { role: 'admin', label: 'admin' },
         { role: 'member', label: 'member' },
       ],
-      members: [
+      users: [
         {
           user_id: 'ana',
           full_name: 'Ana Gil',
           email: 'ana@example.com',
           role: 'admin',
           label: 'admin',
+          joined_at: '2026-10-08T15:04:05Z',
           role_change_blocked_by: 'sprint_in_progress',
           removal_blocked_by: 'last_admin',
         },
@@ -57,6 +70,7 @@ describe('HttpTeamMembersApi', () => {
           email: 'bruno@example.com',
           role: 'member',
           label: 'member',
+          joined_at: '2026-10-09T10:00:00Z',
           role_change_blocked_by: null,
           removal_blocked_by: null,
         },
@@ -75,6 +89,7 @@ describe('HttpTeamMembersApi', () => {
           email: 'ana@example.com',
           role: 'admin',
           label: 'admin',
+          joinedAt: new Date('2026-10-08T15:04:05Z'),
           roleChangeBlockedBy: 'sprint_in_progress',
           removalBlockedBy: 'last_admin',
         },
@@ -84,6 +99,7 @@ describe('HttpTeamMembersApi', () => {
           email: 'bruno@example.com',
           role: 'member',
           label: 'member',
+          joinedAt: new Date('2026-10-09T10:00:00Z'),
           roleChangeBlockedBy: null,
           removalBlockedBy: null,
         },
@@ -91,13 +107,60 @@ describe('HttpTeamMembersApi', () => {
     });
   });
 
+  it('reads one user with the team in the query', () => {
+    let received: TeamMember | undefined;
+    api.get('atlas', 'bruno').subscribe((member) => (received = member));
+
+    const request = expectUsers('/bruno');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      user_id: 'bruno',
+      full_name: 'Bruno Díaz',
+      email: 'bruno@example.com',
+      role: 'member',
+      label: 'member',
+      joined_at: '2026-10-09T10:00:00Z',
+      role_change_blocked_by: 'sprint_in_progress',
+      removal_blocked_by: null,
+    });
+
+    expect(received?.fullName).toBe('Bruno Díaz');
+    expect(received?.joinedAt).toEqual(new Date('2026-10-09T10:00:00Z'));
+    expect(received?.roleChangeBlockedBy).toBe('sprint_in_progress');
+  });
+
+  it('reads the caller as a member of the team for the header', () => {
+    let received: MyMembership | undefined;
+    api.me('atlas').subscribe((me) => (received = me));
+
+    const request = expectUsers('/me');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      user_id: 'ana',
+      full_name: 'Ana Gil',
+      email: 'ana@example.com',
+      role: 'admin',
+      label: 'scrum_master',
+      joined_at: '2026-10-08T15:04:05Z',
+    });
+
+    expect(received).toEqual({
+      userId: 'ana',
+      fullName: 'Ana Gil',
+      email: 'ana@example.com',
+      role: 'admin',
+      label: 'scrum_master',
+      joinedAt: new Date('2026-10-08T15:04:05Z'),
+    });
+  });
+
   it('reads a role or a label it does not know as the one that offers the least', () => {
     let received: TeamMembers | undefined;
     api.list('atlas').subscribe((members) => (received = members));
 
-    backend.expectOne(`${teamUrl}/members`).flush({
-      roles: [{ role: 'owner', label: 'scrum_master' }],
-      members: [],
+    expectUsers().flush({
+      roles: [{ role: 'owner', label: 'product_owner' }],
+      users: [],
     });
 
     expect(received?.roles).toEqual([{ role: 'member', label: 'member' }]);
@@ -109,7 +172,7 @@ describe('HttpTeamMembersApi', () => {
       .invite('atlas', { fullName: 'Laura', email: 'laura@example.com', role: 'member' })
       .subscribe((received) => (outcome = received));
 
-    const request = backend.expectOne(`${teamUrl}/invitations`);
+    const request = expectUsers('/invitations');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
       full_name: 'Laura',
@@ -125,7 +188,7 @@ describe('HttpTeamMembersApi', () => {
     let done = false;
     api.changeRole('atlas', 'bruno', 'admin').subscribe(() => (done = true));
 
-    const request = backend.expectOne(`${teamUrl}/members/bruno`);
+    const request = expectUsers('/bruno');
     expect(request.request.method).toBe('PATCH');
     expect(request.request.body).toEqual({ role: 'admin' });
     request.flush(null, { status: 204, statusText: 'No Content' });
@@ -137,7 +200,7 @@ describe('HttpTeamMembersApi', () => {
     let done = false;
     api.remove('atlas', 'bruno').subscribe(() => (done = true));
 
-    const request = backend.expectOne(`${teamUrl}/members/bruno`);
+    const request = expectUsers('/bruno');
     expect(request.request.method).toBe('DELETE');
     request.flush(null, { status: 204, statusText: 'No Content' });
 
@@ -147,7 +210,7 @@ describe('HttpTeamMembersApi', () => {
   it('escapes the team and the member ids in the path', () => {
     api.remove('a/b', 'c?d').subscribe();
 
-    const request = backend.expectOne(`${TEST_RUNTIME_CONFIG.apiUrl}/v1/teams/a%2Fb/members/c%3Fd`);
+    const request = expectUsers('/c%3Fd', 'a/b');
     expect(request.request.method).toBe('DELETE');
     request.flush(null, { status: 204, statusText: 'No Content' });
   });
@@ -175,9 +238,7 @@ describe('HttpTeamMembersApi', () => {
         error: (error: unknown) => (failure = error),
       });
 
-      backend
-        .expectOne(`${teamUrl}/members/bruno`)
-        .flush({ error: { code } }, { status, statusText: 'x' });
+      expectUsers('/bruno').flush({ error: { code } }, { status, statusText: 'x' });
 
       expect(failure).toEqual(new MemberFailure(kind as MemberFailure['kind']));
     });
@@ -189,16 +250,16 @@ describe('HttpTeamMembersApi', () => {
       failures.push(error);
     };
     api.list('atlas').subscribe({ error: keep });
-    backend.expectOne(`${teamUrl}/members`).flush('Bad gateway', {
+    expectUsers().flush('Bad gateway', {
       status: 502,
       statusText: 'Bad Gateway',
     });
     api.remove('atlas', 'bruno').subscribe({ error: keep });
-    backend.expectOne(`${teamUrl}/members/bruno`).error(new ProgressEvent('network'));
+    expectUsers('/bruno').error(new ProgressEvent('network'));
     api
       .invite('atlas', { fullName: 'Laura', email: 'laura@example.com', role: 'admin' })
       .subscribe({ error: keep });
-    backend.expectOne(`${teamUrl}/invitations`).flush(null, { status: 500, statusText: 'x' });
+    expectUsers('/invitations').flush(null, { status: 500, statusText: 'x' });
 
     expect(failures).toEqual([
       new MemberFailure('unavailable'),

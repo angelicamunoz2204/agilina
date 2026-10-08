@@ -4,7 +4,9 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
+import { provideStubUsersPort } from '@testing/users';
 
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
@@ -56,6 +58,7 @@ describe('TeamSelectorPage', () => {
           provide: SprintsPort,
           useValue: { active: () => of(null), start: () => NEVER, reconfigure: () => NEVER },
         },
+        provideStubUsersPort(),
       ],
     });
     harness = await RouterTestingHarness.create();
@@ -70,18 +73,13 @@ describe('TeamSelectorPage', () => {
 
   function links(page: HTMLElement): { text: string; href: string | null }[] {
     return Array.from(page.querySelectorAll('ul a')).map((link) => ({
-      text: link.textContent.trim(),
+      text: link.querySelector('[data-testid=team-option-name]')?.textContent.trim() ?? '',
       href: link.getAttribute('href'),
     }));
   }
 
   it('shows the name of each team of the user with a link to its dashboard', async () => {
-    const page = await open(
-      of([
-        { id: 'a', name: 'Atlas', role: 'admin' },
-        { id: 'b', name: 'Boreal', role: 'admin' },
-      ]),
-    );
+    const page = await open(of([aTeam('a', 'Atlas', 'admin'), aTeam('b', 'Boreal', 'admin')]));
 
     expect(page.querySelector('h1')?.textContent).toBe('Selecciona tu equipo');
     expect(links(page)).toEqual([
@@ -92,13 +90,8 @@ describe('TeamSelectorPage', () => {
   });
 
   it('enters the dashboard of the team the user clicks', async () => {
-    port.known = [{ id: 'b', name: 'Boreal', role: 'admin' }];
-    const page = await open(
-      of([
-        { id: 'a', name: 'Atlas', role: 'admin' },
-        { id: 'b', name: 'Boreal', role: 'admin' },
-      ]),
-    );
+    port.known = [aTeam('b', 'Boreal', 'admin')];
+    const page = await open(of([aTeam('a', 'Atlas', 'admin'), aTeam('b', 'Boreal', 'admin')]));
 
     page.querySelectorAll<HTMLAnchorElement>('ul a')[1]!.click();
     await harness.fixture.whenStable();
@@ -118,21 +111,16 @@ describe('TeamSelectorPage', () => {
   });
 
   it('goes straight into the only team: there is nothing to choose', async () => {
-    port.known = [{ id: 'a', name: 'Atlas', role: 'admin' }];
+    port.known = [aTeam('a', 'Atlas', 'admin')];
 
-    await open(of([{ id: 'a', name: 'Atlas', role: 'admin' }]));
+    await open(of([aTeam('a', 'Atlas', 'admin')]));
 
     expect(TestBed.inject(Router).url).toBe('/acme/teams/a');
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
   it('always offers to create a team', async () => {
-    const page = await open(
-      of([
-        { id: 'a', name: 'Atlas', role: 'admin' },
-        { id: 'b', name: 'Boreal', role: 'member' },
-      ]),
-    );
+    const page = await open(of([aTeam('a', 'Atlas', 'admin'), aTeam('b', 'Boreal', 'member')]));
 
     expect(page.querySelector('a[href="/acme/teams/new"]')?.getAttribute('href')).toBe(
       '/acme/teams/new',
@@ -149,15 +137,24 @@ describe('TeamSelectorPage', () => {
     expect(harness.routeNativeElement?.querySelector('form')).not.toBeNull();
   });
 
-  it('does not show the role of the user in each team', async () => {
+  it('shows the mode of each team and how the user is called in it', async () => {
     const page = await open(
       of([
-        { id: 'a', name: 'Atlas', role: 'admin' },
-        { id: 'b', name: 'Boreal', role: 'member' },
+        aTeam('a', 'Atlas', 'admin'),
+        aTeam('b', 'Boreal', 'member'),
+        { ...aTeam('c', 'Cielo', 'admin'), mode: 'autonomous', label: 'admin' },
       ]),
     );
 
-    expect(page.textContent).not.toMatch(/admin|member|miembro/i);
+    const rows = Array.from(page.querySelectorAll('ul a')).map((link) => [
+      link.querySelector('[data-testid=team-mode]')?.textContent.trim(),
+      link.querySelector('[data-testid=team-label]')?.textContent.trim(),
+    ]);
+    expect(rows).toEqual([
+      ['Soporte', 'Scrum Master'],
+      ['Soporte', 'Miembro'],
+      ['Autónomo', 'Administrador'],
+    ]);
   });
 
   it('says it is loading while the API has not answered', async () => {

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from agilina_api.teams.application.dtos import (
     ActiveSprintView,
+    MemberView,
     TeamMembersList,
     TeamView,
     UserTeamView,
@@ -12,13 +13,15 @@ from agilina_api.teams.presentation.http.schemas import (
     ActiveSprintResponse,
     CreatedTeamResponse,
     DailyParticipantResponse,
+    MeResponse,
     MyTeamResponse,
     RoleOptionResponse,
     SprintDayResponse,
-    TeamMemberResponse,
-    TeamMembersResponse,
     TeamResponse,
+    UserInTeamResponse,
+    UsersInTeamResponse,
 )
+from agilina_shared import role_label
 from agilina_shared.enums import TeamRole
 
 
@@ -27,32 +30,56 @@ def present_created(team_id: UUID) -> CreatedTeamResponse:
 
 
 def present_my_team(view: UserTeamView) -> MyTeamResponse:
-    return MyTeamResponse(id=view.team_id, name=view.name, role=view.role)
+    return MyTeamResponse(
+        id=view.team_id,
+        name=view.name,
+        role=view.role,
+        mode=view.mode,
+        label=role_label(view.role, view.mode),
+    )
 
 
 def present_team(view: TeamView, role: TeamRole) -> TeamResponse:
     return TeamResponse(
-        id=view.team_id, name=view.name, mode=view.mode, language=view.language, role=role
+        id=view.team_id,
+        name=view.name,
+        mode=view.mode,
+        language=view.language,
+        role=role,
+        label=role_label(role, view.mode),
     )
 
 
-def present_members(members: TeamMembersList) -> TeamMembersResponse:
-    return TeamMembersResponse(
+def present_user(member: MemberView) -> UserInTeamResponse:
+    return UserInTeamResponse(
+        user_id=member.user_id,
+        full_name=member.full_name,
+        email=member.email,
+        role=member.role,
+        label=member.label,
+        joined_at=member.joined_at,
+        role_change_blocked_by=member.role_change_blocked_by,
+        removal_blocked_by=member.removal_blocked_by,
+    )
+
+
+def present_users(members: TeamMembersList) -> UsersInTeamResponse:
+    return UsersInTeamResponse(
         roles=[
             RoleOptionResponse(role=option.role, label=option.label) for option in members.roles
         ],
-        members=[
-            TeamMemberResponse(
-                user_id=member.user_id,
-                full_name=member.full_name,
-                email=member.email,
-                role=member.role,
-                label=member.label,
-                role_change_blocked_by=member.role_change_blocked_by,
-                removal_blocked_by=member.removal_blocked_by,
-            )
-            for member in members.members
-        ],
+        users=[present_user(member) for member in members.members],
+    )
+
+
+def present_me(member: MemberView) -> MeResponse:
+    return MeResponse(
+        user_id=member.user_id,
+        full_name=member.full_name,
+        email=member.email,
+        role=member.role,
+        label=member.label,
+        joined_at=member.joined_at,
     )
 
 

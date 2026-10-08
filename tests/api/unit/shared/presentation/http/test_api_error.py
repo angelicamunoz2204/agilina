@@ -45,6 +45,14 @@ def test_errors_of_groups_the_codes_of_a_status_for_the_openapi_document():
         IdentityErrors.INVITATION_USED, IdentityErrors.INVITATION_EXPIRED, SharedErrors.VALIDATION
     )
 
-    assert set(responses) == {410, 422}
+    # The 500 is always there: every endpoint can fail in a way nobody planned for.
+    assert set(responses) == {410, 422, 500}
+    assert "`internal_error`" in responses[500]["description"]
     assert "`invitation_used`" in responses[410]["description"]
     assert "`invitation_expired`" in responses[410]["description"]
+
+
+def test_errors_of_does_not_list_the_same_error_twice():
+    responses = errors_of(SharedErrors.INTERNAL, SharedErrors.INTERNAL)
+
+    assert responses[500]["description"].count("`internal_error`") == 1

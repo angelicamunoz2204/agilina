@@ -52,7 +52,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | --- | --- | --- |
 | 404 | `not_found` | La ruta no existe |
 | 405 | `method_not_allowed` | La ruta existe pero no con ese método |
-| 500 | `internal_error` | Un fallo inesperado; el detalle queda en el registro bajo el `request_id`, nunca en la respuesta |
+| 500 | `internal_error` | Un fallo inesperado; el detalle queda en el registro bajo el `request_id`, nunca en la respuesta. Cada endpoint lo declara también en su tabla |
 
 ### Catálogo de códigos
 
@@ -103,6 +103,7 @@ Sonda de vida. Sin tenant, sin sesión.
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
 | 200 | `{version, environment, status: "alive"}` | Siempre que el proceso responde |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `GET /health/ready`
 
@@ -112,6 +113,7 @@ Sonda de disponibilidad: comprueba la base del catálogo. Sin tenant, sin sesió
 | --- | --- | --- |
 | 200 | `{version, environment, status: "ready", database: "up"}` | La base responde |
 | 503 | `{version, environment, status: "not_ready", database: "down"}` | La base no responde. **No** usa el formato de error: es el cuerpo de la sonda, que lee el orquestador |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Tenant
 
@@ -126,6 +128,7 @@ Requiere tenant; sin sesión.
 | 400 | error `tenant_required` | Falta la cabecera |
 | 404 | error `tenant_not_found` | No existe, está suspendido o el nombre no es válido |
 | 422 | error `validation_error` | La especificación la declara porque la cabecera es un parámetro, pero es opcional: en la práctica no ocurre |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Invitaciones
 
@@ -143,6 +146,7 @@ Qué muestra la página de activación sobre un enlace. Cuerpo: `{token}`.
 | 404 | error `invitation_not_found` | El enlace se alteró o nunca existió |
 | 410 | error `invitation_used` / `invitation_expired` / `invitation_revoked` | La invitación ya no sirve |
 | 422 | error `validation_error` | Cuerpo mal formado |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `POST /v1/invitations/activate`
 
@@ -159,6 +163,7 @@ Elige una contraseña y activa la cuenta. Cuerpo: `{token, password, confirmatio
 | 422 | error `password_mismatch` | `password` y `confirmation` difieren |
 | 422 | error `password_policy` | La política la rechaza; `details.reasons` dice por qué. El enlace sigue vigente |
 | 503 | error `identity_provider_unavailable` | Keycloak no responde |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `POST /v1/invitations/request-new`
 
@@ -173,8 +178,11 @@ Pide a los admins del equipo una invitación nueva. Cuerpo: `{token}`.
 | 409 | error `no_admins_to_notify` | Nadie a quien avisar |
 | 422 | error `validation_error` | Cuerpo mal formado |
 | 502 | error `mail_unavailable` | No se pudo enviar el correo |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Equipos
+
+Quién puede hacer qué está en la [matriz de permisos](permisos.md).
 
 Todas requieren tenant y sesión: el usuario es siempre el del token, nunca uno del cuerpo.
 
@@ -190,16 +198,21 @@ modo `support` e idioma `en`. Cuerpo: `{name}` (un campo desconocido se rechaza)
 | 401 | error `not_authenticated` | Sin token válido |
 | 422 | error `validation_error` | Falta `name`, no es texto o hay un campo desconocido |
 | 422 | error `invalid_team_name` | El nombre está en blanco o es demasiado largo una vez recortado |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `GET /v1/teams`
 
-Los equipos del usuario, con su rol en cada uno, ordenados por nombre sin distinguir mayúsculas.
+Los equipos del usuario, con su rol, el modo del equipo y la etiqueta visible del rol en cada uno,
+ordenados por nombre sin distinguir mayúsculas. La etiqueta se resuelve equipo por equipo
+([permisos](permisos.md)): `scrum_master` para el admin de un equipo en modo soporte, `admin` en
+modo autónomo y `member` para un miembro; solo se muestra, los permisos siguen al `role`.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 200 | `[{id, name, role}]` (vacía si no tiene equipos) | Siempre que hay sesión |
+| 200 | `[{id, name, role, mode, label}]` (vacía si no tiene equipos) | Siempre que hay sesión |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
 | 401 | error `not_authenticated` | Sin token válido |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `GET /v1/teams/{team_id}`
 
@@ -207,37 +220,84 @@ Un equipo del usuario: nombre, modo, idioma y el rol de quien pregunta.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 200 | `{id, name, mode, language, role}` | El usuario es miembro activo |
+| 200 | `{id, name, mode, language, role, label}` | El usuario es miembro activo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
 | 401 | error `not_authenticated` | Sin token válido |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la lectura (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
 
-### `GET /v1/teams/{team_id}/members`
+## Usuarios
 
-Los miembros activos del equipo, para su pantalla de configuración (HU-06). Solo para los admins
-del equipo. Cada miembro trae `{user_id, full_name, email, role, label, role_change_blocked_by,
-removal_blocked_by}`, ordenados por nombre sin distinguir mayúsculas (y por correo si se repite).
-`label` es el código de la etiqueta visible del rol, que la web traduce: por ahora es el mismo
-rol (`admin` o `member`) y HU-04 lo derivará del rol y del modo del equipo. Los dos `…_blocked_by`
-dicen por qué no se puede cambiar el rol o retirar a esa persona ahora (`null` si se puede), con
-las mismas reglas que aplican los cambios: `sprint_in_progress` (solo el cambio de rol, y va
-primero) o `last_admin`. `roles` son los roles que un admin puede dar, con su etiqueta.
+Las personas de un equipo, sus roles y su retiro (HU-06), y quien llama como miembro de un equipo
+(HU-04). Un usuario tiene un rol distinto en cada equipo, así que **toda ruta nombra el equipo en la
+query** (`?team_id=<uuid>`). Todas requieren tenant y sesión, y las mismas respuestas de acceso en el
+mismo orden: sin sesión `401`, quien no es miembro activo del equipo `403 not_a_team_member` (la
+misma respuesta si el equipo es ajeno, lo retiraron o no existe) y, en las rutas de admin, un miembro
+que no lo es `403 not_a_team_admin`. Falta `team_id` o no es un UUID: `422 validation_error` con
+`details.fields` `query.team_id`. Quién puede hacer qué: [matriz de permisos](permisos.md).
+
+Un usuario del equipo (`UserInTeam`) es `{user_id, full_name, email, role, label, joined_at,
+role_change_blocked_by, removal_blocked_by}`. `role` es el rol interno (`admin` o `member`) y
+`label` el código de la etiqueta visible en ese equipo (`scrum_master`, `admin` o `member`). Los dos
+`…_blocked_by` dicen por qué no se puede cambiar el rol o retirar a esa persona ahora (`null` si se
+puede), con las mismas reglas que aplican los cambios: `sprint_in_progress` (solo el cambio de rol, y
+va primero) o `last_admin`.
+
+### `GET /v1/users?team_id=…`
+
+Los usuarios activos del equipo, para su pantalla de configuración. Solo para los admins del equipo.
+Ordenados por nombre sin distinguir mayúsculas (y por correo si se repite). `roles` son los roles que
+un admin puede dar, con su etiqueta.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 200 | `{roles: [{role, label}], members: [{user_id, full_name, email, role, label, role_change_blocked_by, removal_blocked_by}]}` | Quien pregunta es admin del equipo |
+| 200 | `{roles: [{role, label}], users: [UserInTeam]}` | Quien pregunta es admin del equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
 | 401 | error `not_authenticated` | Sin token válido |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 403 | error `not_a_team_admin` | Es miembro, pero no admin del equipo |
-| 422 | error `validation_error` | `team_id` no es un UUID |
+| 422 | error `validation_error` | Falta `team_id` o no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
 
-### `PATCH /v1/teams/{team_id}/members/{user_id}`
+### `GET /v1/users/me?team_id=…`
+
+Quien llama, como miembro del equipo: lo que muestra el encabezado de la app. Cualquier miembro
+activo, y solo para sí mismo. Responde `{user_id, full_name, email, role, label, joined_at}`.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | `{user_id, full_name, email, role, label, joined_at}` | Quien llama es miembro activo del equipo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 404 | error `member_not_found` | Lo retiraron entre la verificación de acceso y la lectura (solo una carrera) |
+| 422 | error `validation_error` | Falta `team_id` o no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
+
+### `GET /v1/users/{user_id}?team_id=…`
+
+Un usuario activo del equipo, con los mismos datos que la lista: para el detalle de una persona. Solo
+para los admins del equipo.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | `UserInTeam` | Quien pregunta es admin y la persona es miembro activo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token válido |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 403 | error `not_a_team_admin` | Es miembro, pero no admin del equipo |
+| 404 | error `member_not_found` | `user_id` no es miembro activo del equipo (nunca lo fue o lo retiraron) |
+| 422 | error `validation_error` | Falta `team_id` o `team_id` / `user_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
+
+### `PATCH /v1/users/{user_id}?team_id=…`
 
 Da otro rol interno a un miembro activo, que puede ser el mismo admin que lo pide. Solo para los
-admins del equipo. Cuerpo: `{role}` (`admin` o `member`; un campo desconocido se rechaza). Dar el
-rol que ya tiene no cambia nada. Queda en el registro quién cambió qué rol a quién.
+admins del equipo. Cuerpo: `{role}` (`admin` o `member`; una etiqueta como `scrum_master` no es un
+rol; un campo desconocido se rechaza). Dar el rol que ya tiene no cambia nada. Queda en el registro
+quién cambió qué rol a quién.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
@@ -249,29 +309,31 @@ rol que ya tiene no cambia nada. Queda en el registro quién cambió qué rol a 
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 409 | error `sprint_in_progress` | El equipo tiene un sprint en curso; nada cambia |
 | 409 | error `last_admin` | Bajaría el rol al único admin, también si se lo pide a sí mismo; nada cambia |
-| 422 | error `validation_error` | `team_id` o `user_id` no es un UUID, falta `role`, el rol no existe o hay un campo desconocido |
+| 422 | error `validation_error` | Falta `team_id`, `team_id` o `user_id` no es un UUID, falta `role`, el rol no existe o hay un campo desconocido |
+| 500 | error `internal_error` | Fallo inesperado |
 
-### `DELETE /v1/teams/{team_id}/members/{user_id}`
+### `DELETE /v1/users/{user_id}?team_id=…`
 
-Retira a un miembro activo del equipo, que puede ser el mismo admin que lo pide. Solo para los
-admins del equipo. Termina la membresía (queda como `removed`, con su fecha): la cuenta de la
-persona no se toca, porque puede estar en otros equipos, y se la puede volver a invitar. Un sprint
+Retira a un miembro activo **del equipo**, que puede ser el mismo admin que lo pide. Solo para los
+admins del equipo. Termina la membresía (queda como `removed`, con su fecha): **la cuenta de la
+persona no se borra**, porque puede estar en otros equipos, y se la puede volver a invitar. Un sprint
 en curso no lo impide. Si la persona participa en la daily del sprint activo, sale de los
 participantes en el mismo cambio y quienes iban después avanzan un turno (el orden sigue desde 1, sin
 huecos), aunque la daily quede sin participantes. Queda en el registro quién retiró a quién.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 204 | — | Retirado |
+| 204 | — | Retirado del equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
 | 401 | error `not_authenticated` | Sin token válido |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `member_not_found` | `user_id` no es miembro activo del equipo |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 409 | error `last_admin` | Es el único admin, también si se retira a sí mismo; nada cambia |
-| 422 | error `validation_error` | `team_id` o `user_id` no es un UUID |
+| 422 | error `validation_error` | Falta `team_id`, o `team_id` o `user_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
 
-### `POST /v1/teams/{team_id}/invitations`
+### `POST /v1/users/invitations?team_id=…`
 
 Un admin invita a una persona a su equipo (HU-06). Solo para los admins del equipo. Cuerpo:
 `{full_name, email, role}`, con `role` `member` por defecto (un campo desconocido se rechaza).
@@ -298,9 +360,10 @@ servidor de correo lo rechaza no cambia nada.
 | 409 | error `already_a_team_member` | La persona ya es miembro activo; nada se guarda ni se envía |
 | 409 | error `account_disabled` | La persona tiene una cuenta desactivada; nada se guarda ni se envía |
 | 409 | error `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante |
-| 422 | error `validation_error` | Falta `full_name` o `email`, el rol no existe, un texto es demasiado largo o hay un campo desconocido |
+| 422 | error `validation_error` | Falta `team_id` o no es un UUID, falta `full_name` o `email`, el rol no existe, un texto es demasiado largo o hay un campo desconocido |
 | 422 | error `invalid_email` / `invalid_full_name` | El correo no es válido o el nombre está en blanco |
 | 502 | error `mail_unavailable` | No se pudo enviar el correo; nada se guarda |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Sprint
 
@@ -363,6 +426,7 @@ Esa comprobación va antes que las reglas del sprint: con un sprint activo, la r
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada se guarda |
 | 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada se guarda |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `GET /v1/teams/{team_id}/sprints/active`
 
@@ -375,7 +439,9 @@ dashboard lo usa). Sin sprint activo responde `200` con `null`: es un estado nor
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
 | 401 | error `not_authenticated` | Sin token válido |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la lectura (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `PUT /v1/teams/{team_id}/sprints/active`
 
@@ -393,6 +459,7 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada cambia |
 | 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada cambia |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Ceremonias (contrato del worker)
 
@@ -408,6 +475,7 @@ El contexto que el worker necesita antes de entrar a la sala.
 | 200 | `CeremonyContext` (contrato en `shared/`) | Aún no ocurre |
 | 422 | error `validation_error` | `ceremony_id` no es un UUID |
 | 501 | error `not_implemented` | Siempre, hasta HU-56 |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ### `POST /v1/ceremonies/{ceremony_id}/result`
 
@@ -418,3 +486,4 @@ El resultado que el worker entrega al cerrar la ceremonia. Cuerpo: `CeremonyResu
 | 200 | — | Aún no ocurre |
 | 422 | error `validation_error` | `ceremony_id` no es un UUID o el cuerpo no cumple el contrato |
 | 501 | error `not_implemented` | Siempre, hasta HU-56 |
+| 500 | error `internal_error` | Fallo inesperado |

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from agilina_shared.enums import TeamRole
+from agilina_shared.enums import OperationMode, TeamRole
 
 
 @dataclass(frozen=True)
@@ -11,3 +11,5 @@ class UserTeamView:
     team_id: UUID
     name: str
     role: TeamRole
+    mode: OperationMode
+    """The team's mode: with the role it gives the label to show (HU-04)."""

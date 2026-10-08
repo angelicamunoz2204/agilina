@@ -8,8 +8,8 @@ import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HealthPort } from '@features/status/application/health.port';
 import { SprintsPort } from '@features/teams/application/sprints.port';
-import { TeamMembersPort } from '@features/teams/application/team-members.port';
 import { TeamsPort } from '@features/teams/application/teams.port';
+import { UsersPort } from '@features/teams/application/users.port';
 import { type ActiveSprint } from '@features/teams/domain/active-sprint';
 import { type Team } from '@features/teams/domain/team';
 import { type TeamMembers } from '@features/teams/domain/team-member';
@@ -39,11 +39,19 @@ class SilentTeamsPort extends TeamsPort {
 }
 
 /** Members port double that never answers either. */
-class SilentTeamMembersPort extends TeamMembersPort {
+class SilentUsersPort extends UsersPort {
   readonly requested: string[] = [];
 
   list(teamId: string): Observable<TeamMembers> {
     this.requested.push(teamId);
+    return NEVER;
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
     return NEVER;
   }
 
@@ -80,7 +88,7 @@ class SilentSprintsPort extends SprintsPort {
 
 describe('routes', () => {
   let port: SilentTeamsPort;
-  let members: SilentTeamMembersPort;
+  let members: SilentUsersPort;
   let sprints: SilentSprintsPort;
   let session: FakeAuthSession;
   let harness: RouterTestingHarness;
@@ -88,7 +96,7 @@ describe('routes', () => {
   async function start(signedIn: boolean): Promise<void> {
     TestBed.resetTestingModule();
     port = new SilentTeamsPort();
-    members = new SilentTeamMembersPort();
+    members = new SilentUsersPort();
     sprints = new SilentSprintsPort();
     session = new FakeAuthSession(signedIn);
     TestBed.configureTestingModule({
@@ -97,7 +105,7 @@ describe('routes', () => {
         provideFakeLogger(),
         provideRouter(routes, withComponentInputBinding()),
         { provide: TeamsPort, useValue: port },
-        { provide: TeamMembersPort, useValue: members },
+        { provide: UsersPort, useValue: members },
         { provide: SprintsPort, useValue: sprints },
         { provide: InvitationPort, useValue: { status: () => NEVER } },
         { provide: LoginRedirectPort, useValue: {} },
@@ -133,7 +141,7 @@ describe('routes', () => {
       expect(await screenAt('/acme/teams/team-1')).toBe('agl-app-shell > agl-team-dashboard-page');
       TestBed.tick();
 
-      expect(port.requested).toEqual(['team-1']);
+      expect(new Set(port.requested)).toEqual(new Set(['team-1']));
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1');
     });
 
@@ -144,7 +152,8 @@ describe('routes', () => {
       TestBed.tick();
 
       expect(members.requested).toEqual(['team-1']);
-      expect(port.requested).toEqual([]);
+      // The settings also read the team, for the name and the role label in the top bar.
+      expect(port.requested).toEqual(['team-1']);
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings');
     });
 

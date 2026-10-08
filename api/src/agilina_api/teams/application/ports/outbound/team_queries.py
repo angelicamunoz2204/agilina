@@ -33,8 +33,8 @@ class TeamQueries(Protocol):
 
     async def list_members(self, team_id: UUID) -> TeamMemberRecords:
         """The team's active members with their role, in the order they joined, and whether
-        the team has a sprint in progress; no members and no sprint when the team does not
-        exist. Removed members are not listed (HU-06)."""
+        the team has a sprint in progress and its mode; no members and no sprint when the team
+        does not exist. Removed members are not listed (HU-06)."""
         ...
 
     async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:

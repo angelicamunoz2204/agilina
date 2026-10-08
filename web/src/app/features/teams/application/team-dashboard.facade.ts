@@ -26,6 +26,7 @@ export class TeamDashboardFacade {
     this.current.hasValue() ? this.current.value() : null,
   );
   readonly loading = this.current.isLoading;
+
   readonly failed = computed(() => this.current.status() === 'error');
   /** What went wrong, when the team could not be opened. */
   readonly problem = computed<TeamFailureKind | null>(() =>

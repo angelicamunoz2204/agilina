@@ -1,6 +1,11 @@
 {
   "app": {
-    "tagline": "Scrum Master virtual para la reunión diaria"
+    "tagline": "Scrum Master virtual para la reunión diaria",
+    "role_labels": {
+      "member": "Miembro",
+      "scrum_master": "Scrum Master",
+      "admin": "Administrador"
+    }
   },
   "status": {
     "title": "Estado del entorno",
@@ -23,6 +28,10 @@
       "create": "Crear equipo nuevo",
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo."
+      },
+      "modes": {
+        "support": "Soporte",
+        "autonomous": "Autónomo"
       }
     },
     "create": {
@@ -33,7 +42,7 @@
         "blank": "Escribe el nombre del equipo.",
         "too_long": "El nombre no puede pasar de {{ max }} caracteres."
       },
-      "defaults_hint": "El equipo se creará en modo soporte y con idioma inglés. Tú quedarás como su Administrador.",
+      "defaults_hint": "El equipo se creará en modo soporte y con idioma inglés. Tú quedarás como su Scrum Master.",
       "submit": "Crear equipo",
       "saving": "Creando…",
       "failed": "No se pudo crear el equipo. Inténtalo de nuevo.",
@@ -63,30 +72,37 @@
       "subtitle": "Las personas que participan en las ceremonias del equipo y su rol.",
       "back": "Volver al equipo",
       "members": "Integrantes",
+      "columns": {
+        "name": "Nombre",
+        "email": "Correo electrónico",
+        "role": "Rol",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "status": {
+        "active": "Activo"
+      },
+      "role_hint": "El rol solo se puede cambiar sin sprint activo.",
       "loading": "Cargando a los integrantes…",
       "failed": "No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.",
       "saving": "Guardando…",
       "role_of": "Rol de {{ name }}",
-      "roles": {
-        "admin": "Administrador",
-        "member": "Miembro"
-      },
       "blocked": {
         "role_change": {
           "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo.",
-          "last_admin": "Es el único Administrador: el equipo no puede quedarse sin Administrador."
+          "last_admin": "Es el único {{ admin }}: el equipo no puede quedarse sin {{ admin }}."
         },
         "removal": {
-          "last_admin": "Es el único Administrador: no se puede eliminar del equipo."
+          "last_admin": "Es el único {{ admin }}: no se puede eliminar del equipo."
         }
       },
       "forbidden": {
         "title": "No tienes acceso a esta pantalla",
-        "text": "Solo los Administradores del equipo pueden gestionar a sus integrantes."
+        "text": "Solo quienes administran el equipo pueden gestionar a sus integrantes."
       },
       "lost_access": {
         "title": "Ya no administras este equipo",
-        "role_change": "Tu cambio quedó guardado: ahora eres Miembro, y solo los Administradores gestionan a los integrantes.",
+        "role_change": "Tu cambio quedó guardado: ahora eres Miembro, y solo quienes administran el equipo gestionan a los integrantes.",
         "removal": "Tu cambio quedó guardado: ya no perteneces a este equipo ni recibirás sus convocatorias.",
         "to_teams": "Ir a mis equipos"
       },
@@ -97,9 +113,9 @@
         "failed": "No se pudo cambiar el rol. Inténtalo de nuevo.",
         "problems": {
           "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
-          "forbidden": "Ya no eres Administrador de este equipo.",
+          "forbidden": "Ya no eres {{ admin }} de este equipo.",
           "not_found": "Esta persona ya no está en el equipo.",
-          "last_admin": "No se puede cambiar el rol: el equipo no puede quedarse sin Administrador.",
+          "last_admin": "No se puede cambiar el rol: el equipo no puede quedarse sin {{ admin }}.",
           "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo."
         }
       },
@@ -128,7 +144,7 @@
         "failed": "No se pudo enviar la invitación. Inténtalo de nuevo.",
         "problems": {
           "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
-          "forbidden": "Ya no eres Administrador de este equipo.",
+          "forbidden": "Ya no eres {{ admin }} de este equipo.",
           "already_member": "Esta persona ya es integrante del equipo.",
           "account_disabled": "La cuenta de esta persona está desactivada, así que no se puede agregar al equipo.",
           "invalid_email": "El correo no es válido. Revísalo y vuelve a intentarlo.",
@@ -152,9 +168,33 @@
         "failed": "No se pudo eliminar a esta persona. Inténtalo de nuevo.",
         "problems": {
           "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
-          "forbidden": "Ya no eres Administrador de este equipo.",
+          "forbidden": "Ya no eres {{ admin }} de este equipo.",
           "not_found": "Esta persona ya no está en el equipo.",
-          "last_admin": "No se puede eliminar: el equipo no puede quedarse sin Administrador."
+          "last_admin": "No se puede eliminar: el equipo no puede quedarse sin {{ admin }}."
+        }
+      },
+      "view": {
+        "open_label": "Ver a {{ name }}",
+        "subtitle": "Datos de la persona en este equipo.",
+        "email": "Correo electrónico",
+        "role": "Rol",
+        "joined": "En el equipo desde",
+        "loading": "Cargando…",
+        "close": "Cerrar",
+        "failed": "No se pudo cargar a esta persona. Inténtalo de nuevo más tarde.",
+        "blocked": {
+          "role_change": {
+            "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo.",
+            "last_admin": "Es el único {{ admin }}: el equipo no puede quedarse sin {{ admin }}."
+          },
+          "removal": {
+            "last_admin": "Es el único {{ admin }}: no se puede eliminar del equipo."
+          }
+        },
+        "problems": {
+          "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+          "forbidden": "Ya no eres {{ admin }} de este equipo.",
+          "not_found": "Esta persona ya no está en el equipo."
         }
       },
       "tabs": {

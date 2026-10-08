@@ -18,6 +18,7 @@ from agilina_api.teams.application.dtos import (
 )
 from agilina_api.teams.domain.sprint import Sprint, SprintStatus
 from agilina_api.teams.domain.team import Team
+from agilina_shared.enums import OperationMode
 
 
 class InMemoryTeamRepository:
@@ -145,7 +146,8 @@ class FakeTeamsUnitOfWork:
 
 class FakeTeamQueries:
     """Answers with what the test gives it: summaries, views and members by team, teams by
-    user, memberships by team and user, and the teams with a sprint in progress."""
+    user, memberships by team and user, the teams with a sprint in progress and the mode of
+    each team (support unless the test says otherwise)."""
 
     def __init__(
         self,
@@ -155,6 +157,7 @@ class FakeTeamQueries:
         memberships: dict[tuple[UUID, UUID], MembershipRef] | None = None,
         members: dict[UUID, tuple[MemberRecord, ...]] | None = None,
         teams_with_active_sprint: set[UUID] | None = None,
+        modes: dict[UUID, OperationMode] | None = None,
     ) -> None:
         self.summaries = summaries or {}
         self.teams_by_user = teams_by_user or {}
@@ -162,6 +165,7 @@ class FakeTeamQueries:
         self.memberships = memberships or {}
         self.members = members or {}
         self.teams_with_active_sprint = teams_with_active_sprint or set()
+        self.modes = modes or {}
 
     async def get_summary(self, team_id: UUID) -> TeamSummary | None:
         return self.summaries.get(team_id)
@@ -176,6 +180,7 @@ class FakeTeamQueries:
         return TeamMemberRecords(
             members=self.members.get(team_id, ()),
             has_active_sprint=team_id in self.teams_with_active_sprint,
+            mode=self.modes.get(team_id, OperationMode.SUPPORT),
         )
 
     async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:

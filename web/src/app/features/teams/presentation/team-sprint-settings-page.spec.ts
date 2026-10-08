@@ -10,7 +10,7 @@ import { provideTestTenant } from '@testing/tenant';
 
 import { TeamSprintSettingsPage } from './team-sprint-settings-page';
 import { SprintsPort } from '../application/sprints.port';
-import { TeamMembersPort } from '../application/team-members.port';
+import { UsersPort } from '../application/users.port';
 import { type ActiveSprint } from '../domain/active-sprint';
 import { MemberFailure } from '../domain/member-failure';
 import { type SprintDraft } from '../domain/sprint-draft';
@@ -24,6 +24,7 @@ function member(userId: string, fullName: string): TeamMember {
     email: `${userId}@example.com`,
     role: 'member',
     label: 'member',
+    joinedAt: new Date('2026-10-08T15:04:05Z'),
     roleChangeBlockedBy: null,
     removalBlockedBy: null,
   };
@@ -96,12 +97,20 @@ class FakeSprintsPort extends SprintsPort {
 }
 
 /** Members port double: list() answers `answer`; the sprint screen uses nothing else. */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   answer: TeamMembers | MemberFailure = { roles: [], members: [ANA, BRUNO, CARLA] };
 
   list(): Observable<TeamMembers> {
     const answer = this.answer;
     return answer instanceof MemberFailure ? throwError(() => answer) : of(answer);
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
+    return NEVER;
   }
 
   invite(): Observable<never> {
@@ -119,13 +128,13 @@ class FakeTeamMembersPort extends TeamMembersPort {
 
 describe('TeamSprintSettingsPage', () => {
   let sprints: FakeSprintsPort;
-  let members: FakeTeamMembersPort;
+  let members: FakeUsersPort;
   let harness: RouterTestingHarness;
   let page: HTMLElement;
 
   beforeEach(async () => {
     sprints = new FakeSprintsPort();
-    members = new FakeTeamMembersPort();
+    members = new FakeUsersPort();
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
@@ -135,7 +144,7 @@ describe('TeamSprintSettingsPage', () => {
           withComponentInputBinding(),
         ),
         { provide: SprintsPort, useValue: sprints },
-        { provide: TeamMembersPort, useValue: members },
+        { provide: UsersPort, useValue: members },
         // The browser of whoever opens the screen, fixed: not the zone of the machine.
         { provide: BROWSER_TIME_ZONE, useValue: 'America/Bogota' },
       ],

@@ -28,8 +28,12 @@ async def test_a_user_with_several_teams_receives_them_all(session_factory):
     teams = await SqlTeamQueries(session_factory).list_for_user(ana.id)
 
     assert teams == (
-        UserTeamView(team_id=atlas.id, name="Atlas", role=TeamRole.ADMIN),
-        UserTeamView(team_id=boreal.id, name="Boreal", role=TeamRole.MEMBER),
+        UserTeamView(
+            team_id=atlas.id, name="Atlas", role=TeamRole.ADMIN, mode=OperationMode.SUPPORT
+        ),
+        UserTeamView(
+            team_id=boreal.id, name="Boreal", role=TeamRole.MEMBER, mode=OperationMode.SUPPORT
+        ),
     )
 
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from agilina_api.teams.application.dtos.member_record import MemberRecord
+from agilina_shared.enums import OperationMode
 
 
 @dataclass(frozen=True)
@@ -10,3 +11,5 @@ class TeamMemberRecords:
 
     members: tuple[MemberRecord, ...]
     has_active_sprint: bool
+    mode: OperationMode
+    """The team's mode: with each role it gives the label to show (HU-04)."""

@@ -34,7 +34,20 @@
                   <circle cx="9" cy="7" r="4" />
                 </svg>
               </span>
-              <span class="min-w-0 flex-1 font-medium break-words">{{ team.name }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium break-words" data-testid="team-option-name">{{
+                  team.name
+                }}</span>
+                <span class="block text-xs text-muted" data-testid="team-mode">
+                  {{ t('modes.' + team.mode) }}
+                </span>
+              </span>
+              <span
+                class="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent"
+                data-testid="team-label"
+              >
+                {{ 'app.role_labels.' + team.label | transloco }}
+              </span>
             </a>
           </li>
         }

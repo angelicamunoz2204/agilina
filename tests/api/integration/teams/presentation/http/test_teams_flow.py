@@ -92,6 +92,7 @@ async def test_a_created_team_has_support_mode_and_english(teams, engine):
         "mode": "support",
         "language": "en",
         "role": "admin",
+        "label": "scrum_master",
     }
     async with engine.connect() as connection:
         stored = (
@@ -118,7 +119,15 @@ async def test_the_creator_is_admin_of_the_created_team(teams, engine):
     listed = (await teams.request("GET", "", TOKEN_A)).json()
 
     assert [tuple(member) for member in members] == [(teams.ana, "admin", "active")]
-    assert listed == [{"id": team_id, "name": "Atlas", "role": "admin"}]
+    assert listed == [
+        {
+            "id": team_id,
+            "name": "Atlas",
+            "role": "admin",
+            "mode": "support",
+            "label": "scrum_master",
+        }
+    ]
 
 
 @pytest.mark.parametrize("name", ["", "   ", "x" * 81])
@@ -143,12 +152,14 @@ async def test_a_user_with_several_teams_receives_them_all(teams, session_factor
     theirs = await teams.request("GET", "", TOKEN_B)
 
     assert mine.status_code == 200
-    assert mine.json() == [
-        {"id": atlas, "name": "Atlas", "role": "admin"},
-        {"id": boreal, "name": "boreal", "role": "admin"},
-        {"id": str(cielo.id), "name": "Cielo", "role": "member"},
+    assert [(t["id"], t["name"], t["role"], t["label"]) for t in mine.json()] == [
+        (atlas, "Atlas", "admin", "scrum_master"),
+        (boreal, "boreal", "admin", "scrum_master"),
+        (str(cielo.id), "Cielo", "member", "member"),
     ]
-    assert theirs.json() == [{"id": str(cielo.id), "name": "Cielo", "role": "admin"}]
+    assert [(t["id"], t["name"], t["role"]) for t in theirs.json()] == [
+        (str(cielo.id), "Cielo", "admin")
+    ]
     member_view = await teams.request("GET", f"/{cielo.id}", TOKEN_A)
     assert member_view.status_code == 200 and member_view.json()["role"] == "member"
 

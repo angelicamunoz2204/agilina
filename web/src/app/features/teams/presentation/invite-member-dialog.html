@@ -4,6 +4,7 @@
   (dismissed)="dismissed.emit()"
 >
   <ng-container *transloco="let t; prefix: 'teams.settings'">
+    @let labels = { admin: 'app.role_labels.' + adminLabel() | transloco };
     <h2 id="invite-member-title" class="font-display text-lg font-semibold">
       {{ t('invite.title') }}
     </h2>
@@ -85,14 +86,14 @@
         (ngModelChange)="changeRole($event)"
       >
         @for (option of roles(); track option.role) {
-          <option [value]="option.role">{{ t('roles.' + option.label) }}</option>
+          <option [value]="option.role">{{ 'app.role_labels.' + option.label | transloco }}</option>
         }
       </select>
       <p id="invite-role-hint" class="mt-1.5 text-xs text-muted">{{ t('invite.role_hint') }}</p>
 
       @if (problemMessage(); as message) {
         <p role="alert" class="mt-4 text-sm text-danger" data-testid="invite-problem">
-          {{ t('invite.' + message) }}
+          {{ t('invite.' + message, labels) }}
         </p>
       }
 

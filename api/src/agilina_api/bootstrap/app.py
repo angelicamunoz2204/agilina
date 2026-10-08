@@ -40,6 +40,7 @@ from agilina_api.shared.presentation.http.request_id import REQUEST_ID_HEADER, R
 from agilina_api.shared.presentation.http.tenancy import get_tenant_directory
 from agilina_api.teams.presentation.http import dependencies as teams_dependencies
 from agilina_api.teams.presentation.http import router as teams_router
+from agilina_api.teams.presentation.http import users_router
 from agilina_api.teams.presentation.http.errors import TEAMS_ERRORS
 
 logger = get_logger(__name__)
@@ -109,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(ceremonies_router.router)
     app.include_router(identity_router.router)
     app.include_router(teams_router.router)
+    app.include_router(users_router.router)
     app.include_router(identity_router.team_invitations_router)
     register_error_handlers(app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS))
 
@@ -149,6 +151,9 @@ def create_app() -> FastAPI:
         ),
         teams_dependencies.get_list_team_members_handler: from_container(
             lambda container: container.list_team_members
+        ),
+        teams_dependencies.get_get_team_user_handler: from_container(
+            lambda container: container.get_team_user
         ),
         teams_dependencies.get_change_member_role_handler: from_container(
             lambda container: container.change_member_role

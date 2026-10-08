@@ -332,7 +332,10 @@ class TeamInvitations:
             transport=ASGITransport(app=self.app), base_url="http://tests"
         ) as client:
             return await client.post(
-                f"/v1/teams/{team_id or self.atlas}/invitations", json=body, headers=headers
+                "/v1/users/invitations",
+                params={"team_id": str(team_id or self.atlas)},
+                json=body,
+                headers=headers,
             )
 
 
@@ -450,8 +453,9 @@ async def test_the_specification_documents_the_team_invitation_and_its_errors(in
     ) as client:
         spec = (await client.get("/openapi.json")).json()
 
-    operation = spec["paths"]["/v1/teams/{team_id}/invitations"]["post"]
-    assert {"201", "401", "403", "404", "409", "422", "502"} <= set(operation["responses"])
+    operation = spec["paths"]["/v1/users/invitations"]["post"]
+    assert {"201", "401", "403", "404", "409", "422", "500", "502"} <= set(operation["responses"])
+    assert "/v1/teams/{team_id}/invitations" not in spec["paths"]
     request = spec["components"]["schemas"]["InviteToTeamRequest"]
     assert request["properties"]["role"]["default"] == "member"
     assert request["additionalProperties"] is False

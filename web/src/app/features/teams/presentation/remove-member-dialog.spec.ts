@@ -25,6 +25,7 @@ class Host {
     email: 'bruno@example.com',
     role: 'member',
     label: 'member',
+    joinedAt: new Date('2026-10-08T15:04:05Z'),
     roleChangeBlockedBy: null,
     removalBlockedBy: null,
   };

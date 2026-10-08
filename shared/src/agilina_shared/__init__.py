@@ -18,8 +18,10 @@ from agilina_shared.enums import (
     CeremonyType,
     Language,
     OperationMode,
+    RoleLabel,
     TeamRole,
 )
+from agilina_shared.role_label import role_label
 
 __all__ = [
     "CONTRACT_VERSION",
@@ -30,8 +32,10 @@ __all__ = [
     "Language",
     "OperationMode",
     "ParticipantContext",
+    "RoleLabel",
     "TeamRole",
     "TranscriptSegment",
+    "role_label",
 ]
 
 CONTRACT_VERSION = "2.0"

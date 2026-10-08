@@ -1,17 +1,21 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from agilina_api.teams.domain.member_rules import MemberChangeBlocker
-from agilina_shared.enums import TeamRole
+from agilina_shared.enums import RoleLabel, TeamRole
 
 
-class TeamMemberResponse(BaseModel):
+class UserInTeamResponse(BaseModel):
     user_id: UUID
     full_name: str
     email: str
     role: TeamRole = Field(description="The member's internal role: what authorization uses.")
-    label: str = Field(description="The code of the role's visible label (see `roles`).")
+    label: RoleLabel = Field(
+        description="The code of the role's visible label in this team (see `roles`)."
+    )
+    joined_at: datetime = Field(description="Since when the person is in the team (UTC).")
     role_change_blocked_by: MemberChangeBlocker | None = Field(
         description=(
             "Why the member's role cannot change now, or `null` when it can: "

@@ -6,7 +6,7 @@ import { BROWSER_TIME_ZONE } from '@core/time/browser-time-zone';
 import { localDateTimeToIso } from '@shared/utils/local-date-time';
 
 import { SprintsPort } from './sprints.port';
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { type ActiveSprint } from '../domain/active-sprint';
 import { memberFailureKindOf, type MemberFailureKind } from '../domain/member-failure';
 import { type SprintDraft, type SprintFields } from '../domain/sprint-draft';
@@ -26,7 +26,7 @@ import { type TeamMember } from '../domain/team-member';
 @Injectable()
 export class SprintSettingsFacade {
   private readonly sprints = inject(SprintsPort);
-  private readonly membersPort = inject(TeamMembersPort);
+  private readonly membersPort = inject(UsersPort);
   private readonly browserTimeZone = inject(BROWSER_TIME_ZONE);
   private readonly teamId = signal<Signal<string> | null>(null);
   private readonly activeSprint = rxResource({

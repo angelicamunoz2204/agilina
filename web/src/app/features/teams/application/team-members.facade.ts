@@ -9,7 +9,7 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom, type Observable } from 'rxjs';
 
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { memberFailureKindOf, type MemberFailureKind } from '../domain/member-failure';
 import { type RoleOption, type TeamMember, type TeamRole } from '../domain/team-member';
 
@@ -24,7 +24,7 @@ import { type RoleOption, type TeamMember, type TeamRole } from '../domain/team-
  */
 @Injectable()
 export class TeamMembersFacade {
-  private readonly port = inject(TeamMembersPort);
+  private readonly port = inject(UsersPort);
   private readonly teamId = signal<Signal<string> | null>(null);
   private readonly listing = rxResource({
     params: () => this.teamId()?.(),
