@@ -165,7 +165,8 @@ describe('routes', () => {
 
       expect(sprints.requested).toEqual(['team-1']);
       expect(members.requested).toEqual(['team-1']);
-      expect(port.requested).toEqual([]);
+      // The top bar reads the team too, for its name and the user's label in it.
+      expect(port.requested).toEqual(['team-1']);
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings/sprint');
     });
 

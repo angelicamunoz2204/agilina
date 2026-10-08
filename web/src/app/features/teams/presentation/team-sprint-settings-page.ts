@@ -21,6 +21,7 @@ import { problemMessageKey } from './problem-message';
 import { SettingsNoAccess } from './settings-no-access';
 import { SettingsTabs } from './settings-tabs';
 import { SprintSettingsFacade } from '../application/sprint-settings.facade';
+import { TeamShellFacade } from '../application/team-shell.facade';
 import { keepMembers, moveDown, moveUp, toggleParticipant } from '../domain/daily-order';
 import { areSprintFieldsValid, sprintFieldsProblems } from '../domain/sprint-draft';
 
@@ -50,7 +51,7 @@ interface Turn {
     SettingsNoAccess,
     SettingsTabs,
   ],
-  providers: [SprintSettingsFacade],
+  providers: [SprintSettingsFacade, TeamShellFacade],
   templateUrl: './team-sprint-settings-page.html',
 })
 export class TeamSprintSettingsPage implements OnInit {
@@ -58,6 +59,7 @@ export class TeamSprintSettingsPage implements OnInit {
   readonly teamId = input.required<string>();
 
   private readonly facade = inject(SprintSettingsFacade);
+  private readonly shell = inject(TeamShellFacade);
   protected readonly tenant = inject(TenantContext);
 
   protected readonly sprint = this.facade.sprint;
@@ -135,6 +137,7 @@ export class TeamSprintSettingsPage implements OnInit {
 
   ngOnInit(): void {
     this.facade.follow(this.teamId);
+    this.shell.follow(this.teamId);
   }
 
   protected isParticipant(userId: string): boolean {

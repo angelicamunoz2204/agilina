@@ -581,4 +581,17 @@ describe('TeamSettingsPage', () => {
 
     expect(port.meCalls).toBe(2);
   });
+
+  it('shows the eye and the bin as icon buttons, the bin dimmed when the removal is blocked', async () => {
+    await open();
+    const ana = page.querySelector('[data-testid="member-ana@example.com"]')!;
+    const bruno = page.querySelector('[data-testid="member-bruno@example.com"]')!;
+
+    for (const id of ['member-view', 'member-remove']) {
+      expect(bruno.querySelector(`[data-testid=${id}]`)?.classList).toContain('size-9');
+    }
+    const blocked = ana.querySelector<HTMLButtonElement>('[data-testid=member-remove]')!;
+    expect(blocked.disabled).toBeTrue();
+    expect(blocked.classList).toContain('disabled:opacity-40');
+  });
 });
