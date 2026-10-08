@@ -4,19 +4,27 @@ import os
 from livekit import agents
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse
 from livekit.agents.voice import room_io
-from livekit.plugins import elevenlabs, google, openai, silero
+from livekit.plugins import elevenlabs, google, silero
 
 from metricas import RegistroMetricas
+from turnos import CierreManual, SeguimientoSegmentos, WhisperSTT, ahora_ms, logger as log_turnos
 
 server = AgentServer()
 
 USAR_LLM = os.environ.get("USAR_LLM") == "1"
 RESPUESTA_FIJA = "Gracias, quedó anotado."  # Plantilla, como en la ceremonia real (AD-19)
-MIN_PALABRAS = 3  # Turnos más cortos se ignoran (p. ej. un "Gracias." alucinado por Whisper)
-# Fin de turno por STT: el turno se cierra cuando llega la transcripción (no antes) y pasa al menos
-# `min_delay` desde el fin de la voz. Con el detector de LiveKit Cloud y 0,3 s, en CPU el turno se cerraba
-# antes de que Whisper respondiera. Además, así no se envía audio al detector de turno en la nube.
-TURNOS = {"turn_detection": "stt", "endpointing": {"min_delay": 1.0}}
+MIN_PALABRAS = 3  # Solo en modo stt: turnos más cortos se ignoran (p. ej. un "Gracias." alucinado por Whisper)
+# manual (por defecto, diseño de HU-26): el participante cierra su turno con "Terminar turno" (RPC terminar_turno).
+# stt: el turno se cierra cuando llega la transcripción y pasa al menos `min_delay` desde el fin de la voz.
+MODO_TURNO = os.environ.get("MODO_TURNO", "manual")
+ESPERA_TRANSCRIPCION_S = float(os.environ.get("ESPERA_TRANSCRIPCION_S", "10"))
+TURNOS = (
+    {"turn_detection": "manual"}
+    if MODO_TURNO == "manual"
+    else {"turn_detection": "stt", "endpointing": {"min_delay": 1.0}}
+)
+# Silero descarta el audio de un segmento que supere max_buffered_speech (60 s por defecto en 1.8.4).
+VAD_MAX_BUFFERED_SPEECH_S = os.environ.get("VAD_MAX_BUFFERED_SPEECH_S", "")
 INSTRUCCIONES = (
     "Eres Agilina, una facilitadora de prueba. Responde siempre en español, "
     "en una sola frase corta, resumiendo lo que acaba de decir el participante."
@@ -31,7 +39,7 @@ class Agilina(Agent):
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         texto = new_message.text_content or ""
-        if not USAR_LLM and len(texto.split()) < MIN_PALABRAS:
+        if MODO_TURNO != "manual" and not USAR_LLM and len(texto.split()) < MIN_PALABRAS:
             self._registro.descartar_turno()
             raise StopResponse()  # Texto vacío o casi vacío: no se responde ni se cede el turno.
         hablante = self.session.room_io.linked_participant
@@ -63,7 +71,9 @@ async def entrypoint(ctx: JobContext):
             "usar_llm": "1" if USAR_LLM else "0",
         },
     )
-    stt = openai.STT(
+    seguimiento = SeguimientoSegmentos()
+    stt = WhisperSTT(
+        seguimiento=seguimiento,
         base_url=os.environ["WHISPER_BASE_URL"],
         api_key="no-se-usa",  # speaches no valida la llave
         model=os.environ.get("WHISPER_MODEL", "Systran/faster-whisper-small"),
@@ -80,14 +90,29 @@ async def entrypoint(ctx: JobContext):
     # En la sesión el evento metrics_collected está deprecado; en los componentes no.
     stt.on("metrics_collected", registro.al_medir_stt)
     tts.on("metrics_collected", registro.al_medir_tts)
+    vad = (
+        silero.VAD.load(max_buffered_speech=float(VAD_MAX_BUFFERED_SPEECH_S))
+        if VAD_MAX_BUFFERED_SPEECH_S
+        else silero.VAD.load()
+    )
     session = AgentSession(
-        vad=silero.VAD.load(),
+        vad=vad,
         stt=stt,
         llm=llm,
         tts=tts,
         turn_handling=TURNOS,
     )
     session.on("conversation_item_added", lambda ev: registro.al_agregar_mensaje(ev.item))
+
+    @session.on("user_state_changed")
+    def al_cambiar_usuario(ev) -> None:
+        if ev.old_state == "speaking" and ev.new_state != "speaking":
+            seguimiento.fin_de_voz()  # el segmento queda "en vuelo" hasta que Whisper responda
+
+    @session.on("agent_state_changed")
+    def al_cambiar_agente(ev) -> None:
+        if ev.new_state == "speaking":
+            log_turnos.info("agilina_habla", extra={"t_ms": ahora_ms()})
     tareas: set[asyncio.Task] = set()
 
     def siguiente_participante() -> str | None:
@@ -126,6 +151,19 @@ async def entrypoint(ctx: JobContext):
         agent=Agilina(ceder_turno_tras, registro),
         room_options=room_io.RoomOptions(participant_identity=primero.identity),
     )
+    log_turnos.info(
+        "configuracion_turnos",
+        extra={
+            "t_ms": ahora_ms(),
+            "modo_turno": MODO_TURNO,
+            "espera_transcripcion_s": ESPERA_TRANSCRIPCION_S,
+            "vad_max_buffered_speech_s": VAD_MAX_BUFFERED_SPEECH_S or "por defecto",
+        },
+    )
+    if MODO_TURNO == "manual":
+        # En el spike se acepta la orden de cualquier participante; restringirla a quien tiene la palabra es de HU-26.
+        cierre = CierreManual(session, seguimiento, ESPERA_TRANSCRIPCION_S)
+        ctx.room.local_participant.register_rpc_method("terminar_turno", cierre.al_recibir_rpc)
     session.say(f"Hola equipo, soy Agilina. {primero.identity}, tienes la palabra.")
 
 
