@@ -363,6 +363,15 @@ tiempo que incluye la reacción y el RPC. Todos los valores son **medidos** (dif
   "realm" → "tutorial" / "río" / "real". En C se perdieron las dos primeras palabras ("Ayer terminé la integración"
   → "La acción"). B (de corrido) tuvo más errores que A (17,4 % frente a 12,6 %). Insumo para el prompt de vocabulario
   (HU-24): agregar Playwright, Jira, nombres del equipo y "realm".
+- **De extremo a extremo (fin de voz → voz de Agilina).** Medido desde `vad_fin_voz` del último segmento con texto
+  hasta `agilina_habla`: C 2,21 s (622.415 → 624.625), A 1,98 s (332.026 → 334.002), B 2,90 s (053.998 → 056.894).
+  Desde la última palabra hay que sumar la espera de silencio del VAD (`min_silence_duration` 0,55 s, valor de
+  configuración, no medido): ≈ 2,8 / 2,5 / 3,4 s. Cronología de B (fin de voz del VAD = 0): Whisper devuelve el texto
+  en +2,23 s, el botón llega en +2,70 s (0,47 s después), el turno se confirma en +2,70 s y Agilina habla en +2,90 s.
+  En las tres corridas el tiempo lo marcó el clic, no Whisper (en A el agente esperó 93 ms a Whisper).
+  Cálculo (no medido): con un clic inmediato y un último tramo de ~46 s, 0,55 + 2,23 + ~0,2 ≈ 3 s desde la última
+  palabra, en el borde de U1 (< 3 s). Formas de acotarlo, sin probar: pausas naturales (último tramo corto) o
+  forzar cortes del VAD para que el último tramo nunca sea largo.
 
 ## Cierre · Estimaciones de costo (U5, U6)
 - U5 (estimado): ~20 min de instancia por ceremonia (15 de daily + ~5 de arranque) × USD 0,526/h ≈ USD 0,18
