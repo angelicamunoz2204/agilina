@@ -1,5 +1,3 @@
-"""Repository interface of the teams domain."""
-
 from typing import Protocol
 from uuid import UUID
 

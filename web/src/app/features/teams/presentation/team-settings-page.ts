@@ -9,6 +9,8 @@ import { Select } from '@shared/ui/select';
 import { InviteMemberDialog } from './invite-member-dialog';
 import { problemMessageKey } from './problem-message';
 import { RemoveMemberDialog } from './remove-member-dialog';
+import { SettingsNoAccess } from './settings-no-access';
+import { SettingsTabs } from './settings-tabs';
 import { TeamMembersFacade } from '../application/team-members.facade';
 import { type InvitationOutcome, type TeamMember } from '../domain/team-member';
 
@@ -21,7 +23,16 @@ import { type InvitationOutcome, type TeamMember } from '../domain/team-member';
  */
 @Component({
   selector: 'agl-team-settings-page',
-  imports: [RouterLink, TranslocoDirective, Button, Select, InviteMemberDialog, RemoveMemberDialog],
+  imports: [
+    RouterLink,
+    TranslocoDirective,
+    Button,
+    Select,
+    InviteMemberDialog,
+    RemoveMemberDialog,
+    SettingsNoAccess,
+    SettingsTabs,
+  ],
   providers: [TeamMembersFacade],
   templateUrl: './team-settings-page.html',
 })

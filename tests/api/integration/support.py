@@ -1,8 +1,5 @@
 """Storing builder-made objects in the real PostgreSQL, committed, as a test's starting data."""
 
-from datetime import date
-from uuid import UUID, uuid4
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agilina_api.identity.domain.invitation import Invitation
@@ -12,11 +9,13 @@ from agilina_api.identity.infrastructure.persistence.invitation_repository impor
 )
 from agilina_api.identity.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
-from agilina_api.teams.domain.sprint import SprintStatus
+from agilina_api.teams.domain.sprint import Sprint
 from agilina_api.teams.domain.team import Team
-from agilina_api.teams.infrastructure.persistence.orm_models import SprintRow
+from agilina_api.teams.infrastructure.persistence.sprint_repository import (
+    SqlAlchemySprintRepository,
+)
 from agilina_api.teams.infrastructure.persistence.team_repository import SqlAlchemyTeamRepository
-from tests.api.builders import AppUserBuilder, InvitationBuilder, TeamBuilder
+from tests.api.builders import AppUserBuilder, InvitationBuilder, SprintBuilder, TeamBuilder
 
 SessionFactory = async_sessionmaker[AsyncSession]
 
@@ -52,21 +51,12 @@ async def stored_invitation(
     return invitation
 
 
-async def stored_sprint(
-    session_factory: SessionFactory, team_id: UUID, status: SprintStatus = SprintStatus.ACTIVE
-) -> UUID:
-    """A committed sprint of the team, with ``status``. There is no ``Sprint`` aggregate
-    until HU-07, so the row is written straight in the table."""
-    sprint_id = uuid4()
-    async with session_factory() as session:
-        session.add(
-            SprintRow(
-                id=sprint_id,
-                team_id=team_id,
-                start_date=date(2026, 10, 5),
-                end_date=date(2026, 10, 16),
-                status=status,
-            )
-        )
-        await session.commit()
-    return sprint_id
+async def stored_sprint(session_factory: SessionFactory, builder: SprintBuilder) -> Sprint:
+    """A committed sprint, through the repository. Its team must already be stored, and its
+    participants must be members of it (``SprintBuilder.for_team`` takes the team's active
+    members). A closed or planned sprint comes from ``SprintBuilder.closed()`` or
+    ``planned()``."""
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        sprint = await builder.saved_in(SqlAlchemySprintRepository(uow.session))
+        await uow.commit()
+    return sprint

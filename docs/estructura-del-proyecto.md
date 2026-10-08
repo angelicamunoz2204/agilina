@@ -13,7 +13,7 @@ contrato entre ellos.
 
 ```
 agilina/
-├── shared/    Contrato worker ↔ API, enums y textos i18n (Python)
+├── shared/    Contrato worker ↔ API, enums, reglas puras compartidas y textos i18n (Python)
 ├── api/       API en FastAPI: un paquete por contexto, cada uno en cuatro capas
 ├── agent/     Worker de LiveKit Agents: todo lo que ocurre durante la ceremonia
 ├── stt/       Servicio de transcripción con faster-whisper (GPU)
@@ -80,9 +80,10 @@ Dos consecuencias prácticas:
 Ya existen las dos clases. En `identity` están los comandos de las
 invitaciones (`IssueInvitation`, `ActivateAccount`, `RequestNewInvitation`, de HU-02, e
 `InviteToTeam`, de HU-06) y la consulta `GetInvitationStatus`. En `teams` están los
-comandos `CreateTeam` y `AddTeamMember` (HU-02), `CreateTeamAsAdmin` (HU-05) y
-`ChangeMemberRole` y `RemoveMember` (HU-06), y las consultas `ListMyTeams` y `GetTeam`
-(HU-05) y `ListTeamMembers` (HU-06). En `shared` están las consultas de salud
+comandos `CreateTeam` y `AddTeamMember` (HU-02), `CreateTeamAsAdmin` (HU-05),
+`ChangeMemberRole` y `RemoveMember` (HU-06) y `StartSprint` y `ReconfigureSprint` (HU-07), y
+las consultas `ListMyTeams` y `GetTeam` (HU-05), `ListTeamMembers` (HU-06) y
+`GetActiveSprint` (HU-07). En `shared` están las consultas de salud
 (`GetLiveness` y `GetReadiness`).
 
 ### Contextos delimitados
@@ -95,7 +96,7 @@ a otro contexto**: se hablan por los casos de uso o los eventos del otro.
 | --- | --- | --- |
 | `ceremonies` | Contrato con el worker del agente | Solo `presentation` (501 hasta HU-56) |
 | `identity` | Invitaciones, activación de cuenta, vínculo con Keycloak, etiqueta del rol | Invitaciones (HU-02) completas: en el servidor, dominio, casos de uso, persistencia, API HTTP, adaptador de Keycloak y `make invite`; en la web, la pantalla `/activate`; el inicio de sesión (HU-03: validación del token de Keycloak en la API, `core/auth` y la entrada en la web). HU-06 agrega la invitación de un Administrador a su equipo (`InviteToTeam`, `POST /v1/teams/{team_id}/invitations`): a un correo sin cuenta le llega el enlace de activación y una cuenta existente entra directo al equipo con un aviso; invitar de nuevo revoca la invitación pendiente (`Invitation.revoke`), también en `make invite`. HU-04 después |
-| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio (con el nombre como objeto de valor `TeamName`; cambio de rol y remoción de un integrante, HU-06, con la regla del último Administrador en el agregado y en el paquete `member_rules/`, que también usa el listado), comandos (`CreateTeam` y `AddTeamMember` de HU-02, `CreateTeamAsAdmin` de HU-05, `ChangeMemberRole` y `RemoveMember` de HU-06), consultas (administradores, `ListMyTeams`, `GetTeam`, la membresía de un usuario y `ListTeamMembers`, que trae nombre y correo de `identity` por el puerto `MemberContactsDirectory`), persistencia (el repositorio bloquea la fila del equipo con `SELECT … FOR UPDATE` al cargarlo) y API HTTP (`/v1/teams`, HU-05; `/v1/teams/{team_id}/members`, HU-06). Del sprint, HU-06 solo crea la tabla `sprint` mínima (equipo, fechas y estado) y una sola consulta «¿hay sprint activo?» (`team_has_active_sprint`, detrás del puerto `ActiveSprints`), que bloquea el cambio de rol y que el listado expone como motivo; lo demás con HU-07… |
+| `teams` | Equipos, membresía, sprint, modo, idioma, preferencias | Equipo y membresías: dominio (con el nombre como objeto de valor `TeamName`; cambio de rol y remoción de un integrante, HU-06, con la regla del último Administrador en el agregado y en el paquete `member_rules/`, que también usa el listado), comandos (`CreateTeam` y `AddTeamMember` de HU-02, `CreateTeamAsAdmin` de HU-05, `ChangeMemberRole` y `RemoveMember` de HU-06), consultas (administradores, `ListMyTeams`, `GetTeam`, la membresía de un usuario y `ListTeamMembers`, que trae nombre y correo de `identity` por el puerto `MemberContactsDirectory`), persistencia (el repositorio bloquea la fila del equipo con `SELECT … FOR UPDATE` al cargarlo) y API HTTP (`/v1/teams`, HU-05; `/v1/teams/{team_id}/members`, HU-06). Sprint (HU-07, sobre la tabla mínima de HU-06): el agregado `Sprint` con sus objetos de valor `SprintPeriod` y `DailyTime` (instante UTC de anclaje más la zona de captura, AD-31) y los participantes de la daily en orden de turno (tabla `sprint_participant`), su repositorio (`get_active`), los comandos `StartSprint` y `ReconfigureSprint`, que cargan y bloquean primero el equipo, y la consulta `GetActiveSprint`, que calcula el día N de M y la próxima daily con `agilina_shared.sprint_calendar` y el `Clock`; API HTTP en `/v1/teams/{team_id}/sprints` y `/v1/teams/{team_id}/sprints/active`. «¿Hay sprint activo?» tiene un solo predicado (`is_active_sprint_of`), que usan `team_has_active_sprint` (detrás del puerto `ActiveSprints`, que bloquea el cambio de rol y que el listado expone como motivo), el repositorio y la lectura del sprint… |
 | `postprocessing` | Resumen, action items, flujo de aprobación | Planeado (Release 2–3) |
 | `integrations` | Credenciales por equipo y adaptadores de Slack, Jira y Graph | Planeado (Release 3) |
 
@@ -204,13 +205,20 @@ corre en cualquier máquina y en el pipeline.
 ```
 shared/src/agilina_shared/
 ├── contract/      CeremonyContext, CeremonyResult, ParticipantContext, TranscriptSegment (un archivo por clase)
-├── enums/         OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus (un archivo por clase)
-└── i18n.py        Plantillas de lo que Agilina dice, en español e inglés
+├── enums/            OperationMode, TeamRole, Language, CeremonyType, CeremonyStatus (un archivo por clase)
+├── sprint_calendar/  daily_occurrences, sprint_day_at, SprintDay, SprintPhase (un archivo por clase o función)
+└── i18n.py           Plantillas de lo que Agilina dice, en español e inglés
 ```
 
 Es el *lenguaje publicado* entre desplegables, no un dominio. No puede importar
 ninguno de los tres desplegables. Un cambio incompatible sube
 `CONTRACT_VERSION` y se declara con `BREAKING CHANGE` en el pie del commit.
+
+Aloja también las **reglas puras** que más de un desplegable debe calcular igual: hoy,
+`sprint_calendar/` (las ocurrencias de la daily y el día N de M), que usan la API, el agente y
+el planificador ([AD-31](adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)).
+Una regla así usa solo la biblioteca estándar, no lee el reloj ni la base de datos y recibe el
+instante como parámetro.
 
 ### `web/`
 
@@ -221,7 +229,7 @@ web/
 └── src/app/
     ├── app.config.ts                Raíz de composición: enlaza puertos con adaptadores
     ├── app.routes.ts                Mapa de pantallas, con carga diferida
-    ├── core/                        config, http, i18n, logging (y auth, cuando llegue)
+    ├── core/                        auth, config, http, i18n, logging, tenant y time
     ├── layout/                      Cabecera y marco de la aplicación
     ├── shared/                      Componentes, pipes y utilidades sin estado
     └── features/<contexto>/
@@ -236,10 +244,13 @@ Hoy existen `features/status` (la pantalla de estado del entorno) y
 mínimo, el formulario para crear un equipo y el dashboard del equipo, que por ahora muestra su
 nombre y, a un Administrador, el enlace a Configuración; HU-06: Configuración → Equipo en
 `/teams/:teamId/settings`, con su puerto `TeamMembersPort` y su adaptador
-`HttpTeamMembersApi`, sin guard: si la API responde 403, la pantalla muestra «sin acceso»).
-`shared/ui` tiene `aglButton`, `aglTextField`, `aglSelect` y `agl-dialog` (sobre el
-`<dialog>` nativo). Las demás (`ceremonies` y el resto de `identity`) llegan con sus
-historias. El detalle,
+`HttpTeamMembersApi`, sin guard: si la API responde 403, la pantalla muestra «sin acceso»;
+HU-07: Configuración → Sprint en `/teams/:teamId/settings/sprint`, pestaña hermana de Equipo,
+con su puerto `SprintsPort` y su adaptador `HttpSprintsApi`, y la línea «Día N de M» del
+dashboard). `core/time` tiene `BROWSER_TIME_ZONE` (la zona IANA del navegador) y `shared/utils`,
+las funciones puras de fechas (`local-date-time.ts`). `shared/ui` tiene `aglButton`,
+`aglTextField`, `aglSelect` y `agl-dialog` (sobre el `<dialog>` nativo). Las demás
+(`ceremonies` y el resto de `identity`) llegan con sus historias. El detalle,
 las convenciones y el porqué están en [web/README.md](../web/README.md) y en
 [AD-26](adr/0026-organizar-y-equipar-la-aplicacion-web.md).
 

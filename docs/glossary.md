@@ -41,6 +41,11 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | `Language` | Idioma | `es` o `en`. Atributo del equipo; parametriza transcripción, plantillas, voz y resumen |
 | `Sprint` | Sprint | Periodo de trabajo del equipo. Puede estar `planned`, `active` o `closed` |
 | `SprintStatus` | Estado del sprint | `planned`, `active` o `closed`. Un equipo tiene a lo sumo un sprint `active`; mientras dura no se cambian roles (HU-06) |
+| `SprintPeriod` | Periodo del sprint | Las fechas de calendario de inicio y fin (`start_date`, `end_date`), sin hora y ambas incluidas. Pueden caer cualquier día de la semana, y **todos los días del periodo cuentan**, sábado y domingo incluidos (AD-31) |
+| `SprintPhase` | Fase del sprint | `not_started`, `in_progress` o `finished`, según la fecha de hoy en la zona de captura. Se **calcula**, no se guarda, y no es el `SprintStatus`: un sprint `active` puede no haber empezado o haber terminado ya |
+| `SprintDay` | Día de sprint (día N de M) | M es la cantidad de días del periodo; N, el día en curso según la zona de captura: 0 antes del inicio, de 1 a M durante el sprint y M después del fin |
+| `DailyTime` | Hora de la daily | La hora de pared a la que se convoca la daily, única para todo el equipo. Se guarda como un instante UTC de anclaje (`daily_time_utc`) más la zona de captura; cada integrante la ve en la zona de su navegador (AD-31) |
+| `daily_time_zone` | Zona de captura | Zona IANA del navegador de quien guardó el sprint. Fija la hora de pared de la daily y el calendario del sprint (qué fecha es «hoy») |
 | `MemberPreference` | Preferencia del integrante | Hora y zona del recordatorio matutino; lo único que el rol Miembro configura |
 
 ## La ceremonia
@@ -49,6 +54,8 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | --- | --- | --- |
 | `Ceremony` | Ceremonia | Una ocurrencia de la reunión. Hoy solo existe el tipo `daily` |
 | Daily | Daily | La reunión diaria de pie (*stand-up*) |
+| Daily occurrence | Ocurrencia de la daily | El instante UTC de una daily concreta: la hora de la daily en la zona de captura en una fecha del periodo, convertida a UTC. Hay una por cada día del periodo (`daily_occurrences`) |
+| Daily participant (`sprint_participant`) | Participante de la daily | Integrante del equipo convocado a la daily del sprint, con su `turn_order` desde 1. El orden de la lista es el orden de turnos |
 | `CeremonyStatus` | Estado de la ceremonia | `scheduled`, `in_progress`, `completed`, `cancelled`. El contrato del worker agrega `degraded`, que el esquema aún modela como bandera `degraded` de la ceremonia (a resolver en HU-56) |
 | `CeremonyContext` | Contexto de la ceremonia | Lo que el worker necesita saber antes de entrar a la sala |
 | `CeremonyResult` | Resultado de la ceremonia | Lo que el worker entrega a la API al cerrar |

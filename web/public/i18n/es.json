@@ -50,6 +50,12 @@
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
         "not_a_member": "Este equipo no existe o no perteneces a él."
+      },
+      "sprint": {
+        "in_progress": "Día {{ number }} de {{ total }}",
+        "not_started": "El sprint empieza el {{ date }}",
+        "finished": "Sprint terminado",
+        "none": "Sin sprint activo"
       }
     },
     "settings": {
@@ -150,6 +156,80 @@
           "not_found": "Esta persona ya no está en el equipo.",
           "last_admin": "No se puede eliminar: el equipo no puede quedarse sin Administrador."
         }
+      },
+      "tabs": {
+        "title": "Configuración",
+        "label": "Secciones de la configuración",
+        "team": "Equipo",
+        "sprint": "Sprint"
+      }
+    },
+    "sprint": {
+      "title": "Sprint",
+      "active_badge": "Sprint activo",
+      "back": "Volver al equipo",
+      "loading": "Cargando el sprint…",
+      "failed": "No se pudo cargar el sprint. Inténtalo de nuevo más tarde.",
+      "problems": {
+        "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo."
+      },
+      "start_date": "Inicio",
+      "end_date": "Fin",
+      "daily_time": "Hora de la daily (única para el equipo)",
+      "zone_hint": "Las horas se muestran en la zona horaria de tu navegador ({{ zone }}).",
+      "saved_zone": "La hora de la daily está guardada en la zona {{ zone }}.",
+      "zone_change": "Al guardar, la hora de la daily pasará a la zona de tu navegador.",
+      "next_daily": "Próxima daily: {{ when }}.",
+      "no_next_daily": "Ya no quedan dailies en este sprint.",
+      "errors": {
+        "start_date": {
+          "blank": "Elige la fecha de inicio."
+        },
+        "end_date": {
+          "blank": "Elige la fecha de fin.",
+          "before_start": "La fecha de fin no puede ser anterior a la de inicio."
+        },
+        "daily_time": {
+          "blank": "Elige la hora de la daily."
+        },
+        "participants": {
+          "none": "Elige al menos un participante para la daily.",
+          "duplicate": "Un participante aparece más de una vez."
+        }
+      },
+      "participants": {
+        "title": "Participantes de la daily"
+      },
+      "order": {
+        "title": "Orden de turnos de la daily",
+        "empty": "Marca a los participantes de la daily para ordenar sus turnos.",
+        "move_up": "Subir a {{ name }}",
+        "move_down": "Bajar a {{ name }}",
+        "moved": "{{ name }} ahora tiene el turno {{ position }}."
+      },
+      "submit": "Guardar sprint",
+      "saving": "Guardando…",
+      "saved": "Sprint guardado.",
+      "save": {
+        "failed": "No se pudo guardar el sprint. Inténtalo de nuevo.",
+        "problems": {
+          "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
+          "no_active_sprint": "El equipo ya no tiene un sprint activo. Revisa los datos y guarda de nuevo.",
+          "active_sprint_exists": "Alguien más configuró el sprint del equipo mientras tanto. Revisa los datos y guarda de nuevo.",
+          "ends_before_start": "La fecha de fin no puede ser anterior a la de inicio.",
+          "invalid_time_zone": "La zona horaria de tu navegador no es una zona válida. Revisa la configuración de tu dispositivo.",
+          "no_participants": "Elige al menos un participante para la daily.",
+          "duplicate_participant": "Un participante aparece más de una vez.",
+          "participant_not_a_member": "Uno de los participantes ya no es integrante del equipo. Recarga la página y vuelve a elegirlos."
+        }
+      },
+      "forbidden": {
+        "text": "Solo los Administradores del equipo pueden configurar el sprint."
+      },
+      "calendar": {
+        "choose_date": "Elige una fecha",
+        "previous_month": "Mes anterior",
+        "next_month": "Mes siguiente"
       }
     }
   },

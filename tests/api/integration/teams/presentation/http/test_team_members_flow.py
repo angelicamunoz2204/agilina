@@ -19,9 +19,8 @@ from agilina_api.bootstrap.app import create_app
 from agilina_api.identity.presentation.http import dependencies as identity_deps
 from agilina_api.shared.presentation.http.access import get_authenticated_users, get_team_access
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
-from agilina_api.teams.domain.sprint import SprintStatus
 from agilina_api.teams.presentation.http import dependencies as deps
-from tests.api.builders import AppUserBuilder, TeamBuilder, next_id
+from tests.api.builders import AppUserBuilder, SprintBuilder, TeamBuilder, next_id
 from tests.api.doubles import FakeAuthenticatedUsers
 from tests.api.integration.support import stored_sprint, stored_team, stored_user
 from tests.api.integration.world import World
@@ -129,7 +128,7 @@ async def test_without_a_sprint_in_progress_the_admin_changes_a_role(members, en
 async def test_with_a_sprint_in_progress_the_role_cannot_change_and_the_list_says_why(
     members, engine, session_factory
 ):
-    await stored_sprint(session_factory, members.team.id, SprintStatus.ACTIVE)
+    await stored_sprint(session_factory, SprintBuilder().for_team(members.team))
 
     response = await members.change_role(members.bruno, "admin")
     listed = await members.members()
@@ -143,11 +142,11 @@ async def test_with_a_sprint_in_progress_the_role_cannot_change_and_the_list_say
 async def test_once_the_sprint_is_closed_the_role_can_change_again(
     members, engine, session_factory
 ):
-    sprint_id = await stored_sprint(session_factory, members.team.id, SprintStatus.ACTIVE)
+    sprint = await stored_sprint(session_factory, SprintBuilder().for_team(members.team))
     assert (await members.change_role(members.bruno, "admin")).status_code == 409
     async with engine.begin() as connection:
         await connection.execute(
-            text("UPDATE sprint SET status = 'closed' WHERE id = :id"), {"id": sprint_id}
+            text("UPDATE sprint SET status = 'closed' WHERE id = :id"), {"id": sprint.id}
         )
 
     response = await members.change_role(members.bruno, "admin")
@@ -158,7 +157,7 @@ async def test_once_the_sprint_is_closed_the_role_can_change_again(
 
 async def test_the_sprint_of_another_team_does_not_block_this_one(members, engine, session_factory):
     other = await stored_team(session_factory, TeamBuilder().with_admin(members.carla.id))
-    await stored_sprint(session_factory, other.id, SprintStatus.ACTIVE)
+    await stored_sprint(session_factory, SprintBuilder().for_team(other))
 
     response = await members.change_role(members.bruno, "admin")
 
@@ -185,7 +184,7 @@ async def test_a_removed_member_leaves_the_team_but_keeps_their_account(members,
 
 
 async def test_a_sprint_in_progress_does_not_prevent_a_removal(members, session_factory):
-    await stored_sprint(session_factory, members.team.id, SprintStatus.ACTIVE)
+    await stored_sprint(session_factory, SprintBuilder().for_team(members.team))
 
     response = await members.remove(members.bruno)
 

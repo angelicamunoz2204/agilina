@@ -33,7 +33,7 @@ class ChangeMemberRoleHandler:
             team = await uow.teams.get(command.team_id)
             if team is None:
                 raise TeamNotFoundError(f"Team {command.team_id} does not exist")
-            if await uow.sprints.has_active_sprint(command.team_id):
+            if await uow.active_sprints.has_active_sprint(command.team_id):
                 raise RoleChangeDuringActiveSprintError(
                     f"Team {command.team_id} has a sprint in progress"
                 )

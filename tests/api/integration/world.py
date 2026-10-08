@@ -1,6 +1,7 @@
 """The scenario the integration tests of the identity use cases share: real database and
 real repositories; Keycloak, the mailer and the clock are doubles. It also has the HU-06
-use cases that manage a team's members, which cross identity and teams."""
+use cases that manage a team's members, which cross identity and teams, and the HU-07 ones
+that configure the team's sprint."""
 
 from dataclasses import replace
 
@@ -26,8 +27,12 @@ from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUse
 from agilina_api.shared.application.ports import EmailRenderer
 from agilina_api.teams.application.commands.change_member_role import ChangeMemberRoleHandler
 from agilina_api.teams.application.commands.create_team import CreateTeam, CreateTeamHandler
+from agilina_api.teams.application.commands.reconfigure_sprint import ReconfigureSprintHandler
 from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
+from agilina_api.teams.application.commands.start_sprint import StartSprintHandler
+from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
+from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_api.teams.infrastructure.persistence.unit_of_work import teams_unit_of_work_factory
 from agilina_shared.enums import Language, TeamRole
@@ -88,6 +93,9 @@ class World:
         )
         self.change_role = ChangeMemberRoleHandler(teams_uow, self.clock)
         self.remove = RemoveMemberHandler(teams_uow, self.clock)
+        self.start_sprint = StartSprintHandler(teams_uow)
+        self.reconfigure_sprint = ReconfigureSprintHandler(teams_uow)
+        self.active_sprint = GetActiveSprintHandler(SqlSprintQueries(session_factory), self.clock)
 
     async def a_team(self, name="Atlas", language=Language.ES):
         return await self.create_team.handle(CreateTeam(name=name, language=language))

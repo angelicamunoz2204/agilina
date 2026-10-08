@@ -54,7 +54,8 @@ Dentro de `web/`, los scripts de `package.json` son los mismos que usa la CI:
 - **La sala no muestra la transcripción en vivo.** Muestra los participantes
   conectados, quién está hablando, el turno en curso y el estado de Agilina.
 - **Fechas en UTC.** Llegan y se envían en UTC y se muestran en la zona horaria
-  del navegador. No existe zona horaria por equipo.
+  del navegador. No existe zona horaria por equipo; la única zona que se envía a la API es la
+  de captura de la hora de la daily (ver [Fechas y zonas horarias](#fechas-y-zonas-horarias)).
 - **Configuración por variables de entorno.** Nunca se escriben credenciales,
   llaves ni URLs en el código (ver [Configuración](#configuración)).
 - **La pestaña de configuración** solo se muestra a los roles Admin y SM. En el
@@ -62,11 +63,12 @@ Dentro de `web/`, los scripts de `package.json` son los mismos que usa la CI:
   modo soporte, ver el [glosario](../docs/glossary.md)): la interfaz decide con
   el rol interno, nunca con la etiqueta.
   El dashboard muestra el enlace a Configuración solo si `GET /v1/teams/{id}`
-  devuelve `role: admin`. La ruta `/:tenant/teams/:teamId/settings` no lleva guard de rol:
-  la pantalla pide los integrantes a la API y, si responde 403, muestra «sin
-  acceso» (un guard escondería esa respuesta). Las etiquetas de rol y los motivos
-  por los que un control queda deshabilitado (`last_admin`, `sprint_in_progress`)
-  también los manda la API; la pantalla solo los traduce.
+  devuelve `role: admin`. Configuración tiene dos pestañas, cada una con su ruta:
+  Equipo (`/:tenant/teams/:teamId/settings`) y Sprint (`/:tenant/teams/:teamId/settings/sprint`).
+  Ninguna lleva guard de rol: la pantalla pide los integrantes a la API y, si responde 403,
+  muestra «sin acceso» (`settings-no-access`; un guard escondería esa respuesta). Las
+  etiquetas de rol y los motivos por los que un control queda deshabilitado (`last_admin`,
+  `sprint_in_progress`) también los manda la API; la pantalla solo los traduce.
 
 ## Estructura de carpetas
 
@@ -93,6 +95,7 @@ web/
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
         │   ├── tenant/           El tenant de la dirección: contexto, guards y puerto del catálogo (AD-29)
+        │   ├── time/             La zona horaria del navegador (BROWSER_TIME_ZONE)
         │   └── auth/             Sesión: puerto AuthSession, adaptador de keycloak-js, guards e interceptor
         ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
         │                         centered-layout (las pantallas antes de entrar a un equipo)
@@ -121,7 +124,7 @@ concepto se llame igual en todo el sistema:
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
-| `teams` | Equipo, integrantes y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar. El resto llega con sus historias |
+| `teams` | Equipo, integrantes, sprint y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
@@ -222,7 +225,7 @@ en inglés.
 
 ## Formularios
 
-Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:tenant/teams/new` y el diálogo de invitar de `/:tenant/teams/:teamId/settings`):
+Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:tenant/teams/new`, el diálogo de invitar de `/:tenant/teams/:teamId/settings` y el del sprint de `/:tenant/teams/:teamId/settings/sprint`):
 
 - **`FormsModule` con signals:** cada campo es un `signal` de la página, atado con
   `[ngModel]="name()"` y `(ngModelChange)="name.set($event)"`. No se usan `FormGroup` ni
@@ -306,12 +309,22 @@ web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t
 
 ## Fechas y zonas horarias
 
-- La API envía y recibe instantes en ISO 8601 con zona UTC (`...Z`).
+- La API envía y recibe instantes en ISO 8601 con zona UTC (`...Z`) y fechas de calendario
+  como `AAAA-MM-DD`, sin hora.
 - Al enviar, `date.toISOString()`. Al mostrar, `Intl.DateTimeFormat` con el
   idioma activo como *locale* y sin `timeZone`, de modo que usa la del
-  navegador. El formateo vive en una función pura de `shared/utils` (o en un
-  *pipe* de `shared/pipes`) cuando lo necesite la primera pantalla.
-- No se guarda ni se calcula con zonas horarias por equipo: no existen.
+  navegador. Todo eso vive en funciones puras de `shared/utils/local-date-time.ts`:
+  `localDateTimeToIso` (una hora de pared en una fecha, al instante UTC), `localTimeOf`,
+  `formatLocalDateTime` y `formatCalendarDate` (una fecha de calendario se arma a medianoche
+  local y se formatea en la misma zona, así nunca se corre un día).
+- No se guarda ni se calcula con zonas horarias por equipo: no existen. La única excepción es la
+  **zona de captura de la hora de la daily**
+  ([AD-31](../docs/adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)): al
+  guardar el sprint, la web envía la hora elegida en el día de inicio como instante UTC junto con
+  la zona IANA del navegador de quien guarda (`BROWSER_TIME_ZONE`, de `core/time`, que una prueba
+  puede fijar). La API fija con ella el calendario del sprint y calcula la próxima daily
+  (`next_daily_at`); la web solo la formatea en la zona de quien la ve, sin recalcular el horario
+  de verano.
 
 ## Textos e i18n
 
@@ -412,8 +425,12 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
   `<a routerLink>` (un enlace sigue siendo enlace), `input[aglTextField]` y
   `select[aglSelect]`: directivas sobre el elemento nativo. Una contraseña va dentro de
   `<agl-password-field [toggleLabel]="…">`, que agrega el botón para mostrarla u ocultarla (con
-  `aria-pressed`) sin quitarle su `<label for>`. El espacio y el ancho los pone quien coloca la
-  pieza (`class="mt-4 w-full"`).
+  `aria-pressed`) sin quitarle su `<label for>`. Una fecha de calendario se elige con
+  `<agl-date-picker inputId="…" [(value)]="…">` y no con `<input type="date">`, cuyo calendario
+  dibuja el navegador y no se puede agrandar ni darle estilo: abre un calendario propio con el
+  teclado del patrón de WAI-ARIA (flechas, Re Pág/Av Pág, Inicio/Fin, Escape), los nombres de
+  `Intl` en el idioma activo y `min` para los días que no se pueden elegir. El espacio y el ancho
+  los pone quien coloca la pieza (`class="mt-4 w-full"`).
 - Los diálogos usan `agl-dialog`, un componente sobre el `<dialog>` nativo (`showModal()`):
   el navegador atrapa el foco, deja inerte el resto de la página y lo cierra con Escape, sin
   dependencias. Se abre al colocarlo y se cierra al quitarlo, así que quien lo coloca decide

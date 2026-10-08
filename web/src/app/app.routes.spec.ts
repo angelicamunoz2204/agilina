@@ -7,8 +7,10 @@ import { TenantContext } from '@core/tenant/tenant-context';
 import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HealthPort } from '@features/status/application/health.port';
+import { SprintsPort } from '@features/teams/application/sprints.port';
 import { TeamMembersPort } from '@features/teams/application/team-members.port';
 import { TeamsPort } from '@features/teams/application/teams.port';
+import { type ActiveSprint } from '@features/teams/domain/active-sprint';
 import { type Team } from '@features/teams/domain/team';
 import { type TeamMembers } from '@features/teams/domain/team-member';
 import { FakeAuthSession, provideFakeAuthSession } from '@testing/auth';
@@ -58,9 +60,28 @@ class SilentTeamMembersPort extends TeamMembersPort {
   }
 }
 
+/** Sprints port double that never answers either. */
+class SilentSprintsPort extends SprintsPort {
+  readonly requested: string[] = [];
+
+  active(teamId: string): Observable<ActiveSprint | null> {
+    this.requested.push(teamId);
+    return NEVER;
+  }
+
+  start(): Observable<never> {
+    return NEVER;
+  }
+
+  reconfigure(): Observable<never> {
+    return NEVER;
+  }
+}
+
 describe('routes', () => {
   let port: SilentTeamsPort;
   let members: SilentTeamMembersPort;
+  let sprints: SilentSprintsPort;
   let session: FakeAuthSession;
   let harness: RouterTestingHarness;
 
@@ -68,6 +89,7 @@ describe('routes', () => {
     TestBed.resetTestingModule();
     port = new SilentTeamsPort();
     members = new SilentTeamMembersPort();
+    sprints = new SilentSprintsPort();
     session = new FakeAuthSession(signedIn);
     TestBed.configureTestingModule({
       providers: [
@@ -76,6 +98,7 @@ describe('routes', () => {
         provideRouter(routes, withComponentInputBinding()),
         { provide: TeamsPort, useValue: port },
         { provide: TeamMembersPort, useValue: members },
+        { provide: SprintsPort, useValue: sprints },
         { provide: InvitationPort, useValue: { status: () => NEVER } },
         { provide: LoginRedirectPort, useValue: {} },
         { provide: HealthPort, useValue: { check: () => NEVER } },
@@ -125,6 +148,25 @@ describe('routes', () => {
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings');
     });
 
+    it('opens the sprint settings of the team at /:tenant/teams/:teamId/settings/sprint, with no guard on the role', async () => {
+      expect(await screenAt('/acme/teams/team-1/settings/sprint')).toBe(
+        'agl-app-shell > agl-team-sprint-settings-page',
+      );
+      TestBed.tick();
+
+      expect(sprints.requested).toEqual(['team-1']);
+      expect(members.requested).toEqual(['team-1']);
+      expect(port.requested).toEqual([]);
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings/sprint');
+    });
+
+    it('reads the sprint of the team on its dashboard', async () => {
+      await screenAt('/acme/teams/team-1');
+      TestBed.tick();
+
+      expect(sprints.requested).toEqual(['team-1']);
+    });
+
     it('records the tenant of the address, whichever it is', async () => {
       await harness.navigateByUrl('/acme/teams/team-1');
       expect(TestBed.inject(TenantContext).current()).toBe('acme');
@@ -161,6 +203,14 @@ describe('routes', () => {
       await harness.navigateByUrl('/acme/teams/team-9/settings');
 
       expect(session.ensured).toEqual(['/acme/teams/team-9/settings']);
+      expect(members.requested).toEqual([]);
+    });
+
+    it('asks the sprint settings of a team for a session too', async () => {
+      await harness.navigateByUrl('/acme/teams/team-9/settings/sprint');
+
+      expect(session.ensured).toEqual(['/acme/teams/team-9/settings/sprint']);
+      expect(sprints.requested).toEqual([]);
       expect(members.requested).toEqual([]);
     });
 

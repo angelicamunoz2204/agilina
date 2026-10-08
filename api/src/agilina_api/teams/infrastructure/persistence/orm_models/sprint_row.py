@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Date, Uuid
+from sqlalchemy import Date, DateTime, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agilina_api.shared.infrastructure.database.base import Base
@@ -17,3 +17,5 @@ class SprintRow(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     status: Mapped[SprintStatus] = mapped_column(pg_enum(SprintStatus, "sprint_status"))
+    daily_time_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    daily_time_zone: Mapped[str] = mapped_column(Text)

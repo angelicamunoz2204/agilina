@@ -84,7 +84,7 @@ async def test_the_only_admin_cannot_be_demoted_and_nothing_is_saved(scenario):
 
 async def test_with_a_sprint_in_progress_no_role_changes_and_nothing_is_saved(scenario):
     team = await scenario.a_team()
-    scenario.uow.sprints = FakeActiveSprints({team.id})
+    scenario.uow.active_sprints = FakeActiveSprints({team.id})
 
     with pytest.raises(RoleChangeDuringActiveSprintError):
         await scenario.handler.handle(
@@ -97,7 +97,7 @@ async def test_with_a_sprint_in_progress_no_role_changes_and_nothing_is_saved(sc
 
 async def test_a_sprint_in_progress_in_another_team_does_not_block_the_change(scenario):
     team = await scenario.a_team()
-    scenario.uow.sprints = FakeActiveSprints({next_id()})
+    scenario.uow.active_sprints = FakeActiveSprints({next_id()})
 
     await scenario.handler.handle(
         ChangeMemberRoleBuilder().for_team(team.id).of_user(scenario.bruno).build()

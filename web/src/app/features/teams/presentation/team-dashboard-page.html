@@ -1,4 +1,7 @@
-<section class="mx-auto w-full max-w-5xl" *transloco="let t; prefix: 'teams.dashboard'">
+<section
+  class="mx-auto w-full max-w-5xl"
+  *transloco="let t; prefix: 'teams.dashboard'; currentLang as language"
+>
   @if (team(); as team) {
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <h1
@@ -35,6 +38,25 @@
         </a>
       }
     </div>
+    @if (sprintKnown()) {
+      <p class="mt-2 text-sm font-medium text-muted" data-testid="sprint-day">
+        @if (sprint(); as sprint) {
+          @switch (sprint.day.phase) {
+            @case ('in_progress') {
+              {{ t('sprint.in_progress', { number: sprint.day.number, total: sprint.day.total }) }}
+            }
+            @case ('not_started') {
+              {{ t('sprint.not_started', { date: formatDate(sprint.startDate, language) }) }}
+            }
+            @case ('finished') {
+              {{ t('sprint.finished') }}
+            }
+          }
+        } @else {
+          {{ t('sprint.none') }}
+        }
+      </p>
+    }
   } @else if (loading()) {
     <p role="status" class="text-sm text-muted">{{ t('loading') }}</p>
   } @else if (problemMessage(); as message) {

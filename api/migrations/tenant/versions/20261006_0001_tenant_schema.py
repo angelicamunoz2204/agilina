@@ -1,17 +1,24 @@
 """tenant schema: what a tenant's database holds (identity and teams)
 
 The whole schema of the database of one tenant, in one initial migration (AD-29): ``app_user``,
-``team``, ``team_member``, ``invitation`` and ``sprint``, as the reference schema
-(``agilina_schema.sql``) defines them, with the changes the stories made: ``team.created_by`` and
-``invitation.created_by`` accept NULL, meaning "created by the platform operator" (AD-22), and
-a team's name has at most 80 characters, which backs the ``TeamName`` rule of the domain (HU-05;
-``char_length`` counts characters like Python's ``len`` does, so both sides agree on the limit).
+``team``, ``team_member``, ``invitation``, ``sprint`` and ``sprint_participant``, as the
+reference schema (``agilina_schema.sql``) defines them, with the changes the stories made:
+``team.created_by`` and ``invitation.created_by`` accept NULL, meaning "created by the platform
+operator" (AD-22), and a team's name has at most 80 characters, which backs the ``TeamName``
+rule of the domain (HU-05; ``char_length`` counts characters like Python's ``len`` does, so
+both sides agree on the limit).
 
-``sprint`` is minimal (HU-06): only what answers "does the team have a sprint in progress?",
-that is the team, the dates and the status. HU-07 extends it with the daily's time, its
-participants and their order. The statuses are the glossary's (``planned``, ``active``,
-``closed``), so HU-07 needs no ``ALTER TYPE``, and the partial unique index makes the database
-keep a team to one active sprint at most.
+``sprint`` was created minimal by HU-06 (the team, the dates and the status: enough to answer
+"does the team have a sprint in progress?") and HU-07 completes it: the daily's time as a UTC
+anchor instant plus the IANA time zone it was captured in (AD-31; no column holds a local time),
+and ``sprint_participant``, the daily's participants with their ``turn_order`` from 1. Both
+foreign keys of a participant share its ``team_id``, so the database keeps every participant
+someone who has been a member of the sprint's team. ``team_member`` rows are never deleted (a
+removed member keeps theirs as ``removed``), so the foreign key cannot tell an active member
+from a removed one: the ``Sprint`` aggregate admits only active members, and removing a member
+takes them out of the active sprint's participants. The statuses are the glossary's (``planned``,
+``active``, ``closed``), and the partial unique index makes the database keep a team to one
+active sprint at most.
 
 Development is local, so this migration is rewritten, not added to, while nobody else holds
 data that depends on it: ``make clean`` and ``make up`` build every database from it. From the
@@ -148,26 +155,62 @@ UPGRADE = [
     # ----------------------------------------------------------------- sprint --
     """
     CREATE TABLE sprint (
-        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        team_id     UUID          NOT NULL REFERENCES team(id) ON DELETE CASCADE,
-        start_date  DATE          NOT NULL,
-        end_date    DATE          NOT NULL,
-        status      sprint_status NOT NULL DEFAULT 'planned',
-        created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
-        updated_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
-        CONSTRAINT sprint_dates_ordered CHECK (end_date >= start_date)
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        team_id          UUID          NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+        start_date       DATE          NOT NULL,
+        end_date         DATE          NOT NULL,
+        status           sprint_status NOT NULL DEFAULT 'planned',
+        daily_time_utc   TIMESTAMPTZ   NOT NULL,
+        daily_time_zone  TEXT          NOT NULL,
+        created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        CONSTRAINT sprint_dates_ordered CHECK (end_date >= start_date),
+        CONSTRAINT sprint_daily_time_zone_not_blank CHECK (length(btrim(daily_time_zone)) > 0),
+        CONSTRAINT sprint_id_team_unique UNIQUE (id, team_id)
     )
     """,
     "COMMENT ON TABLE sprint IS "
-    "'Minimal sprint (HU-06): enough to know whether a team has one in progress. "
-    "HU-07 extends it with the daily''s time, participants and order.'",
+    "'A team''s sprint: its calendar dates (every day counts), the daily''s time and status. "
+    "HU-06 created it; HU-07 adds the daily''s time and participants (AD-31).'",
+    "COMMENT ON COLUMN sprint.daily_time_utc IS "
+    "'The daily''s wall-clock time as a UTC anchor instant: never a local time (AD-31).'",
+    "COMMENT ON COLUMN sprint.daily_time_zone IS "
+    "'IANA time zone of the browser of whoever saved the sprint: it fixes the daily''s "
+    "wall-clock time and the sprint''s calendar (AD-31).'",
     "CREATE INDEX sprint_team_idx ON sprint (team_id)",
     "CREATE UNIQUE INDEX sprint_one_active_per_team ON sprint (team_id) WHERE status = 'active'",
     "CREATE TRIGGER trg_sprint_updated BEFORE UPDATE ON sprint "
     "FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+    # ----------------------------------------------------- sprint_participant --
+    # The daily's participants (HU-07). Both foreign keys share team_id: the participant has a
+    # membership (active or removed) in the very team the sprint belongs to. Being an active
+    # member is the aggregate's rule, not the database's. The order of the list is the turn order.
+    """
+    CREATE TABLE sprint_participant (
+        sprint_id   UUID        NOT NULL,
+        team_id     UUID        NOT NULL,
+        user_id     UUID        NOT NULL,
+        turn_order  INTEGER     NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT sprint_participant_pkey PRIMARY KEY (sprint_id, user_id),
+        CONSTRAINT sprint_participant_sprint_fk FOREIGN KEY (sprint_id, team_id)
+            REFERENCES sprint(id, team_id) ON DELETE CASCADE,
+        CONSTRAINT sprint_participant_member_fk FOREIGN KEY (team_id, user_id)
+            REFERENCES team_member(team_id, user_id) ON DELETE CASCADE,
+        CONSTRAINT sprint_participant_turn_order_unique UNIQUE (sprint_id, turn_order),
+        CONSTRAINT sprint_participant_turn_order_positive CHECK (turn_order >= 1)
+    )
+    """,
+    "COMMENT ON TABLE sprint_participant IS "
+    "'The daily''s participants of a sprint (HU-07). The foreign key only ensures each one "
+    "has a membership in the sprint''s team; that it is active is kept by the application, "
+    "which takes a removed member out of the active sprint.'",
+    "COMMENT ON COLUMN sprint_participant.turn_order IS "
+    "'Position in the daily''s round, from 1: the order of the list is the turn order.'",
 ]
 
 DOWNGRADE = [
+    "DROP TABLE sprint_participant",
     "DROP TABLE sprint",
     "DROP TABLE invitation",
     "DROP TABLE team_member",

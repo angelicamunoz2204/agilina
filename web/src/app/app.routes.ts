@@ -35,8 +35,8 @@ const notFound: Routes = [
  * `/:tenant`, sends the signed-in to their teams and everybody else to sign in (HU-03). The
  * routes of the teams need a session: the guard takes the person to sign in and brings them
  * back to the page they asked for. It is comfort, not security: the API decides who sees a team.
- * That includes the team settings, which only an admin may open: no guard checks the role, since
- * it would hide the API's 403, and the screen shows "no access" with it.
+ * That includes the team settings (Team and Sprint), which only an admin may open: no guard checks
+ * the role, since it would hide the API's 403, and the screen shows "no access" with it.
  */
 export const routes: Routes = [
   { path: 'not-found', children: notFound },
@@ -107,6 +107,16 @@ export const routes: Routes = [
             loadComponent: () =>
               import('@features/teams/presentation/team-settings-page').then(
                 (m) => m.TeamSettingsPage,
+              ),
+            title: 'Agilina',
+          },
+          {
+            // Settings → Sprint (HU-07): the active sprint and its daily, for the team's admins.
+            path: 'teams/:teamId/settings/sprint',
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('@features/teams/presentation/team-sprint-settings-page').then(
+                (m) => m.TeamSprintSettingsPage,
               ),
             title: 'Agilina',
           },

@@ -39,6 +39,8 @@ def test_every_context_exposes_its_routes():
     assert "/v1/teams/{team_id}/members" in paths
     assert {"patch", "delete"} <= set(paths["/v1/teams/{team_id}/members/{user_id}"])
     assert "post" in paths["/v1/teams/{team_id}/invitations"]
+    assert "post" in paths["/v1/teams/{team_id}/sprints"]
+    assert {"get", "put"} <= set(paths["/v1/teams/{team_id}/sprints/active"])
 
 
 async def test_the_scheduler_starts_with_the_application_and_stops_with_it(

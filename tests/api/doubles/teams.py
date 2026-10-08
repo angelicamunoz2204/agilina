@@ -8,6 +8,7 @@ from uuid import UUID
 
 from agilina_api.shared.application.access import MembershipRef
 from agilina_api.teams.application.dtos import (
+    ActiveSprintRecord,
     MemberContact,
     MemberRecord,
     TeamMemberRecords,
@@ -15,6 +16,7 @@ from agilina_api.teams.application.dtos import (
     TeamView,
     UserTeamView,
 )
+from agilina_api.teams.domain.sprint import Sprint, SprintStatus
 from agilina_api.teams.domain.team import Team
 
 
@@ -36,6 +38,59 @@ class InMemoryTeamRepository:
     async def save(self, team: Team) -> None:
         self.saved.append(team.id)
         self.teams[team.id] = copy.deepcopy(team)
+
+
+class InMemorySprintRepository:
+    """Stores and returns *copies* of the sprints, like a database does (HU-07)."""
+
+    def __init__(self) -> None:
+        self.sprints: dict[UUID, Sprint] = {}
+        self.saved: list[UUID] = []
+
+    async def add(self, sprint: Sprint) -> None:
+        self.sprints[sprint.id] = copy.deepcopy(sprint)
+
+    async def get_active(self, team_id: UUID) -> Sprint | None:
+        found = self.active_of(team_id)
+        return copy.deepcopy(found) if found is not None else None
+
+    async def save(self, sprint: Sprint) -> None:
+        if sprint.id not in self.sprints:
+            raise LookupError(f"Sprint {sprint.id} does not exist")
+        self.saved.append(sprint.id)
+        self.sprints[sprint.id] = copy.deepcopy(sprint)
+
+    def active_of(self, team_id: UUID) -> Sprint | None:
+        """The stored active sprint of the team, as it is (for the test to read)."""
+        return next(
+            (
+                sprint
+                for sprint in self.sprints.values()
+                if sprint.team_id == team_id and sprint.status is SprintStatus.ACTIVE
+            ),
+            None,
+        )
+
+
+class FakeSprintQueries:
+    """The read side of the sprints ``repository`` holds, as ``SqlSprintQueries`` reads the
+    rows the repository writes: a route that saves and then reads sees what it saved."""
+
+    def __init__(self, repository: InMemorySprintRepository | None = None) -> None:
+        self.repository = repository or InMemorySprintRepository()
+
+    async def active_sprint_of(self, team_id: UUID) -> ActiveSprintRecord | None:
+        sprint = self.repository.active_of(team_id)
+        if sprint is None:
+            return None
+        return ActiveSprintRecord(
+            sprint_id=sprint.id,
+            start_date=sprint.period.start,
+            end_date=sprint.period.end,
+            daily_time=sprint.daily_time.at,
+            time_zone=sprint.daily_time.time_zone,
+            participants=sprint.participants,
+        )
 
 
 class FakeActiveSprints:
@@ -62,10 +117,12 @@ class FakeTeamsUnitOfWork:
     def __init__(
         self,
         teams: InMemoryTeamRepository | None = None,
-        sprints: FakeActiveSprints | None = None,
+        active_sprints: FakeActiveSprints | None = None,
+        sprints: InMemorySprintRepository | None = None,
     ) -> None:
         self.teams = teams or InMemoryTeamRepository()
-        self.sprints = sprints or FakeActiveSprints()
+        self.sprints = sprints or InMemorySprintRepository()
+        self.active_sprints = active_sprints or FakeActiveSprints()
         self.committed = False
 
     async def __aenter__(self) -> Self:

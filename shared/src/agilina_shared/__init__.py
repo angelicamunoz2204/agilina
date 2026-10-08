@@ -2,7 +2,9 @@
 
 This package is the reason Agilina lives in a single repository: the contract
 between the worker and the API is expressed as shared types instead of
-documentation that goes stale (architecture document, section 5.2).
+documentation that goes stale (architecture document, section 5.2). The pure rules
+that several deployables must compute the same way live here too, in their own
+subpackages (``sprint_calendar``).
 """
 
 from agilina_shared.contract import (
