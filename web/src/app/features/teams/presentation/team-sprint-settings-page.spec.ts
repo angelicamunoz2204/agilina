@@ -3,19 +3,23 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
+import { ShellContext } from '@core/shell/shell-context';
 import { BROWSER_TIME_ZONE } from '@core/time/browser-time-zone';
 import { formatLocalDateTime } from '@shared/utils/local-date-time';
 import { provideTestI18n } from '@testing/i18n';
+import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
 
 import { TeamSprintSettingsPage } from './team-sprint-settings-page';
 import { SprintsPort } from '../application/sprints.port';
+import { TeamsPort } from '../application/teams.port';
 import { UsersPort } from '../application/users.port';
 import { type ActiveSprint } from '../domain/active-sprint';
 import { MemberFailure } from '../domain/member-failure';
 import { type SprintDraft } from '../domain/sprint-draft';
 import { SprintFailure } from '../domain/sprint-failure';
-import { type TeamMember, type TeamMembers } from '../domain/team-member';
+import { type Team } from '../domain/team';
+import { type MyMembership, type TeamMember, type TeamMembers } from '../domain/team-member';
 
 function member(userId: string, fullName: string): TeamMember {
   return {
@@ -109,8 +113,15 @@ class FakeUsersPort extends UsersPort {
     return NEVER;
   }
 
-  me(): Observable<never> {
-    return NEVER;
+  me(): Observable<MyMembership> {
+    return of({
+      userId: 'ana',
+      fullName: 'Ana Gil',
+      email: 'ana@example.com',
+      role: 'admin',
+      label: 'scrum_master',
+      joinedAt: new Date('2026-10-08T15:04:05Z'),
+    });
   }
 
   invite(): Observable<never> {
@@ -123,6 +134,21 @@ class FakeUsersPort extends UsersPort {
 
   remove(): Observable<never> {
     return NEVER;
+  }
+}
+
+/** The team of the screen, read for the top bar. */
+class FakeTeamsPort extends TeamsPort {
+  listMine(): Observable<never> {
+    return NEVER;
+  }
+
+  create(): Observable<never> {
+    return NEVER;
+  }
+
+  get(teamId: string): Observable<Team> {
+    return of(aTeam(teamId, 'Atlas'));
   }
 }
 
@@ -145,6 +171,7 @@ describe('TeamSprintSettingsPage', () => {
         ),
         { provide: SprintsPort, useValue: sprints },
         { provide: UsersPort, useValue: members },
+        { provide: TeamsPort, useClass: FakeTeamsPort },
         // The browser of whoever opens the screen, fixed: not the zone of the machine.
         { provide: BROWSER_TIME_ZONE, useValue: 'America/Bogota' },
       ],
@@ -654,5 +681,15 @@ describe('TeamSprintSettingsPage', () => {
       'No se pudo cargar el sprint. Inténtalo de nuevo más tarde.',
     );
     expect(page.querySelector('form')).toBeNull();
+  });
+
+  it('puts the team and how the user is called in it in the top bar, like the other team screens', async () => {
+    await open();
+
+    expect(TestBed.inject(ShellContext).team()).toEqual({
+      name: 'Atlas',
+      roleLabel: 'scrum_master',
+      userName: 'Ana Gil',
+    });
   });
 });

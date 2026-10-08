@@ -4,6 +4,7 @@ import { TranslocoDirective, TranslocoPipe } from '@jsverse/transloco';
 
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
+import { IconButton } from '@shared/ui/icon-button';
 import { Select } from '@shared/ui/select';
 
 import { InviteMemberDialog } from './invite-member-dialog';
@@ -31,6 +32,7 @@ import { type InvitationOutcome, type TeamMember } from '../domain/team-member';
     TranslocoDirective,
     TranslocoPipe,
     Button,
+    IconButton,
     Select,
     InviteMemberDialog,
     RemoveMemberDialog,
