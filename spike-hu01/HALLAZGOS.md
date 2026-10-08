@@ -319,6 +319,51 @@ Implementación (`agent/turnos.py`, `cliente/index.html`, `analizar_corrida.py`)
 - En el spike se acepta el RPC de cualquier participante y se registra `caller_identity` (restricción en HU-26).
 - Se verificó solo con una sesión simulada y logs sintéticos; los tiempos de esas pruebas no son mediciones.
 
+## Intervenciones largas (turno manual, GPU, 8 de octubre de 2026)
+Código: `84d8a2f`. Salas `turno-c-01` (C), `turno-b-01` (B) y `turno-a-02` (A; la `a-01` no se analizó), en ese
+orden. `MODO_TURNO=manual`, `ESPERA_TRANSCRIPCION_S=10`, `max_buffered_speech` por defecto (60 s), `USAR_LLM=0`.
+**Desviaciones:** una persona, un solo cliente (`cliente/index.html`), **n = 1 corrida por condición**. El modelo de
+Whisper y el prompt no aparecen en estos logs (se asume el `.env` de la instancia: large-v3-turbo + prompt; confirmar
+con `metrics/turno-*.csv`). El botón no se pulsó "justo al terminar": llegó al agente 2,60 s (C), 2,30 s (A) y
+2,43 s (B) después del último instante con voz (`last_speaking_time` de "user turn committed" → `boton_recibido`),
+tiempo que incluye la reacción y el RPC. Todos los valores son **medidos** (diferencias de `t_ms` en el log).
+
+| | C (frase, ~8 s) | A (texto, pausas naturales) | B (texto de corrido) |
+|---|---|---|---|
+| Voz (inicio → último instante con voz) | 6,64 s | 57,64 s | 53,29 s (incluye un segmento final de ruido) |
+| Segmentos del VAD (audio a Whisper) | 1 (7,70 s) | 2 (18,64 + 40,60 s) | 3 (8,18 + 45,72 + 1,30 s; el último devolvió texto vacío) |
+| Fin de voz del VAD → respuesta de Whisper, por segmento | 538 ms | 908 / 1.809 ms | 497 / 2.227 / 1.510 ms |
+| Duración de la petición a Whisper (RTF) | 536 ms (0,070) | 905 (0,049) / 1.806 ms (0,044) | 495 (0,061) / 2.221 (0,049) / 131 ms (0,101) |
+| Máximo de segmentos en vuelo | 1 | 1 | 2 (el segmento 3 esperó 1.379 ms en cola tras el 2) |
+| Espera tras el botón: VAD + Whisper | 0 + 0 ms | 0 + 93 ms | 0 + 0 ms |
+| **Botón → turno confirmado** | **1 ms** | **95 ms** | **1 ms** |
+| Botón → inicio de la voz de Agilina | 182 ms | 254 ms | 194 ms |
+| Último instante con voz → voz de Agilina (agente) | 2,79 s | 2,55 s | 2,62 s |
+| Timeout / audio descartado (> 60 s) | no / no | no / no | no / no |
+| Palabras referencia / transcritas · WER | 26 / 24 · 19,2 % | 230 / 231 · 12,6 % | 230 / 222 · 17,4 % |
+
+- **Mecánica del cierre manual:** en las 3 corridas el turno confirmado trajo el texto de todos los segmentos y el
+  commit no esperó el tope. A es la única que ejercitó la espera: el segmento 2 (40,6 s) seguía en Whisper al llegar
+  el botón y el agente esperó 93 ms. Ninguna ejercitó la espera del VAD, porque el botón llegó más de 2,3 s después.
+- **La espera final sí crece con la intervención, a través del último segmento:** fin de voz del VAD → texto fue
+  0,50–0,54 s con segmentos de ~8 s, 0,91 s con 18,6 s y 1,81–2,23 s con 40,6–45,7 s (RTF 0,044–0,070), a lo que se
+  suma la espera de silencio del VAD (`min_silence_duration` 0,55 s). En estas corridas no se notó tras el botón
+  porque la reacción (~2,3–2,6 s) fue mayor; con un botón inmediato y un último segmento de ~45 s quedaría expuesta.
+  Los segmentos anteriores se transcriben mientras la persona sigue hablando y no suman a la espera final.
+- **A y B se segmentaron parecido:** las "pausas naturales" de A solo produjeron un corte (fin del primer párrafo);
+  B se cortó tras la primera oración. El texto leído dura 53–58 s, así que **no llegó al límite de 60 s** de Silero:
+  para probar el descarte hace falta un texto más largo.
+- **Cola en serie confirmada en vivo (B):** un segmento corto de ruido (1,30 s) terminó mientras el de 45,7 s seguía
+  en Whisper; esperó 1.379 ms y luego tardó 131 ms. Whisper devolvió texto vacío (no se agregó al turno).
+- **`transcript_delay` oficial no sirve por segmento:** para segmentos intermedios marca ~0,01–0,05 s (A1, B1) porque
+  se mide contra `last_speaking_time`, que ya avanzó con la voz siguiente; en B el del segmento 2 (1,957 s) se midió
+  contra el fin del segmento de ruido. La métrica fiable por segmento es fin de voz del VAD → respuesta (tabla).
+- **Calidad (WER 12,6–19,2 %):** Keycloak bien en las 3. Playwright mal en 2 de 2 ("playway", "playwar"); Whisper
+  bien en A y mal en B ("wishbar"); Jira bien en A y en B salió "angular". Nombres: "Angélica" → "en el que" / "cliente";
+  "realm" → "tutorial" / "río" / "real". En C se perdieron las dos primeras palabras ("Ayer terminé la integración"
+  → "La acción"). B (de corrido) tuvo más errores que A (17,4 % frente a 12,6 %). Insumo para el prompt de vocabulario
+  (HU-24): agregar Playwright, Jira, nombres del equipo y "realm".
+
 ## Cierre · Estimaciones de costo (U5, U6)
 - U5 (estimado): ~20 min de instancia por ceremonia (15 de daily + ~5 de arranque) × USD 0,526/h ≈ USD 0,18
   (20/60 × 0,526 = 0,175).
