@@ -55,6 +55,7 @@ from agilina_api.teams.application.commands.start_sprint import StartSprintHandl
 from agilina_api.teams.application.ports.outbound import TeamQueries
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
+from agilina_api.teams.application.queries.get_team_user import GetTeamUserHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
 from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
@@ -76,6 +77,7 @@ class Container:
     list_my_teams: ListMyTeamsHandler
     get_team: GetTeamHandler
     list_team_members: ListTeamMembersHandler
+    get_team_user: GetTeamUserHandler
     change_member_role: ChangeMemberRoleHandler
     remove_member: RemoveMemberHandler
     start_sprint: StartSprintHandler
@@ -171,6 +173,7 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         list_team_members=ListTeamMembersHandler(
             team_queries, IdentityBackedMemberContacts(user_contacts)
         ),
+        get_team_user=GetTeamUserHandler(team_queries, IdentityBackedMemberContacts(user_contacts)),
         change_member_role=ChangeMemberRoleHandler(teams_uow, clock),
         remove_member=RemoveMemberHandler(teams_uow, clock),
         start_sprint=StartSprintHandler(teams_uow),

@@ -1,21 +1,15 @@
 from agilina_api.teams.application.dtos import (
     MemberRecord,
-    MemberView,
     RoleOption,
     TeamMembersList,
 )
 from agilina_api.teams.application.ports.outbound import MemberContactsDirectory, TeamQueries
+from agilina_api.teams.application.queries.build_member_view import build_member_view
 from agilina_api.teams.application.queries.list_team_members.list_team_members import (
     ListTeamMembers,
 )
-from agilina_api.teams.domain.member_rules import removal_blocker, role_change_blocker
+from agilina_shared import role_label
 from agilina_shared.enums import TeamRole
-
-
-def _label_of(role: TeamRole) -> str:
-    # HU-04 replaces this with the visible-label resolver (role + the team's mode); until
-    # then the label is the code of the internal role.
-    return role.value
 
 
 def _admin_count(records: tuple[MemberRecord, ...]) -> int:
@@ -41,23 +35,19 @@ class ListTeamMembersHandler:
         # its contact.
         contacts = await self._contacts.contacts_of([record.user_id for record in records])
         members = [
-            MemberView(
-                user_id=record.user_id,
-                full_name=contacts[record.user_id].full_name,
-                email=contacts[record.user_id].email,
-                role=record.role,
-                label=_label_of(record.role),
-                role_change_blocked_by=role_change_blocker(
-                    role=record.role,
-                    admin_count=admin_count,
-                    sprint_in_progress=stored.has_active_sprint,
-                ),
-                removal_blocked_by=removal_blocker(role=record.role, admin_count=admin_count),
+            build_member_view(
+                record,
+                contacts[record.user_id],
+                admin_count=admin_count,
+                has_active_sprint=stored.has_active_sprint,
+                mode=stored.mode,
             )
             for record in records
         ]
         members.sort(key=lambda member: (member.full_name.casefold(), member.email))
         return TeamMembersList(
-            roles=tuple(RoleOption(role=role, label=_label_of(role)) for role in TeamRole),
+            roles=tuple(
+                RoleOption(role=role, label=role_label(role, stored.mode)) for role in TeamRole
+            ),
             members=tuple(members),
         )

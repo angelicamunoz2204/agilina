@@ -12,8 +12,9 @@ from agilina_api.teams.presentation.http.errors import TeamsErrors
 
 DOC = (Path(__file__).parents[4] / "docs" / "api.md").read_text(encoding="utf-8")
 CATALOG = (*catalog_of(SharedErrors), *catalog_of(IdentityErrors), *catalog_of(TeamsErrors))
-# What every route may answer, so the doc says it once, in the conventions.
-EVERYWHERE = {"404", "405", "500"}
+# What every route may answer by the very nature of HTTP, so the doc says it once, in the
+# conventions. The 500 is not here: every endpoint declares it and lists it.
+EVERYWHERE = {"404", "405"}
 
 
 def _operations() -> dict[tuple[str, str], dict]:
@@ -26,7 +27,9 @@ def _operations() -> dict[tuple[str, str], dict]:
 
 
 def _sections() -> dict[tuple[str, str], str]:
-    parts = re.split(r"^### `(GET|POST|PUT|PATCH|DELETE) (\S+)`\n", DOC, flags=re.MULTILINE)
+    parts = re.split(
+        r"^### `(GET|POST|PUT|PATCH|DELETE) ([^\s?`]+)(?:\?[^`]*)?`\n", DOC, flags=re.MULTILINE
+    )
     # [intro, method, path, body, method, path, body, ...]
     return {
         (parts[i].lower(), parts[i + 1]): parts[i + 2].split("\n## ")[0]

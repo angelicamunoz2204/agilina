@@ -56,17 +56,19 @@ class Invitations:
 
     async def invite(self, email: str = "julian@example.test", **body):
         return await self.client.post(
-            f"/v1/teams/{self.team.id}/invitations",
+            "/v1/users/invitations",
+            params={"team_id": str(self.team.id)},
             json={"full_name": "Julián Torres", "email": email, **body},
             headers={"Authorization": f"Bearer {TOKEN_DIEGO}"},
         )
 
     async def members(self) -> list[tuple[str, str]]:
         response = await self.client.get(
-            f"/v1/teams/{self.team.id}/members",
+            "/v1/users",
+            params={"team_id": str(self.team.id)},
             headers={"Authorization": f"Bearer {TOKEN_DIEGO}"},
         )
-        return [(m["email"], m["role"]) for m in response.json()["members"]]
+        return [(m["email"], m["role"]) for m in response.json()["users"]]
 
 
 @pytest.fixture

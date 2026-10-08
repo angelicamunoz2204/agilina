@@ -45,6 +45,7 @@ class Members:
         app = create_app()
         overrides = {
             deps.get_list_team_members_handler: world.list_members,
+            deps.get_get_team_user_handler: world.get_team_user,
             deps.get_change_member_role_handler: world.change_role,
             deps.get_remove_member_handler: world.remove,
             deps.get_get_team_handler: GetTeamHandler(world.team_queries),
@@ -67,16 +68,30 @@ class Members:
                 method, f"/v1/teams/{self.team.id}{path}", headers=headers, **kwargs
             )
 
+    async def users(self, method: str, path: str, token: str | None = TOKEN_ANA, **kwargs):
+        """A request to ``/v1/users{path}`` about this team."""
+        headers = {} if token is None else {"Authorization": f"Bearer {token}"}
+        async with AsyncClient(
+            transport=ASGITransport(app=self.app), base_url="http://tests"
+        ) as client:
+            return await client.request(
+                method,
+                f"/v1/users{path}",
+                params={"team_id": str(self.team.id)},
+                headers=headers,
+                **kwargs,
+            )
+
     async def members(self, token: str = TOKEN_ANA) -> list[dict]:
-        response = await self.request("GET", "/members", token)
+        response = await self.users("GET", "", token)
         assert response.status_code == 200, response.text
-        return response.json()["members"]
+        return response.json()["users"]
 
     async def change_role(self, user, role: str, token: str = TOKEN_ANA):
-        return await self.request("PATCH", f"/members/{user.id}", token, json={"role": role})
+        return await self.users("PATCH", f"/{user.id}", token, json={"role": role})
 
     async def remove(self, user, token: str = TOKEN_ANA):
-        return await self.request("DELETE", f"/members/{user.id}", token)
+        return await self.users("DELETE", f"/{user.id}", token)
 
 
 @pytest.fixture
@@ -108,7 +123,7 @@ async def test_the_admin_sees_each_member_with_name_email_and_role(members):
     listed = await members.members()
 
     assert [(m["full_name"], m["email"], m["role"], m["label"]) for m in listed] == [
-        ("Ana Gil", "ana@example.test", "admin", "admin"),
+        ("Ana Gil", "ana@example.test", "admin", "scrum_master"),
         ("Bruno Díaz", "bruno@example.test", "member", "member"),
     ]
     assert [m["user_id"] for m in listed] == [str(members.ana.id), str(members.bruno.id)]
@@ -245,9 +260,10 @@ async def test_with_two_admins_one_can_remove_themselves(members, engine):
 
 # ------------------------------------------------------- criterion 6 (DoD) --
 ROUTES = [
-    ("GET", "/members", {}),
-    ("PATCH", "/members/{bruno}", {"json": {"role": "admin"}}),
-    ("DELETE", "/members/{bruno}", {}),
+    ("GET", "", {}),
+    ("GET", "/{bruno}", {}),
+    ("PATCH", "/{bruno}", {"json": {"role": "admin"}}),
+    ("DELETE", "/{bruno}", {}),
     ("POST", "/invitations", {"json": {"full_name": "Laura", "email": "laura@example.test"}}),
 ]
 
@@ -258,7 +274,7 @@ async def test_a_member_calling_a_route_directly_gets_403_and_nothing_changes(
 ):
     before = await _roles(engine, members.team.id)
 
-    response = await members.request(
+    response = await members.users(
         method, path.format(bruno=members.bruno.id), TOKEN_BRUNO, **kwargs
     )
 
@@ -275,7 +291,7 @@ async def test_someone_outside_the_team_gets_403_not_a_team_member(
 ):
     before = await _roles(engine, members.team.id)
 
-    response = await members.request(
+    response = await members.users(
         method, path.format(bruno=members.bruno.id), TOKEN_CARLA, **kwargs
     )
 
@@ -287,7 +303,7 @@ async def test_someone_outside_the_team_gets_403_not_a_team_member(
 async def test_without_a_token_every_route_answers_401(members, engine, method, path, kwargs):
     before = await _roles(engine, members.team.id)
 
-    response = await members.request(method, path.format(bruno=members.bruno.id), None, **kwargs)
+    response = await members.users(method, path.format(bruno=members.bruno.id), None, **kwargs)
 
     assert response.status_code == 401 and response.json()["error"]["code"] == "not_authenticated"
     assert await _roles(engine, members.team.id) == before
@@ -297,7 +313,7 @@ async def test_a_removed_admin_loses_access_to_the_routes(members):
     assert (await members.change_role(members.bruno, "admin")).status_code == 204
     assert (await members.remove(members.bruno)).status_code == 204
 
-    response = await members.request("GET", "/members", TOKEN_BRUNO)
+    response = await members.users("GET", "", TOKEN_BRUNO)
 
     assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
 
@@ -307,7 +323,42 @@ async def test_a_team_that_does_not_exist_answers_like_someone_elses(members):
         transport=ASGITransport(app=members.app), base_url="http://tests"
     ) as client:
         response = await client.get(
-            f"/v1/teams/{next_id()}/members", headers={"Authorization": f"Bearer {TOKEN_ANA}"}
+            "/v1/users",
+            params={"team_id": str(next_id())},
+            headers={"Authorization": f"Bearer {TOKEN_ANA}"},
         )
 
     assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
+
+
+# --------------------------------------------------- one user and the caller (HU-04) --
+async def test_the_admin_reads_one_user_with_their_label_and_date(members):
+    response = await members.users("GET", f"/{members.bruno.id}")
+
+    assert response.status_code == 200
+    user = response.json()
+    assert (user["full_name"], user["email"], user["role"], user["label"]) == (
+        "Bruno Díaz",
+        "bruno@example.test",
+        "member",
+        "member",
+    )
+    assert user["joined_at"].endswith("Z") or "+" in user["joined_at"]
+
+
+async def test_a_member_reads_only_themselves_in_me(members):
+    response = await members.users("GET", "/me", TOKEN_BRUNO)
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == str(members.bruno.id)
+    assert (response.json()["role"], response.json()["label"]) == ("member", "member")
+
+
+async def test_a_removed_member_cannot_read_me_and_is_not_found_by_the_admin(members):
+    assert (await members.remove(members.bruno)).status_code == 204
+
+    me = await members.users("GET", "/me", TOKEN_BRUNO)
+    read = await members.users("GET", f"/{members.bruno.id}")
+
+    assert me.status_code == 403 and me.json()["error"]["code"] == "not_a_team_member"
+    assert read.status_code == 404 and read.json()["error"]["code"] == "member_not_found"

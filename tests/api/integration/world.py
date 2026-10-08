@@ -31,6 +31,7 @@ from agilina_api.teams.application.commands.reconfigure_sprint import Reconfigur
 from agilina_api.teams.application.commands.remove_member import RemoveMemberHandler
 from agilina_api.teams.application.commands.start_sprint import StartSprintHandler
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
+from agilina_api.teams.application.queries.get_team_user import GetTeamUserHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
 from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
@@ -89,6 +90,9 @@ class World:
             "https://app.test/teams",
         )
         self.list_members = ListTeamMembersHandler(
+            self.team_queries, IdentityBackedMemberContacts(user_contacts)
+        )
+        self.get_team_user = GetTeamUserHandler(
             self.team_queries, IdentityBackedMemberContacts(user_contacts)
         )
         self.change_role = ChangeMemberRoleHandler(teams_uow, self.clock)

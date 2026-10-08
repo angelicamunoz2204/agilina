@@ -7,6 +7,7 @@ from agilina_api.shared.presentation.http.dependencies import (
     get_liveness_query,
     get_readiness_query,
 )
+from agilina_api.shared.presentation.http.error_schema import errors_of
 from agilina_api.shared.presentation.http.health_schemas import (
     ReadinessResponse,
     ServiceStatusResponse,
@@ -15,7 +16,12 @@ from agilina_api.shared.presentation.http.health_schemas import (
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=ServiceStatusResponse, summary="Liveness probe")
+@router.get(
+    "/health",
+    response_model=ServiceStatusResponse,
+    summary="Liveness probe",
+    responses=errors_of(),
+)
 async def health(query: GetLiveness = Depends(get_liveness_query)) -> ServiceStatusResponse:
     result = query.handle()
     return ServiceStatusResponse(
@@ -27,7 +33,11 @@ async def health(query: GetLiveness = Depends(get_liveness_query)) -> ServiceSta
     "/health/ready",
     response_model=ReadinessResponse,
     summary="Readiness probe",
-    responses={503: {"description": "Some dependency is not responding"}},
+    responses={
+        # Not the common error body: this is what the orchestrator reads.
+        503: {"model": ReadinessResponse, "description": "Some dependency is not responding"},
+        **errors_of(),
+    },
 )
 async def ready(
     response: Response, query: GetReadiness = Depends(get_readiness_query)

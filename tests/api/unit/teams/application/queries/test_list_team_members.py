@@ -7,7 +7,7 @@ from agilina_api.teams.application.queries.list_team_members import (
     ListTeamMembersHandler,
 )
 from agilina_api.teams.domain.member_rules import MemberChangeBlocker
-from agilina_shared.enums import TeamRole
+from agilina_shared.enums import OperationMode, RoleLabel, TeamRole
 from tests.api.builders import NOW, next_id
 from tests.api.doubles import FakeMemberContacts, FakeTeamQueries
 
@@ -52,7 +52,8 @@ async def test_each_member_comes_with_name_email_role_and_label_ordered_by_name(
             full_name="Ana Gil",
             email="ana@example.test",
             role=TeamRole.ADMIN,
-            label="admin",
+            label=RoleLabel.SCRUM_MASTER,
+            joined_at=NOW,
             role_change_blocked_by=MemberChangeBlocker.LAST_ADMIN,
             removal_blocked_by=MemberChangeBlocker.LAST_ADMIN,
         ),
@@ -61,7 +62,8 @@ async def test_each_member_comes_with_name_email_role_and_label_ordered_by_name(
             full_name="bruno Díaz",
             email="bruno@example.test",
             role=TeamRole.MEMBER,
-            label="member",
+            label=RoleLabel.MEMBER,
+            joined_at=NOW,
             role_change_blocked_by=None,
             removal_blocked_by=None,
         ),
@@ -70,7 +72,8 @@ async def test_each_member_comes_with_name_email_role_and_label_ordered_by_name(
             full_name="Carla Ruiz",
             email="carla@example.test",
             role=TeamRole.MEMBER,
-            label="member",
+            label=RoleLabel.MEMBER,
+            joined_at=NOW,
             role_change_blocked_by=None,
             removal_blocked_by=None,
         ),
@@ -78,12 +81,12 @@ async def test_each_member_comes_with_name_email_role_and_label_ordered_by_name(
 
 
 async def test_the_roles_an_admin_can_give_come_with_their_labels():
-    """Until HU-04 the label is the code of the internal role."""
+    """A team in support mode shows its admin as the Scrum Master."""
     roles = (await Scenario().list()).roles
 
     assert roles == (
-        RoleOption(role=TeamRole.ADMIN, label="admin"),
-        RoleOption(role=TeamRole.MEMBER, label="member"),
+        RoleOption(role=TeamRole.ADMIN, label=RoleLabel.SCRUM_MASTER),
+        RoleOption(role=TeamRole.MEMBER, label=RoleLabel.MEMBER),
     )
 
 
@@ -138,3 +141,25 @@ async def test_a_team_without_members_lists_nobody_but_still_the_roles():
 
     assert listed.members == ()
     assert len(listed.roles) == 2
+
+
+async def test_in_autonomous_mode_the_same_roles_are_labelled_administrator():
+    scenario = Scenario()
+    scenario.queries.modes[scenario.team_id] = OperationMode.AUTONOMOUS
+
+    result = await scenario.list()
+
+    assert [member.role for member in result.members] == [
+        TeamRole.ADMIN,
+        TeamRole.MEMBER,
+        TeamRole.MEMBER,
+    ]
+    assert [member.label for member in result.members] == [
+        RoleLabel.ADMIN,
+        RoleLabel.MEMBER,
+        RoleLabel.MEMBER,
+    ]
+    assert result.roles == (
+        RoleOption(role=TeamRole.ADMIN, label=RoleLabel.ADMIN),
+        RoleOption(role=TeamRole.MEMBER, label=RoleLabel.MEMBER),
+    )

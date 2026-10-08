@@ -5,8 +5,8 @@ purpose: the person has no account yet, and the unguessable token in the body is
 authorizes them. Nothing here is cached (it carries tokens and passwords).
 
 ``team_invitations_router`` (HU-06): an admin invites a person to their team. It lives in
-identity, which owns invitations and accounts, under the team's path; only the team's
-admins reach it (``current_team_admin``).
+identity, which owns invitations and accounts, in the ``/v1/users`` API, naming the team in
+the query (``?team_id=``); only the team's admins reach it (``current_team_admin_by_query``).
 """
 
 from fastapi import APIRouter, Depends, Response, status
@@ -47,7 +47,7 @@ from agilina_api.identity.presentation.http.schemas import (
     TokenRequest,
 )
 from agilina_api.shared.application.access import TeamContext
-from agilina_api.shared.presentation.http.access import current_team_admin
+from agilina_api.shared.presentation.http.access import current_team_admin_by_query
 from agilina_api.shared.presentation.http.api_error import ApiException, SharedErrors
 from agilina_api.shared.presentation.http.error_schema import errors_of
 from agilina_shared.enums import TeamRole
@@ -141,7 +141,7 @@ async def request_new_invitation(
     return RequestedResponse()
 
 
-team_invitations_router = APIRouter(prefix="/v1/teams", tags=["teams"])
+team_invitations_router = APIRouter(prefix="/v1/users", tags=["users"])
 
 INVITE_TO_TEAM_DESCRIPTION = f"""
 Invites a person to the team with a role (`{TeamRole.MEMBER}` by default). What happens
@@ -164,7 +164,7 @@ role is the one stored in the membership.
 
 
 @team_invitations_router.post(
-    "/{team_id}/invitations",
+    "/invitations",
     response_model=InviteToTeamResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Invite a person to the team",
@@ -189,7 +189,7 @@ role is the one stored in the membership.
 )
 async def invite_to_team(
     request: InviteToTeamRequest,
-    team: TeamContext = Depends(current_team_admin),
+    team: TeamContext = Depends(current_team_admin_by_query),
     handler: InviteToTeamHandler = Depends(get_invite_to_team_handler),
 ) -> InviteToTeamResponse:
     outcome = await handler.handle(

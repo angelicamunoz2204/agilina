@@ -192,20 +192,20 @@ async def test_the_members_of_a_team_are_read_from_the_database_of_its_tenant(
     )
 
     here = await platform.get(
-        f"/v1/teams/{atlas.id}/members", headers=_bearer(_token("acme", "sub-ana"), "acme")
+        f"/v1/users?team_id={atlas.id}", headers=_bearer(_token("acme", "sub-ana"), "acme")
     )
     there = await platform.get(
-        f"/v1/teams/{moda.id}/members", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
+        f"/v1/users?team_id={moda.id}", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
     )
     crossed = await platform.get(
-        f"/v1/teams/{atlas.id}/members", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
+        f"/v1/users?team_id={atlas.id}", headers=_bearer(_token("ecomoda", "sub-ana"), "ecomoda")
     )
 
-    assert [member["email"] for member in here.json()["members"]] == [
+    assert [member["email"] for member in here.json()["users"]] == [
         "ana@acme.test",
         "bruno@acme.test",
     ]
-    assert [member["email"] for member in there.json()["members"]] == ["ana@ecomoda.test"]
+    assert [member["email"] for member in there.json()["users"]] == ["ana@ecomoda.test"]
     assert crossed.status_code == 403 and crossed.json()["error"]["code"] == "not_a_team_member"
 
 

@@ -17,7 +17,7 @@ from agilina_api.teams.application.ports.outbound import TeamQueries
 from agilina_api.teams.domain.team import MembershipStatus
 from agilina_api.teams.infrastructure.persistence.orm_models import TeamMemberRow, TeamRow
 from agilina_api.teams.infrastructure.persistence.sprint_queries import team_has_active_sprint
-from agilina_shared.enums import TeamRole
+from agilina_shared.enums import OperationMode, TeamRole
 
 
 class SqlTeamQueries(TeamQueries):
@@ -54,7 +54,7 @@ class SqlTeamQueries(TeamQueries):
     async def list_for_user(self, user_id: UUID) -> tuple[UserTeamView, ...]:
         # Served by the ``team_member_user_idx`` index on ``team_member.user_id``.
         statement = (
-            select(TeamRow.id, TeamRow.name, TeamMemberRow.role)
+            select(TeamRow.id, TeamRow.name, TeamRow.mode, TeamMemberRow.role)
             .join(TeamMemberRow, TeamMemberRow.team_id == TeamRow.id)
             .where(
                 TeamMemberRow.user_id == user_id,
@@ -64,7 +64,10 @@ class SqlTeamQueries(TeamQueries):
         )
         async with self._session_factory() as session:
             rows = (await session.execute(statement)).all()
-        return tuple(UserTeamView(team_id=row.id, name=row.name, role=row.role) for row in rows)
+        return tuple(
+            UserTeamView(team_id=row.id, name=row.name, role=row.role, mode=row.mode)
+            for row in rows
+        )
 
     async def get_team(self, team_id: UUID) -> TeamView | None:
         statement = select(TeamRow.id, TeamRow.name, TeamRow.mode, TeamRow.language).where(
@@ -88,12 +91,17 @@ class SqlTeamQueries(TeamQueries):
         async with self._session_factory() as session:
             rows = (await session.execute(statement)).all()
             has_active_sprint = await team_has_active_sprint(session, team_id)
+            mode = (
+                await session.execute(select(TeamRow.mode).where(TeamRow.id == team_id))
+            ).scalar_one_or_none()
         return TeamMemberRecords(
             members=tuple(
                 MemberRecord(user_id=row.user_id, role=row.role, joined_at=row.joined_at)
                 for row in rows
             ),
             has_active_sprint=has_active_sprint,
+            # A team that does not exist has no members to show a label for.
+            mode=mode or OperationMode.SUPPORT,
         )
 
     async def membership_of(self, *, team_id: UUID, user_id: UUID) -> MembershipRef | None:
