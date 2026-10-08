@@ -1,9 +1,16 @@
 """StartSprint against a real PostgreSQL: the sprint and its participants are stored in one
-transaction, and the read side returns it with its day N of M and next daily (HU-07)."""
+transaction, the read side returns it with its day N of M and next daily, and two starts at
+once leave a single active sprint (HU-07)."""
+
+import asyncio
+from datetime import date
+from uuid import UUID
 
 import pytest
+from sqlalchemy import text
 
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprint
+from agilina_api.teams.domain.errors import ActiveSprintExistsError
 from agilina_shared.sprint_calendar import SprintDay, SprintPhase
 from tests.api.builders import DAILY_TIME, StartSprintBuilder, TeamBuilder
 from tests.api.integration.support import stored_team, stored_user
@@ -29,3 +36,40 @@ async def test_a_started_sprint_is_read_back_with_its_day_and_next_daily(session
     assert view.sprint.participants == (bruno.id, ana.id)
     assert view.day == SprintDay(number=0, total=12, phase=SprintPhase.NOT_STARTED)
     assert view.next_daily_at == DAILY_TIME
+
+
+async def test_two_simultaneous_starts_leave_one_sprint_and_a_conflict(session_factory, engine):
+    """Each start runs in its own transaction and connection. The team's lock orders them:
+    the second one finds the first sprint already there and is refused with the domain's
+    ``ActiveSprintExistsError``, never with an ``IntegrityError`` from the index."""
+    world = World(session_factory)
+    ana, bruno = await stored_user(session_factory), await stored_user(session_factory)
+    team = await stored_team(
+        session_factory, TeamBuilder().with_admin(ana.id).with_member(bruno.id)
+    )
+    start = StartSprintBuilder().for_team(team.id).requested_by_admin(ana.id)
+
+    outcomes = await asyncio.gather(
+        world.start_sprint.handle(start.with_participants(ana.id, bruno.id).build()),
+        world.start_sprint.handle(
+            start.with_period(date(2026, 10, 12), date(2026, 10, 23))
+            .with_participants(bruno.id)
+            .build()
+        ),
+        return_exceptions=True,
+    )
+
+    started = [outcome for outcome in outcomes if isinstance(outcome, UUID)]
+    refused = [outcome for outcome in outcomes if isinstance(outcome, BaseException)]
+    assert len(started) == 1
+    assert len(refused) == 1 and type(refused[0]) is ActiveSprintExistsError
+    assert refused[0].__cause__ is None  # refused by the check under the lock, not the index
+    async with engine.connect() as connection:
+        stored = (
+            await connection.execute(
+                text("SELECT id, status::text FROM sprint WHERE team_id = :id"), {"id": team.id}
+            )
+        ).all()
+    assert [tuple(row) for row in stored] == [(started[0], "active")]
+    view = await world.active_sprint.handle(GetActiveSprint(team_id=team.id))
+    assert view is not None and view.sprint.sprint_id == started[0]
