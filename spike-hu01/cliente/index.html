@@ -1,0 +1,111 @@
+<!doctype html>
+<!--
+  Cliente mínimo del spike HU-01 (no productivo): sin frameworks ni build.
+  Servir en localhost (el micrófono solo funciona en localhost o HTTPS):
+    docker run --rm -p 8080:80 -v "$PWD/cliente":/usr/share/nginx/html:ro nginx:alpine
+  y abrir http://localhost:8080
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spike HU-01 · Turno manual</title>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.js"></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; display: grid; gap: 0.75rem; }
+      label { display: grid; gap: 0.25rem; }
+      input { padding: 0.4rem; font: inherit; }
+      .botones { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      button { padding: 0.5rem 0.9rem; font: inherit; }
+      #terminar { font-weight: 600; }
+      #registro { font: 0.85rem ui-monospace, monospace; background: #f4f4f4; padding: 0.5rem; height: 16rem; overflow: auto; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Spike HU-01 · Turno manual</h1>
+    <label>URL de LiveKit <input id="url" placeholder="wss://..." /></label>
+    <label>Token <input id="token" /></label>
+    <div class="botones">
+      <button id="conectar">Conectar</button>
+      <button id="microfono" disabled>Activar micrófono</button>
+      <button id="terminar" disabled>Terminar turno</button>
+    </div>
+    <p id="estado">Desconectado</p>
+    <div id="registro"></div>
+
+    <script>
+      const { Room, RoomEvent, Track } = LivekitClient;
+      // Al silenciar se detiene la pista: dos ventanas del mismo equipo pueden turnarse el micrófono.
+      const room = new Room({ publishDefaults: { stopMicTrackOnMute: true } });
+      const $ = (id) => document.getElementById(id);
+      let micActivo = false;
+
+      function anotar(texto) {
+        const linea = `${new Date().toISOString().slice(11, 23)}  ${texto}\n`;
+        $('registro').textContent += linea;
+        $('registro').scrollTop = $('registro').scrollHeight;
+      }
+
+      function agente() {
+        return [...room.remoteParticipants.values()].find((p) => p.isAgent);
+      }
+
+      room
+        .on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === Track.Kind.Audio) document.body.appendChild(track.attach());
+        })
+        .on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((el) => el.remove()))
+        .on(RoomEvent.ParticipantConnected, (p) => anotar(`entra ${p.identity}${p.isAgent ? ' (agente)' : ''}`))
+        .on(RoomEvent.ParticipantDisconnected, (p) => anotar(`sale ${p.identity}`))
+        .on(RoomEvent.Disconnected, () => {
+          $('estado').textContent = 'Desconectado';
+          $('conectar').disabled = false;
+          $('microfono').disabled = $('terminar').disabled = true;
+        });
+
+      $('conectar').onclick = async () => {
+        $('conectar').disabled = true;
+        try {
+          await room.connect($('url').value.trim(), $('token').value.trim());
+          await room.startAudio(); // dentro del clic, por la política de autoplay
+          $('estado').textContent = `Conectado como ${room.localParticipant.identity} a ${room.name}`;
+          $('microfono').disabled = $('terminar').disabled = false;
+          anotar('conectado; micrófono apagado');
+        } catch (e) {
+          anotar(`error al conectar: ${e.message ?? e}`);
+          $('conectar').disabled = false;
+        }
+      };
+
+      $('microfono').onclick = async () => {
+        try {
+          micActivo = !micActivo;
+          await room.localParticipant.setMicrophoneEnabled(micActivo);
+          $('microfono').textContent = micActivo ? 'Silenciar micrófono' : 'Activar micrófono';
+          anotar(`micrófono ${micActivo ? 'activo' : 'apagado'}`);
+        } catch (e) {
+          micActivo = !micActivo;
+          anotar(`error de micrófono: ${e.message ?? e}`);
+        }
+      };
+
+      $('terminar').onclick = async () => {
+        const destino = agente();
+        if (!destino) return anotar('no hay agente en la sala');
+        const t0 = performance.now();
+        anotar('clic en Terminar turno');
+        try {
+          const respuesta = await room.localParticipant.performRpc({
+            destinationIdentity: destino.identity,
+            method: 'terminar_turno',
+            payload: '',
+          });
+          // Ida y vuelta del RPC: el agente responde al recibir la orden, antes de esperar a Whisper.
+          anotar(`agente respondió "${respuesta}" (RPC ida y vuelta ${Math.round(performance.now() - t0)} ms)`);
+        } catch (e) {
+          anotar(`error en el RPC: ${e.message ?? e}`);
+        }
+      };
+    </script>
+  </body>
+</html>
