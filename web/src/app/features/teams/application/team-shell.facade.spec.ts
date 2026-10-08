@@ -145,6 +145,28 @@ describe('TeamShellFacade', () => {
     expect(shell.team()?.name).toBe('Team boreal');
   });
 
+  it('shows the label the API gives after a refresh: my own role may have changed', () => {
+    follow('atlas');
+    expect(shell.team()?.roleLabel).toBe('scrum_master');
+
+    users.label = 'member';
+    TestBed.inject(TeamShellFacade).refresh();
+    TestBed.tick();
+
+    expect(shell.team()?.roleLabel).toBe('member');
+    expect(users.asked).toEqual(['atlas', 'atlas']);
+  });
+
+  it('stops naming the team when, after a refresh, I am no longer in it', () => {
+    follow('atlas');
+
+    users.failing = true;
+    TestBed.inject(TeamShellFacade).refresh();
+    TestBed.tick();
+
+    expect(shell.team()).toBeNull();
+  });
+
   it('takes the team out of the bar when its screen goes away', () => {
     const screen = TestBed.createComponent(Screen);
     screen.detectChanges();

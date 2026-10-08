@@ -93,13 +93,18 @@ class FakeUsersPort extends UsersPort {
     return member === undefined ? throwError(() => new MemberFailure('not_found')) : of(member);
   }
 
+  /** How the API calls Ana in the team right now; each read of `me` is counted. */
+  myLabel: MyMembership['label'] = 'scrum_master';
+  meCalls = 0;
+
   me(): Observable<MyMembership> {
+    this.meCalls += 1;
     return of({
       userId: 'ana',
       fullName: 'Ana Gil',
       email: 'ana@example.com',
-      role: 'admin',
-      label: 'scrum_master',
+      role: this.myLabel === 'member' ? 'member' : 'admin',
+      label: this.myLabel,
       joinedAt: new Date('2026-10-08T15:04:05Z'),
     });
   }
@@ -545,5 +550,35 @@ describe('TeamSettingsPage', () => {
 
     expect(page.querySelector('[data-testid=user-detail-title]')).toBeNull();
     expect(rows().length).toBe(2);
+  });
+
+  it('asks the API for me again after a role change, so the top bar shows my label of now', async () => {
+    await open();
+    const shell = TestBed.inject(ShellContext);
+    expect(shell.team()?.roleLabel).toBe('scrum_master');
+    expect(port.meCalls).toBe(1);
+
+    // As if the change had been Ana's own: the API now calls her a member.
+    port.myLabel = 'member';
+    roleControl('bruno').value = 'admin';
+    roleControl('bruno').dispatchEvent(new Event('change'));
+    await harness.fixture.whenStable();
+    port.accept();
+    await settled();
+
+    expect(port.meCalls).toBe(2);
+    expect(shell.team()?.roleLabel).toBe('member');
+  });
+
+  it('asks the API for me again after a removal', async () => {
+    await open();
+    removeButtonOf('Bruno Díaz').click();
+    await harness.fixture.whenStable();
+
+    button('Eliminar del equipo', dialog()!).click();
+    port.accept();
+    await settled();
+
+    expect(port.meCalls).toBe(2);
   });
 });

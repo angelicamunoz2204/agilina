@@ -53,4 +53,13 @@ export class TeamShellFacade {
   follow(teamId: Signal<string>): void {
     this.teamId.set(teamId);
   }
+
+  /**
+   * Asks the API for me again: after a change that may touch my own role (I demoted or removed
+   * myself), the bar must not keep the label I no longer have. If I am no longer in the team,
+   * the bar stops naming it.
+   */
+  refresh(): void {
+    this.me.reload();
+  }
 }

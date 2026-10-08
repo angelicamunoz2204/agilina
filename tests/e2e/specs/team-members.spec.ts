@@ -158,6 +158,10 @@ test('the invited person activates the account and joins as a member, without ac
   const memberPage = await freshPage(browser);
   await activateAndSignIn(memberPage, MEMBER_EMAIL);
   await expect(memberPage.getByTestId('team-settings-link')).toHaveCount(0);
+  // The top bar names the person and their role in this team: a member, whatever the mode.
+  await expect(memberPage.getByTestId('header-team')).toHaveText(TEAM);
+  await expect(memberPage.getByTestId('header-role-label')).toHaveText('Miembro');
+  await expect(memberPage.getByTestId('header-user-name')).toHaveText(MEMBER_NAME);
 
   // By its address: the API answers 403 and the screen says so.
   await memberPage.goto(settingsUrl);

@@ -100,6 +100,8 @@ export class TeamSettingsPage implements OnInit {
     const changed = await this.facade.changeRole(member.userId, role);
     if (changed) {
       this.lastChange.set('role_change');
+      // It may have been my own role: the top bar shows the one the API has now.
+      this.shell.refresh();
     } else {
       // The API kept the old role: the control shows it again.
       control.value = member.role;
@@ -124,6 +126,7 @@ export class TeamSettingsPage implements OnInit {
     if (await this.facade.remove(member.userId)) {
       this.lastChange.set('removal');
       this.removing.set(null);
+      this.shell.refresh();
     }
   }
 }
