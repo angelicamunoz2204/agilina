@@ -4,7 +4,9 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
+import { provideStubUsersPort } from '@testing/users';
 
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
@@ -37,7 +39,7 @@ class FakeTeamsPort extends TeamsPort {
 
   /** The API creates the team with this id. */
   accept(id: string): void {
-    this.created.push({ id, name: this.names.at(-1)!.trim(), role: 'admin' });
+    this.created.push(aTeam(id, this.names.at(-1)!.trim()));
     this.pending.next(id);
     this.pending.complete();
   }
@@ -72,6 +74,7 @@ describe('CreateTeamPage', () => {
           provide: SprintsPort,
           useValue: { active: () => of(null), start: () => NEVER, reconfigure: () => NEVER },
         },
+        provideStubUsersPort(),
       ],
     });
     harness = await RouterTestingHarness.create('/acme/teams/new');
@@ -127,7 +130,7 @@ describe('CreateTeamPage', () => {
 
   it('says the team starts in support mode and English, with the user as its admin', () => {
     expect(page.textContent).toContain(
-      'El equipo se creará en modo soporte y con idioma inglés. Tú quedarás como su Administrador.',
+      'El equipo se creará en modo soporte y con idioma inglés. Tú quedarás como su Scrum Master.',
     );
   });
 

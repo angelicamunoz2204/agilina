@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoPipe } from '@jsverse/transloco';
 
 import { Button } from '@shared/ui/button';
 import { Dialog } from '@shared/ui/dialog';
@@ -9,6 +9,7 @@ import { TextField } from '@shared/ui/text-field';
 
 import { problemMessageKey } from './problem-message';
 import { InviteMemberFacade } from '../application/invite-member.facade';
+import { adminLabelOf } from '../domain/admin-label';
 import {
   EMAIL_MAX_LENGTH,
   FULL_NAME_MAX_LENGTH,
@@ -25,7 +26,7 @@ import { type InvitationOutcome, type RoleOption, type TeamRole } from '../domai
  */
 @Component({
   selector: 'agl-invite-member-dialog',
-  imports: [FormsModule, TranslocoDirective, Button, Dialog, Select, TextField],
+  imports: [FormsModule, TranslocoDirective, TranslocoPipe, Button, Dialog, Select, TextField],
   providers: [InviteMemberFacade],
   templateUrl: './invite-member-dialog.html',
 })
@@ -54,6 +55,7 @@ export class InviteMemberDialog {
   protected readonly emailProblem = computed(() =>
     this.emailTouched() ? this.problems().email : null,
   );
+  protected readonly adminLabel = computed(() => adminLabelOf(this.roles()));
   protected readonly saving = this.facade.saving;
   protected readonly problemMessage = computed(() => problemMessageKey(this.facade.problem()));
 

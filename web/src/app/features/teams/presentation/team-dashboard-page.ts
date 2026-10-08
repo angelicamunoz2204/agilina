@@ -9,6 +9,7 @@ import { formatCalendarDate } from '@shared/utils/local-date-time';
 import { problemMessageKey } from './problem-message';
 import { ActiveSprintFacade } from '../application/active-sprint.facade';
 import { TeamDashboardFacade } from '../application/team-dashboard.facade';
+import { TeamShellFacade } from '../application/team-shell.facade';
 
 /**
  * Dashboard of a team. For now a placeholder that shows the team's name, the day of its active
@@ -19,7 +20,7 @@ import { TeamDashboardFacade } from '../application/team-dashboard.facade';
 @Component({
   selector: 'agl-team-dashboard-page',
   imports: [RouterLink, TranslocoDirective, Button],
-  providers: [TeamDashboardFacade, ActiveSprintFacade],
+  providers: [TeamDashboardFacade, ActiveSprintFacade, TeamShellFacade],
   templateUrl: './team-dashboard-page.html',
 })
 export class TeamDashboardPage implements OnInit {
@@ -28,6 +29,7 @@ export class TeamDashboardPage implements OnInit {
 
   private readonly facade = inject(TeamDashboardFacade);
   private readonly sprintFacade = inject(ActiveSprintFacade);
+  private readonly shell = inject(TeamShellFacade);
   protected readonly tenant = inject(TenantContext);
 
   protected readonly team = this.facade.team;
@@ -40,6 +42,7 @@ export class TeamDashboardPage implements OnInit {
   ngOnInit(): void {
     this.facade.follow(this.teamId);
     this.sprintFacade.follow(this.teamId);
+    this.shell.follow(this.teamId);
   }
 
   /** A calendar date, as the person reads it in the active language. */

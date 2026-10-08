@@ -2,6 +2,8 @@ import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError, type Observable } from 'rxjs';
 
+import { aTeam } from '@testing/team';
+
 import { TeamDashboardFacade } from './team-dashboard.facade';
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
@@ -10,8 +12,8 @@ import { type Team } from '../domain/team';
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
   readonly teams: Record<string, Team> = {
-    atlas: { id: 'atlas', name: 'Atlas', role: 'admin' },
-    boreal: { id: 'boreal', name: 'Boreal', role: 'admin' },
+    atlas: aTeam('atlas', 'Atlas', 'admin'),
+    boreal: aTeam('boreal', 'Boreal', 'admin'),
   };
 
   listMine(): Observable<readonly Team[]> {
@@ -58,7 +60,7 @@ describe('TeamDashboardFacade', () => {
     await stable();
 
     expect(port.requested).toEqual(['atlas']);
-    expect(facade.team()).toEqual({ id: 'atlas', name: 'Atlas', role: 'admin' });
+    expect(facade.team()).toEqual(aTeam('atlas', 'Atlas', 'admin'));
     expect(facade.loading()).toBeFalse();
   });
 
@@ -71,7 +73,7 @@ describe('TeamDashboardFacade', () => {
     await stable();
 
     expect(port.requested).toEqual(['atlas', 'boreal']);
-    expect(facade.team()).toEqual({ id: 'boreal', name: 'Boreal', role: 'admin' });
+    expect(facade.team()).toEqual(aTeam('boreal', 'Boreal', 'admin'));
   });
 
   it('turns a refused team into the failed state', async () => {

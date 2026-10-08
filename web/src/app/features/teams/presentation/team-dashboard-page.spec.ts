@@ -4,7 +4,9 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
 import { provideTestI18n } from '@testing/i18n';
+import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
+import { provideStubUsersPort } from '@testing/users';
 
 import { TeamDashboardPage } from './team-dashboard-page';
 import { SprintsPort } from '../application/sprints.port';
@@ -17,9 +19,9 @@ import { type Team } from '../domain/team';
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
   readonly known: readonly Team[] = [
-    { id: 'atlas', name: 'Atlas', role: 'admin' },
-    { id: 'boreal', name: 'Boreal', role: 'admin' },
-    { id: 'cielo', name: 'Cielo', role: 'member' },
+    aTeam('atlas', 'Atlas', 'admin'),
+    aTeam('boreal', 'Boreal', 'admin'),
+    aTeam('cielo', 'Cielo', 'member'),
   ];
 
   listMine(): Observable<readonly Team[]> {
@@ -90,6 +92,7 @@ describe('TeamDashboardPage', () => {
         ),
         { provide: TeamsPort, useValue: port },
         { provide: SprintsPort, useValue: sprints },
+        provideStubUsersPort(),
       ],
     });
     harness = await RouterTestingHarness.create();
@@ -104,7 +107,8 @@ describe('TeamDashboardPage', () => {
   it('shows the name of the team of the :teamId', async () => {
     const page = await open('/acme/teams/atlas');
 
-    expect(port.requested).toEqual(['atlas']);
+    // The dashboard and the top bar each read the team: it is the same team, once per reader.
+    expect(new Set(port.requested)).toEqual(new Set(['atlas']));
     expect(page.querySelector('h1')?.textContent.trim()).toBe('Atlas');
   });
 
@@ -113,7 +117,7 @@ describe('TeamDashboardPage', () => {
 
     const page = await open('/acme/teams/boreal');
 
-    expect(port.requested).toEqual(['atlas', 'boreal']);
+    expect([...new Set(port.requested)]).toEqual(['atlas', 'boreal']);
     expect(page.querySelector('h1')?.textContent.trim()).toBe('Boreal');
   });
 

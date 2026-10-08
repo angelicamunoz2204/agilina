@@ -2,18 +2,26 @@ import { TestBed } from '@angular/core/testing';
 import { NEVER, Subject, type Observable } from 'rxjs';
 
 import { InviteMemberFacade } from './invite-member.facade';
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { MemberFailure } from '../domain/member-failure';
 import { type InvitationOutcome, type MemberInvitation } from '../domain/team-member';
 
 const LAURA: MemberInvitation = { fullName: 'Laura', email: 'laura@example.com', role: 'member' };
 
 /** Port double: each invite() waits until the test answers it. */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   readonly invitations: [string, MemberInvitation][] = [];
   pending = new Subject<InvitationOutcome>();
 
   list(): Observable<never> {
+    return NEVER;
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
     return NEVER;
   }
 
@@ -38,13 +46,13 @@ class FakeTeamMembersPort extends TeamMembersPort {
 }
 
 describe('InviteMemberFacade', () => {
-  let port: FakeTeamMembersPort;
+  let port: FakeUsersPort;
   let facade: InviteMemberFacade;
 
   beforeEach(() => {
-    port = new FakeTeamMembersPort();
+    port = new FakeUsersPort();
     TestBed.configureTestingModule({
-      providers: [InviteMemberFacade, { provide: TeamMembersPort, useValue: port }],
+      providers: [InviteMemberFacade, { provide: UsersPort, useValue: port }],
     });
     facade = TestBed.inject(InviteMemberFacade);
   });

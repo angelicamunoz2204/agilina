@@ -6,7 +6,7 @@ import { BROWSER_TIME_ZONE } from '@core/time/browser-time-zone';
 
 import { SprintSettingsFacade } from './sprint-settings.facade';
 import { SprintsPort } from './sprints.port';
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { type ActiveSprint } from '../domain/active-sprint';
 import { MemberFailure } from '../domain/member-failure';
 import { type SprintDraft, type SprintFields } from '../domain/sprint-draft';
@@ -19,6 +19,7 @@ const ANA: TeamMember = {
   email: 'ana@example.com',
   role: 'admin',
   label: 'admin',
+  joinedAt: new Date('2026-10-08T15:04:05Z'),
   roleChangeBlockedBy: null,
   removalBlockedBy: null,
 };
@@ -89,7 +90,7 @@ class FakeSprintsPort extends SprintsPort {
 }
 
 /** Members port double: list() answers `answer`; nothing else is used by this facade. */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   answer: TeamMembers | MemberFailure = MEMBERS;
   readonly listed: string[] = [];
 
@@ -100,6 +101,14 @@ class FakeTeamMembersPort extends TeamMembersPort {
     }
     const answer = this.answer;
     return answer instanceof MemberFailure ? throwError(() => answer) : of(answer);
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
+    return NEVER;
   }
 
   invite(): Observable<never> {
@@ -117,17 +126,17 @@ class FakeTeamMembersPort extends TeamMembersPort {
 
 describe('SprintSettingsFacade', () => {
   let sprints: FakeSprintsPort;
-  let members: FakeTeamMembersPort;
+  let members: FakeUsersPort;
   let facade: SprintSettingsFacade;
 
   beforeEach(() => {
     sprints = new FakeSprintsPort();
-    members = new FakeTeamMembersPort();
+    members = new FakeUsersPort();
     TestBed.configureTestingModule({
       providers: [
         SprintSettingsFacade,
         { provide: SprintsPort, useValue: sprints },
-        { provide: TeamMembersPort, useValue: members },
+        { provide: UsersPort, useValue: members },
         { provide: BROWSER_TIME_ZONE, useValue: 'America/Bogota' },
       ],
     });

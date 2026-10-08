@@ -5,7 +5,7 @@ import { NEVER, Subject, type Observable } from 'rxjs';
 import { provideTestI18n } from '@testing/i18n';
 
 import { InviteMemberDialog } from './invite-member-dialog';
-import { TeamMembersPort } from '../application/team-members.port';
+import { UsersPort } from '../application/users.port';
 import { MemberFailure } from '../domain/member-failure';
 import {
   type InvitationOutcome,
@@ -14,11 +14,19 @@ import {
 } from '../domain/team-member';
 
 /** Port double: each invite() waits until the test answers it. */
-class FakeTeamMembersPort extends TeamMembersPort {
+class FakeUsersPort extends UsersPort {
   readonly invitations: [string, MemberInvitation][] = [];
   pending = new Subject<InvitationOutcome>();
 
   list(): Observable<never> {
+    return NEVER;
+  }
+
+  get(): Observable<never> {
+    return NEVER;
+  }
+
+  me(): Observable<never> {
     return NEVER;
   }
 
@@ -61,14 +69,14 @@ class Host {
 }
 
 describe('InviteMemberDialog', () => {
-  let port: FakeTeamMembersPort;
+  let port: FakeUsersPort;
   let fixture: ComponentFixture<Host>;
   let root: HTMLElement;
 
   beforeEach(async () => {
-    port = new FakeTeamMembersPort();
+    port = new FakeUsersPort();
     TestBed.configureTestingModule({
-      providers: [provideTestI18n(), { provide: TeamMembersPort, useValue: port }],
+      providers: [provideTestI18n(), { provide: UsersPort, useValue: port }],
     });
     fixture = TestBed.createComponent(Host);
     root = fixture.nativeElement as HTMLElement;

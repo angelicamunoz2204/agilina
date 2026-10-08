@@ -2,6 +2,8 @@ import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError, type Observable } from 'rxjs';
 
+import { aTeam } from '@testing/team';
+
 import { TeamSelectorFacade } from './team-selector.facade';
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
@@ -41,17 +43,11 @@ describe('TeamSelectorFacade', () => {
   }
 
   it('exposes the teams of the user once the API answers', async () => {
-    port.mine = of([
-      { id: 'a', name: 'Atlas', role: 'admin' },
-      { id: 'b', name: 'Boreal', role: 'admin' },
-    ]);
+    port.mine = of([aTeam('a', 'Atlas', 'admin'), aTeam('b', 'Boreal', 'admin')]);
 
     const facade = await settled();
 
-    expect(facade.teams()).toEqual([
-      { id: 'a', name: 'Atlas', role: 'admin' },
-      { id: 'b', name: 'Boreal', role: 'admin' },
-    ]);
+    expect(facade.teams()).toEqual([aTeam('a', 'Atlas', 'admin'), aTeam('b', 'Boreal', 'admin')]);
     expect(facade.loading()).toBeFalse();
     expect(facade.failed()).toBeFalse();
   });

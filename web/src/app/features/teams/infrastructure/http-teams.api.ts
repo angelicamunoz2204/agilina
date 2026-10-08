@@ -5,9 +5,10 @@ import { catchError, map, type Observable, throwError } from 'rxjs';
 import { RUNTIME_CONFIG } from '@core/config/runtime-config';
 import { readApiError } from '@core/http/api-error';
 
+import { toRoleLabel } from './role-label';
 import { toTeamRole } from './team-role';
 import { type TeamsPort } from '../application/teams.port';
-import { type Team } from '../domain/team';
+import { type Team, type TeamMode } from '../domain/team';
 import { TeamFailure, type TeamFailureKind } from '../domain/team-failure';
 
 /** Item of GET /v1/teams, exactly as the API sends it. */
@@ -15,6 +16,8 @@ interface MyTeamResponse {
   id: string;
   name: string;
   role: string;
+  mode: string;
+  label: string;
 }
 
 /** Body of POST /v1/teams. */
@@ -34,6 +37,7 @@ interface TeamResponse {
   mode: string;
   language: string;
   role: string;
+  label: string;
 }
 
 const FAILURES: Readonly<Record<string, TeamFailureKind>> = {
@@ -72,10 +76,21 @@ export class HttpTeamsApi implements TeamsPort {
 
 /**
  * The API contract stays in this file; the rest of the app sees the domain model.
- * The mode and language are not shown yet, so they do not reach the domain.
+ * The language is not shown yet, so it does not reach the domain.
  */
 function toTeam(response: MyTeamResponse | TeamResponse): Team {
-  return { id: response.id, name: response.name, role: toTeamRole(response.role) };
+  return {
+    id: response.id,
+    name: response.name,
+    role: toTeamRole(response.role),
+    label: toRoleLabel(response.label),
+    mode: toTeamMode(response.mode),
+  };
+}
+
+/** A mode this app does not know reads as the one where a human is still in charge. */
+function toTeamMode(mode: string): TeamMode {
+  return mode === 'autonomous' ? 'autonomous' : 'support';
 }
 
 /** The API's error codes stay in this file: the rest of the app only sees `TeamFailure`. */

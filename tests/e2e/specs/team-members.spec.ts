@@ -82,6 +82,14 @@ async function activateAndSignIn(page: Page, email: string): Promise<void> {
   await expect(page.getByTestId('team-name')).toHaveText(TEAM);
 }
 
+/** A team starts in support mode (HU-04): its admin is the Scrum Master, in the top bar too. */
+async function expectHeaderLabel(page: Page, label: string): Promise<void> {
+  await expect(page.getByTestId('header-team')).toHaveText(TEAM);
+  await expect(page.getByTestId('header-role-label')).toHaveText(label);
+  // The person themselves, as the team knows them (`GET /v1/users/me`).
+  await expect(page.getByTestId('header-user-name')).toHaveText(ADMIN_NAME);
+}
+
 /** A browser without session or cookies: a person arriving cold. */
 async function freshPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext({ locale: 'es-CO' });
@@ -114,6 +122,7 @@ test.afterAll(async () => {
 
 test('the admin opens Settings → Team and sees themself as the only admin', async () => {
   await activateAndSignIn(page, ADMIN_EMAIL);
+  await expectHeaderLabel(page, 'Scrum Master');
 
   await page.getByTestId('team-settings-link').click();
   await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}/settings$`));
@@ -122,10 +131,11 @@ test('the admin opens Settings → Team and sees themself as the only admin', as
 
   const me = memberRow(page, ADMIN_EMAIL);
   await expect(me.getByTestId('member-name')).toHaveText(ADMIN_NAME);
-  await expect(me.getByTestId('member-label')).toHaveText('Administrador');
+  await expect(me.getByTestId('member-role').locator('option:checked')).toHaveText('Scrum Master');
+  await expectHeaderLabel(page, 'Scrum Master');
   // The only admin: the API says why the controls are off, and the screen shows it.
   await expect(me.getByTestId('member-role')).toBeDisabled();
-  await expect(me.getByTestId('member-role-blocked')).toContainText('Es el único Administrador');
+  await expect(me.getByTestId('member-role-blocked')).toContainText('Es el único Scrum Master');
   await expect(me.getByTestId('member-remove')).toBeDisabled();
 });
 
@@ -162,7 +172,7 @@ test('the admin sees the new member, and inviting them again is refused', async 
   await page.reload();
   const member = memberRow(page, MEMBER_EMAIL);
   await expect(member.getByTestId('member-name')).toHaveText(MEMBER_NAME);
-  await expect(member.getByTestId('member-label')).toHaveText('Miembro');
+  await expect(member.getByTestId('member-role').locator('option:checked')).toHaveText('Miembro');
 
   await invite(page, MEMBER_NAME, MEMBER_EMAIL);
 
@@ -173,17 +183,30 @@ test('the admin sees the new member, and inviting them again is refused', async 
   await expect(page.getByTestId('invite-submit')).toHaveCount(0);
 });
 
+test('the eye opens the detail of the member in a dialog, and it closes', async () => {
+  const member = memberRow(page, MEMBER_EMAIL);
+
+  await member.getByTestId('member-view').click();
+
+  await expect(page.getByTestId('user-detail-title')).toHaveText(MEMBER_NAME);
+  await expect(page.getByTestId('user-detail-email')).toHaveText(MEMBER_EMAIL);
+  await expect(page.getByTestId('user-detail-label')).toHaveText('Miembro');
+  await expect(page.getByTestId('user-detail-joined')).not.toHaveText('');
+  await page.getByTestId('user-detail-close').click();
+  await expect(page.getByTestId('user-detail-title')).toHaveCount(0);
+});
+
 test('the admin changes the role of the member, and back', async () => {
   const member = memberRow(page, MEMBER_EMAIL);
   const me = memberRow(page, ADMIN_EMAIL);
 
   await member.getByTestId('member-role').selectOption('admin');
-  await expect(member.getByTestId('member-label')).toHaveText('Administrador');
+  await expect(member.getByTestId('member-role').locator('option:checked')).toHaveText('Scrum Master');
   // With a second admin, the first one is no longer the last: their controls turn on.
   await expect(me.getByTestId('member-role')).toBeEnabled();
 
   await member.getByTestId('member-role').selectOption('member');
-  await expect(member.getByTestId('member-label')).toHaveText('Miembro');
+  await expect(member.getByTestId('member-role').locator('option:checked')).toHaveText('Miembro');
   await expect(me.getByTestId('member-role')).toBeDisabled();
 });
 
@@ -206,7 +229,7 @@ test('inviting back someone who has an account adds them at once and notifies th
   await invite(page, MEMBER_NAME, MEMBER_EMAIL);
 
   await expect(page.getByTestId('invite-outcome')).toContainText('ya tenía cuenta en Agilina');
-  await expect(memberRow(page, MEMBER_EMAIL).getByTestId('member-label')).toHaveText('Miembro');
+  await expect(memberRow(page, MEMBER_EMAIL).getByTestId('member-role').locator('option:checked')).toHaveText('Miembro');
 
   const notice = await emailMatching(
     MEMBER_EMAIL,

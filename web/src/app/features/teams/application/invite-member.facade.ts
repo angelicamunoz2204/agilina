@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import { TeamMembersPort } from './team-members.port';
+import { UsersPort } from './users.port';
 import { memberFailureKindOf, type MemberFailureKind } from '../domain/member-failure';
 import { type InvitationOutcome, type MemberInvitation } from '../domain/team-member';
 
@@ -15,7 +15,7 @@ import { type InvitationOutcome, type MemberInvitation } from '../domain/team-me
  */
 @Injectable()
 export class InviteMemberFacade {
-  private readonly port = inject(TeamMembersPort);
+  private readonly port = inject(UsersPort);
   private readonly isSaving = signal(false);
   private readonly lastProblem = signal<MemberFailureKind | null>(null);
   private readonly lastOutcome = signal<InvitationOutcome | null>(null);
