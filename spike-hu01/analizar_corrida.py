@@ -12,8 +12,11 @@ Uso (sin instalar Python en el Mac; jiwer es opcional):
 Fuentes en el log (JSON, modo start --log-level debug):
 - agilina.turnos: vad_fin_voz, whisper_peticion, whisper_respuesta, boton_recibido, espera_terminada,
   commit_invocado, turno_confirmado, agilina_habla (todos con t_ms en epoch ms; ver agent/turnos.py).
-- livekit.agents: "received user transcript" (transcript_delay oficial por segmento) y el aviso de Silero
+- livekit.agents: "received user transcript" (transcript_delay oficial) y el aviso de Silero
   "max_buffered_speech reached" (audio descartado).
+Por segmento, la métrica fiable es finvoz→resp_ms (fin de voz del VAD → respuesta de Whisper). El transcript_delay
+oficial se mide contra last_speaking_time, que avanza si la persona sigue hablando: en segmentos intermedios marca
+casi 0 y en el último puede medirse contra un segmento posterior (p. ej. ruido). Se muestra solo como referencia.
 "botón" = momento en que el agente recibe el RPC, no el clic (el cliente muestra la ida y vuelta del RPC).
 Ningún número se estima: si un dato no está en el log, se muestra "—".
 """
@@ -81,6 +84,7 @@ def turnos(eventos):
 
 def segmentos(ventana, posteriores):
     pet = {e["segmento"]: e for e in ventana if e["message"] == "whisper_peticion"}
+    fin_voz = {e["segmento"]: e for e in ventana if e["message"] == "vad_fin_voz"}
     resp = {e["segmento"]: e for e in ventana + posteriores if e["message"] == "whisper_respuesta"}
     oficiales = [e for e in ventana if e["message"] == "received user transcript"]
     filas = []
@@ -97,6 +101,7 @@ def segmentos(ventana, posteriores):
                 "n": n,
                 "audio_s": p.get("audio_s"),
                 "cola_ms": p.get("espera_en_cola_ms"),
+                "finvoz_resp_ms": r["t_ms"] - fin_voz[n]["t_ms"] if r is not None and n in fin_voz else None,
                 "stt_ms": r.get("stt_ms") if r else None,
                 "rtf": r.get("rtf") if r else None,
                 "transcript_delay_s": delay,
@@ -214,13 +219,14 @@ def reportar_turno(t, referencia=None):
     print(f"  botón recibido de {b.get('caller_identity')} · user_state={b.get('user_state')} · en vuelo={b.get('en_vuelo')}")
     print(f"  Segmentos: {len(t['segmentos'])} · máx. en vuelo: {t['max_en_vuelo']}"
           + (f" · AUDIO DESCARTADO por max_buffered_speech: {t['audio_descartado']} aviso(s)" if t["audio_descartado"] else ""))
-    print("    #   audio_s  cola_ms  stt_ms    rtf  transcript_delay_s  texto")
+    print("    #   audio_s  finvoz→resp_ms  cola_ms  stt_ms    rtf  td_oficial_s  texto")
     for s in t["segmentos"]:
         texto = " ".join(s["texto"].split())
         texto = (texto[:60] + "…") if len(texto) > 60 else texto
         marca = "  [TARDÍO: llegó después del commit]" if s["tardio"] else ""
-        print(f"   {s['n']:>2} {fmt(s['audio_s'],2):>8} {fmt(s['cola_ms']):>8} {fmt(s['stt_ms']):>7} "
-              f"{fmt(s['rtf'],3):>6} {fmt(s['transcript_delay_s'],3):>19}  {texto}{marca}")
+        print(f"   {s['n']:>2} {fmt(s['audio_s'],2):>8} {fmt(s['finvoz_resp_ms']):>15} {fmt(s['cola_ms']):>8} "
+              f"{fmt(s['stt_ms']):>7} {fmt(s['rtf'],3):>6} {fmt(s['transcript_delay_s'],3):>13}  {texto}{marca}"
+              + ("  [sin texto]" if s["stt_ms"] is not None and not s["texto"] else ""))
     if e:
         print(f"  Espera tras el botón: VAD {e['espera_vad_ms']} ms + Whisper {e['espera_whisper_ms']} ms = "
               f"{e['espera_total_ms']} ms" + (f" · TIMEOUT ({e['timeout_por']}, tope {e['espera_max_s']} s)" if e["timeout"] else ""))
@@ -260,18 +266,22 @@ def main():
             print(f"=== Corrida {nombre} ({log}): {len(ts)} turno(s)")
             for t in ts:
                 reportar_turno(t, cargar_referencia(ref) if ref else None)
-                ult = t["segmentos"][-1] if t["segmentos"] else {}
+                # último segmento con texto entregado antes del commit (el que define la espera final)
+                con_texto = [s for s in t["segmentos"] if s["texto"] and not s["tardio"]]
+                ult = con_texto[-1] if con_texto else {}
                 filas.append((nombre, t, ult))
             print()
         print("=== Comparación (un renglón por turno; n = número de turnos por corrida)")
-        print("corrida  segs  audio_total_s  máx_vuelo  esp_VAD_ms  esp_Whisper_ms  botón→confirmado_ms  botón→voz_ms  último_seg_audio_s  último_seg_stt_ms  timeout")
+        print("corrida  segs  audio_total_s  máx_vuelo  esp_VAD_ms  esp_Whisper_ms  botón→confirmado_ms  botón→voz_ms  "
+              "últ_seg_audio_s  últ_seg_finvoz→resp_ms  timeout")
         for nombre, t, ult in filas:
             e = t["espera"] or {}
             audio = [s["audio_s"] for s in t["segmentos"] if s["audio_s"] is not None]
             print(f"{nombre:<8} {len(t['segmentos']):>4} {fmt(sum(audio) if audio else None,1):>14} {t['max_en_vuelo']:>10} "
                   f"{fmt(e.get('espera_vad_ms')):>11} {fmt(e.get('espera_whisper_ms')):>15} "
                   f"{fmt(ms(t['boton'], t['confirmado'])):>20} {fmt(ms(t['boton'], t['voz'])):>13} "
-                  f"{fmt(ult.get('audio_s'),2):>19} {fmt(ult.get('stt_ms')):>18} {'sí' if e.get('timeout') else 'no':>8}")
+                  f"{fmt(ult.get('audio_s'),2):>16} {fmt(ult.get('finvoz_resp_ms')):>23} {'sí' if e.get('timeout') else 'no':>8}")
+        print("(últ_seg = último segmento con texto antes del commit)")
         por_corrida = {}
         for nombre, t, _ in filas:
             v = ms(t["boton"], t["confirmado"])
